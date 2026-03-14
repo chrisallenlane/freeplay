@@ -126,14 +126,6 @@
                     if (data) fetch(saveBase + '/' + type, { method: 'POST', body: new Blob([data]) });
                 }
 
-                // Load save state if one exists
-                var checkState = new XMLHttpRequest();
-                checkState.open('HEAD', saveBase + '/state', false);
-                checkState.send();
-                if (checkState.status === 200) {
-                    window.EJS_loadStateURL = saveBase + '/state';
-                }
-
                 window.EJS_onSaveState = function(data) { postSave('state', data.state); };
                 window.EJS_onSaveSave = function(data) { postSave('sram', data.save); };
 
@@ -144,9 +136,19 @@
                     }
                 };
 
-                var script = document.createElement('script');
-                script.src = '/emulatorjs/data/loader.js';
-                document.body.appendChild(script);
+                // Load save state if one exists, then start the emulator
+                fetch(saveBase + '/state', { method: 'HEAD' })
+                    .then(function(res) {
+                        if (res.ok) {
+                            window.EJS_loadStateURL = saveBase + '/state';
+                        }
+                    })
+                    .catch(function() {})
+                    .finally(function() {
+                        var script = document.createElement('script');
+                        script.src = '/emulatorjs/data/loader.js';
+                        document.body.appendChild(script);
+                    });
             }
         })();
     </script>

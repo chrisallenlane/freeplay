@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -43,7 +44,10 @@ func testServer(t *testing.T) (*Server, string) {
 		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
 	}
 
-	srv := New(cfg, dir, frontendFS, emulatorjsFS)
+	srv, err := New(cfg, dir, frontendFS, emulatorjsFS)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return srv, dir
 }
 
@@ -52,7 +56,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/api/health", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
@@ -76,7 +80,7 @@ func TestGamesEndpoint(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/api/games", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
@@ -96,7 +100,7 @@ func TestROMServing(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/roms/NES/Mega%20Man.nes", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
@@ -111,7 +115,7 @@ func TestROMServingUnknownConsole(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/roms/SNES/game.sfc", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
@@ -123,7 +127,7 @@ func TestBIOSServing(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/bios/PSX/scph1001.bin", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
@@ -138,7 +142,7 @@ func TestBIOSServingNoConfig(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/bios/NES/bios.bin", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
@@ -156,7 +160,7 @@ func TestPathTraversalBlocked(t *testing.T) {
 	for _, path := range tests {
 		req := httptest.NewRequest("GET", path, nil)
 		w := httptest.NewRecorder()
-		srv.mux.ServeHTTP(w, req)
+		srv.handler.ServeHTTP(w, req)
 
 		if w.Code == 200 {
 			t.Errorf("path %q should not return 200", path)
@@ -173,7 +177,7 @@ func TestServeSecureFileBlocksDirectory(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/roms/NES/subdir", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 404 {
 		t.Errorf("directory request got status %d, want 404", w.Code)
@@ -187,7 +191,7 @@ func TestSaveRoundtrip(t *testing.T) {
 	// POST save
 	postReq := httptest.NewRequest("POST", "/api/saves/NES/game1/state", bytes.NewReader(saveData))
 	postW := httptest.NewRecorder()
-	srv.mux.ServeHTTP(postW, postReq)
+	srv.handler.ServeHTTP(postW, postReq)
 
 	if postW.Code != 200 {
 		t.Fatalf("POST save got status %d, want 200", postW.Code)
@@ -196,7 +200,7 @@ func TestSaveRoundtrip(t *testing.T) {
 	// GET save
 	getReq := httptest.NewRequest("GET", "/api/saves/NES/game1/state", nil)
 	getW := httptest.NewRecorder()
-	srv.mux.ServeHTTP(getW, getReq)
+	srv.handler.ServeHTTP(getW, getReq)
 
 	if getW.Code != 200 {
 		t.Fatalf("GET save got status %d, want 200", getW.Code)
@@ -214,7 +218,7 @@ func TestGetSaveNotFound(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/api/saves/NES/noexist/state", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
@@ -226,7 +230,7 @@ func TestSaveInvalidType(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/api/saves/NES/game/badtype", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 400 {
 		t.Errorf("got status %d, want 400", w.Code)
@@ -238,7 +242,7 @@ func TestRescanEndpoint(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/api/rescan", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
@@ -254,7 +258,7 @@ func TestCoversServing(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/covers/NES/Mega%20Man.png", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
@@ -269,7 +273,7 @@ func TestCoversNotFound(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/covers/NES/noexist.png", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
@@ -281,9 +285,66 @@ func TestPlayPage(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/play", nil)
 	w := httptest.NewRecorder()
-	srv.mux.ServeHTTP(w, req)
+	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
+	}
+}
+
+func TestSavePathTraversalBlocked(t *testing.T) {
+	srv, dir := testServer(t)
+
+	// Create a sentinel file outside the saves directory
+	sentinel := filepath.Join(dir, "secret")
+	os.WriteFile(sentinel, []byte("sensitive"), 0o644)
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{"GET dotdot console", "GET", "/api/saves/%2e%2e/secret/state"},
+		{"GET dotdot game", "GET", "/api/saves/NES/%2e%2e%2f%2e%2e%2fsecret/state"},
+		{"POST dotdot console", "POST", "/api/saves/%2e%2e/secret/state"},
+		{"POST dotdot game", "POST", "/api/saves/NES/%2e%2e%2f%2e%2e%2fsecret/state"},
+		{"GET backslash", "GET", "/api/saves/NES/game%5c..%5c../state"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var req *http.Request
+			if tt.method == "POST" {
+				req = httptest.NewRequest(tt.method, tt.path, bytes.NewReader([]byte("payload")))
+			} else {
+				req = httptest.NewRequest(tt.method, tt.path, nil)
+			}
+			w := httptest.NewRecorder()
+			srv.handler.ServeHTTP(w, req)
+
+			if w.Code == 200 {
+				t.Errorf("path traversal attempt should not return 200, got %d", w.Code)
+			}
+		})
+	}
+}
+
+func TestSecurityHeaders(t *testing.T) {
+	srv, _ := testServer(t)
+
+	req := httptest.NewRequest("GET", "/api/health", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	headers := map[string]string{
+		"X-Content-Type-Options": "nosniff",
+		"X-Frame-Options":        "DENY",
+		"Referrer-Policy":        "same-origin",
+	}
+	for name, want := range headers {
+		got := w.Header().Get(name)
+		if got != want {
+			t.Errorf("%s = %q, want %q", name, got, want)
+		}
 	}
 }
