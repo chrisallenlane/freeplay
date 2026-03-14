@@ -52,31 +52,36 @@ func newTestServer(t *testing.T, queryLog *[]string, gamesResp []byte) *httptest
 	}))
 }
 
-func TestFetchWithPlatformFilter(t *testing.T) {
+// newTestFetcher creates an IGDBFetcher wired to a test server.
+// Returns the fetcher, a log of Apicalypse queries, and the test server.
+func newTestFetcher(t *testing.T, games []map[string]any) (*IGDBFetcher, *[]string, *httptest.Server) {
+	t.Helper()
 	var queries []string
-	gamesResp, _ := json.Marshal([]map[string]any{
-		{"name": "Mega Man", "cover": 1},
-	})
-
+	gamesResp, _ := json.Marshal(games)
 	ts := newTestServer(t, &queries, gamesResp)
-	defer ts.Close()
-
+	t.Cleanup(ts.Close)
 	f := NewIGDBFetcher("test-id:test-secret")
-	// Replace the HTTP client with one that redirects to our test server
 	f.client = &http.Client{
 		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
 	}
+	return f, &queries, ts
+}
+
+func TestFetchWithPlatformFilter(t *testing.T) {
+	f, queries, _ := newTestFetcher(t, []map[string]any{
+		{"name": "Mega Man", "cover": 1},
+	})
 
 	_, err := f.Fetch("Mega Man", "NES", []int{18, 99})
 	if err != nil {
 		t.Fatalf("Fetch returned error: %v", err)
 	}
 
-	if len(queries) == 0 {
+	if len(*queries) == 0 {
 		t.Fatal("no queries recorded")
 	}
 
-	query := queries[0]
+	query := (*queries)[0]
 	if !strings.Contains(query, "where platforms = (18,99)") {
 		t.Errorf("query missing platform filter: %s", query)
 	}
@@ -89,29 +94,20 @@ func TestFetchWithPlatformFilter(t *testing.T) {
 }
 
 func TestFetchWithoutPlatformFilter(t *testing.T) {
-	var queries []string
-	gamesResp, _ := json.Marshal([]map[string]any{
+	f, queries, _ := newTestFetcher(t, []map[string]any{
 		{"name": "Mega Man", "cover": 1},
 	})
-
-	ts := newTestServer(t, &queries, gamesResp)
-	defer ts.Close()
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
 
 	_, err := f.Fetch("Mega Man", "NES", nil)
 	if err != nil {
 		t.Fatalf("Fetch returned error: %v", err)
 	}
 
-	if len(queries) == 0 {
+	if len(*queries) == 0 {
 		t.Fatal("no queries recorded")
 	}
 
-	query := queries[0]
+	query := (*queries)[0]
 	if strings.Contains(query, "where platforms") {
 		t.Errorf("query should NOT have platform filter when IDs are nil: %s", query)
 	}
@@ -121,16 +117,11 @@ func TestFetchWithoutPlatformFilter(t *testing.T) {
 }
 
 func TestFetchNameMatching(t *testing.T) {
-	var queries []string
-	// Return multiple results — exact match is second
-	gamesResp, _ := json.Marshal([]map[string]any{
+	f, _, ts := newTestFetcher(t, []map[string]any{
 		{"name": "Mega Man X", "cover": 10},
 		{"name": "Mega Man", "cover": 20},
 		{"name": "Mega Man 2", "cover": 30},
 	})
-
-	ts := newTestServer(t, &queries, gamesResp)
-	defer ts.Close()
 
 	// Track which cover ID is requested
 	var coverQueries []string
@@ -143,11 +134,6 @@ func TestFetchNameMatching(t *testing.T) {
 		}
 		origHandler.ServeHTTP(w, r)
 	})
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
 
 	_, err := f.Fetch("Mega Man", "NES", nil)
 	if err != nil {
@@ -164,16 +150,7 @@ func TestFetchNameMatching(t *testing.T) {
 }
 
 func TestFetchNoResults(t *testing.T) {
-	var queries []string
-	gamesResp, _ := json.Marshal([]map[string]any{})
-
-	ts := newTestServer(t, &queries, gamesResp)
-	defer ts.Close()
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
+	f, _, _ := newTestFetcher(t, []map[string]any{})
 
 	img, err := f.Fetch("Nonexistent Game", "NES", []int{18})
 	if err != nil {
@@ -185,19 +162,10 @@ func TestFetchNoResults(t *testing.T) {
 }
 
 func TestFetchAllResultsNoCover(t *testing.T) {
-	var queries []string
-	gamesResp, _ := json.Marshal([]map[string]any{
+	f, _, _ := newTestFetcher(t, []map[string]any{
 		{"name": "Game A", "cover": 0},
 		{"name": "Game B", "cover": 0},
 	})
-
-	ts := newTestServer(t, &queries, gamesResp)
-	defer ts.Close()
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
 
 	img, err := f.Fetch("Game A", "NES", nil)
 	if err != nil {
