@@ -97,16 +97,60 @@
             }
 
             function startEmulator(game) {
+                var encConsole = encodeURIComponent(consoleName);
+                var gameSlug = encodeURIComponent(nameEl.textContent);
+
                 window.EJS_player = '#game';
                 window.EJS_core = game.core;
-                window.EJS_gameUrl = '/roms/' + encodeURIComponent(consoleName) + '/' + encodeURIComponent(rom);
+                window.EJS_gameUrl = '/roms/' + encConsole + '/' + encodeURIComponent(rom);
                 window.EJS_pathtodata = '/emulatorjs/data/';
                 window.EJS_color = '#1a1a2e';
                 window.EJS_gameName = nameEl.textContent;
 
                 if (game.hasBios) {
-                    window.EJS_biosUrl = '/bios/' + encodeURIComponent(consoleName) + '/';
+                    window.EJS_biosUrl = '/bios/' + encConsole + '/';
                 }
+
+                // Load save state if one exists
+                var stateUrl = '/api/saves/' + encConsole + '/' + gameSlug + '/state';
+                var checkState = new XMLHttpRequest();
+                checkState.open('HEAD', stateUrl, false);
+                checkState.send();
+                if (checkState.status === 200) {
+                    window.EJS_loadStateURL = stateUrl;
+                }
+
+                // Save state hook — fires when user clicks Save State
+                window.EJS_onSaveState = function(data) {
+                    fetch('/api/saves/' + encConsole + '/' + gameSlug + '/state', {
+                        method: 'POST',
+                        body: new Blob([data.state])
+                    });
+                };
+
+                // SRAM save hook — fires when user clicks Export Save
+                window.EJS_onSaveSave = function(data) {
+                    if (data.save) {
+                        fetch('/api/saves/' + encConsole + '/' + gameSlug + '/sram', {
+                            method: 'POST',
+                            body: new Blob([data.save])
+                        });
+                    }
+                };
+
+                // Register periodic SRAM save after game starts
+                window.EJS_onGameStart = function() {
+                    if (window.EJS_emulator) {
+                        window.EJS_emulator.on('saveSaveFiles', function(data) {
+                            if (data) {
+                                fetch('/api/saves/' + encConsole + '/' + gameSlug + '/sram', {
+                                    method: 'POST',
+                                    body: new Blob([data])
+                                });
+                            }
+                        });
+                    }
+                };
 
                 var script = document.createElement('script');
                 script.src = '/emulatorjs/data/loader.js';

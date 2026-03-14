@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
+	"github.com/chrisallenlane/freeplay/internal/saves"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
@@ -19,6 +20,7 @@ type Server struct {
 	cfg          *config.Config
 	dataDir      string
 	scanner      *scanner.Scanner
+	saves        *saves.Manager
 	frontendFS   embed.FS
 	emulatorjsFS embed.FS
 	mux          *http.ServeMux
@@ -30,6 +32,7 @@ func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS embed.FS) 
 		cfg:          cfg,
 		dataDir:      dataDir,
 		scanner:      scanner.New(cfg, dataDir),
+		saves:        saves.New(dataDir),
 		frontendFS:   frontendFS,
 		emulatorjsFS: emulatorjsFS,
 		mux:          http.NewServeMux(),
@@ -53,6 +56,8 @@ func (s *Server) routes() {
 	// API routes
 	s.mux.HandleFunc("GET /api/health", s.handleHealth)
 	s.mux.HandleFunc("GET /api/games", s.handleGames)
+	s.mux.HandleFunc("GET /api/saves/{console}/{game}/{type}", s.handleGetSave)
+	s.mux.HandleFunc("POST /api/saves/{console}/{game}/{type}", s.handlePostSave)
 
 	// ROM serving
 	s.mux.HandleFunc("GET /roms/{console}/{file}", s.handleROM)
@@ -138,6 +143,39 @@ func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
 	http.ServeFileFS(w, r, s.frontendFS, "frontend/play.html")
+}
+
+func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
+	consoleName := r.PathValue("console")
+	game := r.PathValue("game")
+	saveType := r.PathValue("type")
+
+	if !saves.ValidType(saveType) {
+		http.Error(w, "invalid save type", http.StatusBadRequest)
+		return
+	}
+
+	if !s.saves.Get(w, consoleName, game, saveType) {
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
+	consoleName := r.PathValue("console")
+	game := r.PathValue("game")
+	saveType := r.PathValue("type")
+
+	if !saves.ValidType(saveType) {
+		http.Error(w, "invalid save type", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.saves.Put(consoleName, game, saveType, r.Body); err != nil {
+		http.Error(w, "save failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir, file string) {
