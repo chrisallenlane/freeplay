@@ -418,6 +418,78 @@ func TestRescanConflict(t *testing.T) {
 	}
 }
 
+type mockCoverStatus struct {
+	fetching bool
+}
+
+func (m *mockCoverStatus) Fetching() bool {
+	return m.fetching
+}
+
+func TestStatusEndpointNilCover(t *testing.T) {
+	srv, _ := testServer(t) // coverStatus is nil
+
+	req := httptest.NewRequest("GET", "/api/status", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+
+	var body map[string]bool
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if body["fetchingCovers"] {
+		t.Error("expected fetchingCovers=false with nil coverStatus")
+	}
+}
+
+func TestStatusEndpointFetching(t *testing.T) {
+	dir := t.TempDir()
+
+	romDir := filepath.Join(dir, "roms", "NES")
+	os.MkdirAll(romDir, 0o755)
+
+	cfg := &config.Config{
+		Port: 8080,
+		ROMs: map[string]config.ROM{
+			"NES": {Path: romDir, Core: "fceumm"},
+		},
+		BIOS: map[string]string{},
+	}
+
+	frontendFS := fstest.MapFS{
+		"frontend/index.html": &fstest.MapFile{Data: []byte("<html>index</html>")},
+		"frontend/play.html":  &fstest.MapFile{Data: []byte("<html>play</html>")},
+	}
+	emulatorjsFS := fstest.MapFS{
+		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
+	}
+
+	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, &mockCoverStatus{fetching: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/api/status", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+
+	var body map[string]bool
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if !body["fetchingCovers"] {
+		t.Error("expected fetchingCovers=true when fetcher is active")
+	}
+}
+
 func TestPostSavePutError(t *testing.T) {
 	srv, dir := testServer(t)
 

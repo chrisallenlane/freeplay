@@ -29,9 +29,14 @@ type IGDBFetcher struct {
 // apiKey should be in "client_id:client_secret" format.
 func NewIGDBFetcher(apiKey string) *IGDBFetcher {
 	parts := strings.SplitN(apiKey, ":", 2)
+	var clientID, clientSecret string
+	if len(parts) == 2 {
+		clientID = parts[0]
+		clientSecret = parts[1]
+	}
 	return &IGDBFetcher{
-		clientID:     parts[0],
-		clientSecret: parts[1],
+		clientID:     clientID,
+		clientSecret: clientSecret,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},

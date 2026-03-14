@@ -69,6 +69,26 @@ func newTestFetcher(t *testing.T, games []map[string]any) (*IGDBFetcher, *[]stri
 	return f, &queries, ts
 }
 
+func FuzzNewIGDBFetcher(f *testing.F) {
+	f.Add("client_id:client_secret")
+	f.Add("a:b")
+	f.Add(":")
+	f.Add(":secret")
+	f.Add("id:")
+	f.Add("")
+	f.Add("nocolon")
+	f.Add("a:b:c")
+
+	f.Fuzz(func(t *testing.T, apiKey string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("NewIGDBFetcher panicked on input %q: %v", apiKey, r)
+			}
+		}()
+		NewIGDBFetcher(apiKey)
+	})
+}
+
 func TestFetchWithPlatformFilter(t *testing.T) {
 	f, queries, _ := newTestFetcher(t, []map[string]any{
 		{"name": "Mega Man", "cover": 1},
@@ -189,6 +209,152 @@ func (t *rewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	// Extract just the host:port from target
 	req.URL.Host = strings.TrimPrefix(t.target, "http://")
 	return t.base.RoundTrip(req)
+}
+
+func TestGetTokenNon200(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/oauth2/token") {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("forbidden"))
+			return
+		}
+	}))
+	t.Cleanup(ts.Close)
+
+	f := NewIGDBFetcher("test-id:test-secret")
+	f.client = &http.Client{
+		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
+	}
+
+	_, err := f.Fetch("Test", "NES", nil)
+	if err == nil {
+		t.Fatal("expected error for non-200 token response")
+	}
+	if !strings.Contains(err.Error(), "403") {
+		t.Errorf("error should mention status code: %v", err)
+	}
+}
+
+func TestGetTokenDecodeError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/oauth2/token") {
+			w.Write([]byte("not json"))
+			return
+		}
+	}))
+	t.Cleanup(ts.Close)
+
+	f := NewIGDBFetcher("test-id:test-secret")
+	f.client = &http.Client{
+		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
+	}
+
+	_, err := f.Fetch("Test", "NES", nil)
+	if err == nil {
+		t.Fatal("expected error for invalid token JSON")
+	}
+	if !strings.Contains(err.Error(), "parsing token response") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestFetchAPIErrorNon200(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "test-token",
+				"expires_in":   3600,
+			})
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("server error"))
+		}
+	}))
+	t.Cleanup(ts.Close)
+
+	f := NewIGDBFetcher("test-id:test-secret")
+	f.client = &http.Client{
+		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
+	}
+
+	_, err := f.Fetch("Test", "NES", nil)
+	if err == nil {
+		t.Fatal("expected error for 500 API response")
+	}
+	if !strings.Contains(err.Error(), "500") {
+		t.Errorf("error should mention status code: %v", err)
+	}
+}
+
+func TestFetchEmptyCoverURL(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "test-token",
+				"expires_in":   3600,
+			})
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"name": "Test Game", "cover": 1},
+			})
+		case strings.HasSuffix(r.URL.Path, "/v4/covers"):
+			json.NewEncoder(w).Encode([]map[string]string{
+				{"url": ""},
+			})
+		}
+	}))
+	t.Cleanup(ts.Close)
+
+	f := NewIGDBFetcher("test-id:test-secret")
+	f.client = &http.Client{
+		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
+	}
+
+	img, err := f.Fetch("Test Game", "NES", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if img != nil {
+		t.Error("expected nil image for empty cover URL")
+	}
+}
+
+func TestFetchCoverImageNon200(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "test-token",
+				"expires_in":   3600,
+			})
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"name": "Test Game", "cover": 1},
+			})
+		case strings.HasSuffix(r.URL.Path, "/v4/covers"):
+			json.NewEncoder(w).Encode([]map[string]string{
+				{"url": "//images.igdb.com/t_thumb/cover.jpg"},
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(ts.Close)
+
+	f := NewIGDBFetcher("test-id:test-secret")
+	f.client = &http.Client{
+		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
+	}
+
+	_, err := f.Fetch("Test Game", "NES", nil)
+	if err == nil {
+		t.Fatal("expected error for non-200 image response")
+	}
+	if !strings.Contains(err.Error(), "cover image returned") {
+		t.Errorf("unexpected error message: %v", err)
+	}
 }
 
 // TestFetchTokenRetryOn401 verifies that apiRequestRetry clears the stale
