@@ -45,6 +45,7 @@ vet:
 .PHONY: test
 test:
 	$(GO) test ./...
+	node --test frontend/utils_test.js
 
 ## coverage: generate a test coverage report
 .PHONY: coverage
