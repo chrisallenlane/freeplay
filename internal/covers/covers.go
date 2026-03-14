@@ -83,7 +83,7 @@ func nameVariants(cleanName string) []string {
 }
 
 // Path returns the expected filesystem path for a game's cover art.
-func Path(dataDir, console, filenameWithoutExt string) string {
+func coverPath(dataDir, console, filenameWithoutExt string) string {
 	return filepath.Join(dataDir, "covers", console, filenameWithoutExt+".png")
 }
 
@@ -125,7 +125,7 @@ func (m *Manager) FetchMissing(games []GameEntry) int {
 	for _, g := range games {
 		ext := filepath.Ext(g.Filename)
 		nameNoExt := strings.TrimSuffix(g.Filename, ext)
-		coverPath := Path(m.dataDir, g.Console, nameNoExt)
+		coverPath := coverPath(m.dataDir, g.Console, nameNoExt)
 
 		// Skip if cover already exists
 		if _, err := os.Stat(coverPath); err == nil {
