@@ -299,6 +299,22 @@ func TestFetchMissingPlatformFallback(t *testing.T) {
 	}
 }
 
+func TestFetchMissingNoFallbackOnError(t *testing.T) {
+	dir := t.TempDir()
+	fetcher := &mockFetcher{err: errors.New("network error")}
+	m := New(dir, fetcher)
+
+	game := GameEntry{Console: "NES", Filename: "Q-Bert.nes", IGDBPlatformIDs: []int{18}}
+	got := m.FetchMissing([]GameEntry{game})
+
+	if got != 0 {
+		t.Errorf("FetchMissing() = %d, want 0 (fetch errored)", got)
+	}
+	if fetcher.calls != 1 {
+		t.Errorf("Fetch() called %d times, want 1 (no fallback after error)", fetcher.calls)
+	}
+}
+
 func TestFetchMissingNoFallbackWithoutPlatformIDs(t *testing.T) {
 	dir := t.TempDir()
 	fetcher := &mockFetcher{img: nil, err: nil}

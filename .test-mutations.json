@@ -4,68 +4,177 @@
   "last_updated": "2026-03-14T00:00:00Z",
   "modules": {
     "internal/atomicfile/atomicfile.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["internal/atomicfile/atomicfile_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-03-14",
+      "mutations_by_type": {
+        "constant": {
+          "total": 2,
+          "killed": 1,
+          "survived": 1,
+          "examples": [
+            {"line": 15, "original": "0o755", "mutated": "0o756", "result": "survived"}
+          ]
+        },
+        "relational": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": []
+        },
+        "statement_deletion": {
+          "total": 5,
+          "killed": 2,
+          "survived": 3,
+          "examples": [
+            {"line": 25, "original": "tmp.Close()", "mutated": "(removed)", "result": "survived"},
+            {"line": 29, "original": "tmp.Close()", "mutated": "(removed)", "result": "survived"},
+            {"line": 32, "original": "os.Remove(tmp.Name())", "mutated": "(removed)", "result": "survived"}
+          ]
+        }
+      },
+      "mutation_score": 60.0,
+      "insights": ["Strong error-handling coverage", "File descriptor leak and same-dir rename cleanup are infeasible to test"]
     },
     "internal/config/config.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["internal/config/config_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-03-14",
+      "mutations_by_type": {
+        "arithmetic": {"total": 2, "killed": 2, "survived": 0, "examples": []},
+        "relational": {
+          "total": 15,
+          "killed": 15,
+          "survived": 0,
+          "examples": []
+        },
+        "logical": {
+          "total": 4,
+          "killed": 3,
+          "survived": 1,
+          "examples": [
+            {"line": 112, "original": "os.IsNotExist(err)", "mutated": "!os.IsNotExist(err)", "result": "survived"}
+          ]
+        },
+        "constant": {"total": 2, "killed": 2, "survived": 0, "examples": []},
+        "statement_deletion": {
+          "total": 3,
+          "killed": 2,
+          "survived": 1,
+          "examples": [
+            {"line": 48, "original": "cfg.checkDirectories()", "mutated": "(removed)", "result": "survived"}
+          ]
+        },
+        "control_flow": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 85.2,
+      "insights": ["4 new kills from boundary/edge-case tests added this session", "Remaining survivors in advisory-only checkDirectories function"]
     },
     "internal/covers/covers.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["internal/covers/covers_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-03-14",
+      "mutations_by_type": {
+        "relational": {"total": 9, "killed": 7, "survived": 2, "examples": [
+          {"line": 80, "original": "idx > 0", "mutated": "idx >= 0", "result": "survived"},
+          {"line": 82, "original": "idx > 0", "mutated": "idx >= 0", "result": "survived"}
+        ]},
+        "logical": {"total": 7, "killed": 7, "survived": 0, "examples": []},
+        "constant": {"total": 19, "killed": 15, "survived": 4, "examples": [
+          {"line": 68, "original": "seen[s] = true", "mutated": "seen[s] = false", "result": "survived"},
+          {"line": 119, "original": "m.fetching.Store(true)", "mutated": "m.fetching.Store(false)", "result": "survived"},
+          {"line": 126, "original": "attempted := 0", "mutated": "attempted := 1", "result": "survived"}
+        ]},
+        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": []},
+        "statement_deletion": {"total": 5, "killed": 4, "survived": 1, "examples": [
+          {"line": 139, "original": "attempted++", "mutated": "(removed)", "result": "survived"}
+        ]}
+      },
+      "mutation_score": 83.6,
+      "insights": ["1 new kill from fetchErr fallback test", "Remaining survivors: logging counter, concurrency flag, dedup internals, boundary edge cases"]
     },
     "internal/covers/igdb.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["internal/covers/igdb_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-03-14",
+      "mutations_by_type": {
+        "relational": {"total": 9, "killed": 7, "survived": 2, "examples": [
+          {"line": 50, "original": "f.token != \"\"", "mutated": "f.token == \"\"", "result": "survived"},
+          {"line": 161, "original": "best == -1", "mutated": "best != -1", "result": "now killed"}
+        ]},
+        "logical": {"total": 3, "killed": 2, "survived": 1, "examples": [
+          {"line": 50, "original": "&&", "mutated": "||", "result": "survived"}
+        ]},
+        "constant": {"total": 11, "killed": 6, "survived": 5, "examples": [
+          {"line": 41, "original": "10 * time.Second", "mutated": "11 * time.Second", "result": "survived"},
+          {"line": 85, "original": "range 2", "mutated": "range 3", "result": "survived"}
+        ]},
+        "statement_deletion": {"total": 1, "killed": 1, "survived": 0, "examples": []},
+        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 56.7,
+      "insights": ["3 new kills: fallback selection, case-insensitive matching, fetchErr return", "Remaining survivors: token caching internals, HTTP timeout, retry loop count, URL rewriting (masked by test transport)"]
     },
     "internal/saves/saves.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["internal/saves/saves_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-03-14",
+      "mutations_by_type": {
+        "relational": {"total": 2, "killed": 2, "survived": 0, "examples": []},
+        "constant": {"total": 4, "killed": 4, "survived": 0, "examples": []},
+        "statement_deletion": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 80.0,
+      "insights": ["1 new kill from savePath test", "1 equivalent mutation (return nil in Get error branch)"]
     },
     "internal/scanner/scanner.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["internal/scanner/scanner_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-03-14",
+      "mutations_by_type": {
+        "relational": {"total": 9, "killed": 7, "survived": 2, "examples": [
+          {"line": 127, "original": "<", "mutated": "<=", "result": "survived (equivalent: unique values)"},
+          {"line": 129, "original": "<", "mutated": "<=", "result": "survived (equivalent: unique values)"}
+        ]},
+        "logical": {"total": 3, "killed": 3, "survived": 0, "examples": []},
+        "constant": {"total": 5, "killed": 4, "survived": 1, "examples": [
+          {"line": 93, "original": "= true", "mutated": "= false", "result": "survived (equivalent: only keys checked)"}
+        ]},
+        "statement_deletion": {"total": 4, "killed": 4, "survived": 0, "examples": []},
+        "control_flow": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+      },
+      "mutation_score": 87.0,
+      "insights": ["All survivors are equivalent mutations or minimal-impact edge cases", "Strong coverage across all mutation categories"]
     },
     "internal/server/server.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["internal/server/server_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-03-14",
+      "mutations_by_type": {
+        "logical": {"total": 8, "killed": 8, "survived": 0, "examples": []},
+        "relational": {"total": 4, "killed": 3, "survived": 1, "examples": [
+          {"line": 233, "original": "fullPath != baseDir", "mutated": "fullPath == baseDir", "result": "survived"}
+        ]},
+        "constant": {"total": 12, "killed": 9, "survived": 3, "examples": [
+          {"line": 123, "original": "StatusInternalServerError", "mutated": "StatusOK", "result": "survived (hard to trigger)"},
+          {"line": 180, "original": "\"invalid save parameters\"", "mutated": "\"valid save parameters\"", "result": "survived (error text)"},
+          {"line": 217, "original": "\"scan already in progress\"", "mutated": "\"scan complete\"", "result": "survived (error text)"}
+        ]},
+        "arithmetic": {"total": 1, "killed": 0, "survived": 1, "examples": [
+          {"line": 70, "original": "s.cfg.Port", "mutated": "s.cfg.Port+1", "result": "survived (not unit-testable)"}
+        ]},
+        "statement_deletion": {"total": 3, "killed": 3, "survived": 0, "examples": []}
+      },
+      "mutation_score": 82.1,
+      "insights": ["Agent misreported 2 safeName mutations as survived — verified killed", "Remaining survivors: port binding (untestable), error messages (low value), hard-to-trigger error path"]
     }
   },
   "global_statistics": {
     "total_modules": 7,
-    "completed_modules": 0,
-    "total_mutations": 0,
-    "total_killed": 0,
-    "total_survived": 0,
-    "overall_score": 0.0
+    "completed_modules": 7,
+    "total_mutations": 170,
+    "total_killed": 128,
+    "total_survived": 37,
+    "overall_score": 77.6
   }
 }
