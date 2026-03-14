@@ -1,0 +1,71 @@
+{
+  "version": "1.0",
+  "test_command": "go test ./...",
+  "last_updated": "2026-03-14T00:00:00Z",
+  "modules": {
+    "internal/atomicfile/atomicfile.go": {
+      "status": "pending",
+      "covering_tests": ["internal/atomicfile/atomicfile_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "internal/config/config.go": {
+      "status": "pending",
+      "covering_tests": ["internal/config/config_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "internal/covers/covers.go": {
+      "status": "pending",
+      "covering_tests": ["internal/covers/covers_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "internal/covers/igdb.go": {
+      "status": "pending",
+      "covering_tests": ["internal/covers/igdb_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "internal/saves/saves.go": {
+      "status": "pending",
+      "covering_tests": ["internal/saves/saves_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "internal/scanner/scanner.go": {
+      "status": "pending",
+      "covering_tests": ["internal/scanner/scanner_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "internal/server/server.go": {
+      "status": "pending",
+      "covering_tests": ["internal/server/server_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    }
+  },
+  "global_statistics": {
+    "total_modules": 7,
+    "completed_modules": 0,
+    "total_mutations": 0,
+    "total_killed": 0,
+    "total_survived": 0,
+    "overall_score": 0.0
+  }
+}
