@@ -34,9 +34,14 @@ func CleanName(nameWithoutExt string) string {
 	return strings.TrimSpace(tagPattern.ReplaceAllString(nameWithoutExt, ""))
 }
 
+// Path returns the expected filesystem path for a game's cover art.
+func Path(dataDir, console, filenameWithoutExt string) string {
+	return filepath.Join(dataDir, "covers", console, filenameWithoutExt+".png")
+}
+
 // CoverPath returns the expected filesystem path for a game's cover art.
 func (m *Manager) CoverPath(console, filenameWithoutExt string) string {
-	return filepath.Join(m.dataDir, "covers", console, filenameWithoutExt+".png")
+	return Path(m.dataDir, console, filenameWithoutExt)
 }
 
 // FetchMissing downloads cover art for games that don't have local covers.

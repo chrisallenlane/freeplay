@@ -146,12 +146,17 @@ func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
 	http.ServeFileFS(w, r, s.frontendFS, "frontend/play.html")
 }
 
-func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
-	consoleName := r.PathValue("console")
-	game := r.PathValue("game")
-	saveType := r.PathValue("type")
+func parseSaveParams(r *http.Request) (console, game, saveType string, ok bool) {
+	console = r.PathValue("console")
+	game = r.PathValue("game")
+	saveType = r.PathValue("type")
+	ok = saves.ValidType(saveType)
+	return
+}
 
-	if !saves.ValidType(saveType) {
+func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
+	consoleName, game, saveType, ok := parseSaveParams(r)
+	if !ok {
 		http.Error(w, "invalid save type", http.StatusBadRequest)
 		return
 	}
@@ -162,11 +167,8 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
-	consoleName := r.PathValue("console")
-	game := r.PathValue("game")
-	saveType := r.PathValue("type")
-
-	if !saves.ValidType(saveType) {
+	consoleName, game, saveType, ok := parseSaveParams(r)
+	if !ok {
 		http.Error(w, "invalid save type", http.StatusBadRequest)
 		return
 	}
