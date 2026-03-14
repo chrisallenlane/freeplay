@@ -1,6 +1,5 @@
 dist/
 testdata/
-emulatorjs/
 .tickets/
 .playwright-mcp/
 .tmp/

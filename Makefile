@@ -10,11 +10,11 @@ LINT := revive
 MKDIR := mkdir -p
 
 # build flags
-BUILD_FLAGS := -ldflags="-s -w" -trimpath
+BUILD_FLAGS := -ldflags="-s -w" -mod vendor -trimpath
 
 ## build: build the freeplay binary
 .PHONY: build
-build: | emulatorjs $(dist_dir)
+build: | $(dist_dir)
 	$(GO) build $(BUILD_FLAGS) -o $(dist_dir)/freeplay $(cmd_dir)
 
 ## run: build and run with test data
@@ -73,6 +73,16 @@ clean:
 	rm -f $(dist_dir)/*
 	rm -rf .tmp
 
+## vendor: download, tidy, and verify dependencies
+.PHONY: vendor
+vendor:
+	$(GO) mod vendor && $(GO) mod tidy && $(GO) mod verify
+
+## vendor-update: update vendored dependencies
+.PHONY: vendor-update
+vendor-update:
+	$(GO) get -t -u ./... && $(GO) mod vendor && $(GO) mod tidy && $(GO) mod verify
+
 ## setup: install dev dependencies (gofumpt, revive)
 .PHONY: setup
 setup:
@@ -83,10 +93,6 @@ setup:
 .PHONY: docker
 docker:
 	docker build -t freeplay .
-
-# Download EmulatorJS for local dev
-emulatorjs:
-	@if [ ! -f emulatorjs/data/loader.js ]; then ./scripts/download-emulatorjs.sh; fi
 
 # .tmp
 .tmp:
