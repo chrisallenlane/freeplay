@@ -100,30 +100,27 @@ func (s *Server) handleGames(w http.ResponseWriter, _ *http.Request) {
 	w.Write(data)
 }
 
-func (s *Server) handleROM(w http.ResponseWriter, r *http.Request) {
-	consoleName := r.PathValue("console")
-	file := r.PathValue("file")
-
-	rom, ok := s.cfg.ROMs[consoleName]
+func (s *Server) serveConsoleFile(w http.ResponseWriter, r *http.Request, resolve func(string) (string, bool)) {
+	dir, ok := resolve(r.PathValue("console"))
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
+	s.serveSecureFile(w, r, dir, r.PathValue("file"))
+}
 
-	s.serveSecureFile(w, r, rom.Path, file)
+func (s *Server) handleROM(w http.ResponseWriter, r *http.Request) {
+	s.serveConsoleFile(w, r, func(name string) (string, bool) {
+		rom, ok := s.cfg.ROMs[name]
+		return rom.Path, ok
+	})
 }
 
 func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
-	consoleName := r.PathValue("console")
-	file := r.PathValue("file")
-
-	biosDir, ok := s.cfg.BIOS[consoleName]
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-
-	s.serveSecureFile(w, r, biosDir, file)
+	s.serveConsoleFile(w, r, func(name string) (string, bool) {
+		dir, ok := s.cfg.BIOS[name]
+		return dir, ok
+	})
 }
 
 func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
