@@ -113,6 +113,10 @@
 
                 var saveBase = '/api/saves/' + encConsole + '/' + gameSlug;
 
+                function postSave(type, data) {
+                    if (data) fetch(saveBase + '/' + type, { method: 'POST', body: new Blob([data]) });
+                }
+
                 // Load save state if one exists
                 var checkState = new XMLHttpRequest();
                 checkState.open('HEAD', saveBase + '/state', false);
@@ -121,35 +125,13 @@
                     window.EJS_loadStateURL = saveBase + '/state';
                 }
 
-                // Save state hook — fires when user clicks Save State
-                window.EJS_onSaveState = function(data) {
-                    fetch(saveBase + '/state', {
-                        method: 'POST',
-                        body: new Blob([data.state])
-                    });
-                };
-
-                // SRAM save hook — fires when user clicks Export Save
-                window.EJS_onSaveSave = function(data) {
-                    if (data.save) {
-                        fetch(saveBase + '/sram', {
-                            method: 'POST',
-                            body: new Blob([data.save])
-                        });
-                    }
-                };
+                window.EJS_onSaveState = function(data) { postSave('state', data.state); };
+                window.EJS_onSaveSave = function(data) { postSave('sram', data.save); };
 
                 // Register periodic SRAM save after game starts
                 window.EJS_onGameStart = function() {
                     if (window.EJS_emulator) {
-                        window.EJS_emulator.on('saveSaveFiles', function(data) {
-                            if (data) {
-                                fetch(saveBase + '/sram', {
-                                    method: 'POST',
-                                    body: new Blob([data])
-                                });
-                            }
-                        });
+                        window.EJS_emulator.on('saveSaveFiles', function(data) { postSave('sram', data); });
                     }
                 };
 
