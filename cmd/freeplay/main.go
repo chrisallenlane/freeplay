@@ -14,14 +14,18 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/server"
 )
 
+func fatal(err error) {
+	fmt.Fprintf(os.Stderr, "error: %s\n", err)
+	os.Exit(1)
+}
+
 func main() {
 	dataDir := flag.String("data", "/data", "path to data directory")
 	flag.Parse()
 
 	cfg, err := config.Load(*dataDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		os.Exit(1)
+		fatal(err)
 	}
 
 	// Set up cover art fetcher if configured
@@ -33,8 +37,7 @@ func main() {
 
 	srv, err := server.New(cfg, *dataDir, freeplay.FrontendFS, freeplay.EmulatorjsFS, coverMgr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		os.Exit(1)
+		fatal(err)
 	}
 
 	// Wire cover art fetching to run after each scan
@@ -56,7 +59,6 @@ func main() {
 
 	slog.Info("starting freeplay", "port", cfg.Port, "data", *dataDir)
 	if err := srv.ListenAndServe(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		os.Exit(1)
+		fatal(err)
 	}
 }
