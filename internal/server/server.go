@@ -27,7 +27,6 @@ type Server struct {
 	scanner       *scanner.Scanner
 	saves         *saves.Manager
 	coverStatus   CoverStatus
-	frontendFS    fs.FS
 	frontendSub   fs.FS
 	emulatorjsSub fs.FS
 	mux           *http.ServeMux
@@ -52,7 +51,6 @@ func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS, cov
 		scanner:       scanner.New(cfg, dataDir),
 		saves:         saves.New(dataDir),
 		coverStatus:   coverStatus,
-		frontendFS:    frontendFS,
 		frontendSub:   frontendSub,
 		emulatorjsSub: emulatorjsSub,
 		mux:           http.NewServeMux(),
@@ -157,7 +155,7 @@ func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
-	http.ServeFileFS(w, r, s.frontendFS, "frontend/play.html")
+	http.ServeFileFS(w, r, s.frontendSub, "play.html")
 }
 
 func safeName(s string) bool {
