@@ -9,14 +9,18 @@
 </head>
 <body>
     <header>
-        <h1>🕹️ Freeplay</h1>
-        <button id="rescan-btn">Rescan &#8635;</button>
+        <h1><span aria-hidden="true">🕹️</span> Freeplay</h1>
+        <button id="rescan-btn" title="Rescan ROMs and fetch cover art">Rescan &#8635;</button>
     </header>
-    <div class="filters" id="filters"></div>
-    <div class="search-bar" style="padding: 12px 24px; background: #151525;">
-        <input type="text" id="search" placeholder="Search games...">
-    </div>
-    <div class="game-grid" id="game-grid"></div>
+    <a href="#game-grid" class="skip-link">Skip to games</a>
+    <main>
+        <div class="filters" id="filters"></div>
+        <div class="search-bar" style="padding: 12px 24px; background: #151525;">
+            <label for="search" class="sr-only">Search games</label>
+            <input type="text" id="search" placeholder="Search games...">
+        </div>
+        <div class="game-grid" id="game-grid"></div>
+    </main>
     <script src="/utils.js"></script>
     <script src="/app.js"></script>
 </body>
