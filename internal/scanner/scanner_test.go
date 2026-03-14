@@ -220,3 +220,17 @@ func TestScanCallback(t *testing.T) {
 		t.Errorf("callback got %d games, want 3", len(callbackGames))
 	}
 }
+
+func TestScanReturnsTrue(t *testing.T) {
+	dir, cfg := setupTestDir(t)
+	s := New(cfg, dir)
+
+	if !s.Scan() {
+		t.Error("Scan should return true when no scan is in progress")
+	}
+
+	cat := s.Catalog()
+	if len(cat.Games) != 3 {
+		t.Errorf("got %d games, want 3", len(cat.Games))
+	}
+}

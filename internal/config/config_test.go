@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -78,16 +79,17 @@ core = "fceumm"
 
 func TestLoadValidationErrors(t *testing.T) {
 	tests := []struct {
-		name   string
-		config string // empty means don't write a config file
+		name      string
+		config    string // empty means don't write a config file
+		wantInErr string // substring that must appear in the error message
 	}{
-		{"missing file", ""},
-		{"missing path", "[roms.NES]\ncore = \"fceumm\""},
-		{"missing core", "[roms.NES]\npath = \"roms/nes\""},
-		{"invalid cover_art_api", "cover_art_api = \"invalid\"\ncover_art_api_key = \"key\""},
-		{"cover_art_api missing key", "cover_art_api = \"igdb\""},
-		{"IGDB key missing separator", "cover_art_api = \"igdb\"\ncover_art_api_key = \"missingcolon\""},
-		{"invalid port", "port = 99999"},
+		{"missing file", "", "loading config"},
+		{"missing path", "[roms.NES]\ncore = \"fceumm\"", "path is required"},
+		{"missing core", "[roms.NES]\npath = \"roms/nes\"", "core is required"},
+		{"invalid cover_art_api", "cover_art_api = \"invalid\"\ncover_art_api_key = \"key\"", "cover_art_api must be"},
+		{"cover_art_api missing key", "cover_art_api = \"igdb\"", "cover_art_api_key is required"},
+		{"IGDB key missing separator", "cover_art_api = \"igdb\"\ncover_art_api_key = \"missingcolon\"", "client_id:client_secret"},
+		{"invalid port", "port = 99999", "port must be"},
 	}
 
 	for _, tt := range tests {
@@ -96,8 +98,12 @@ func TestLoadValidationErrors(t *testing.T) {
 			if tt.config != "" {
 				writeConfig(t, dir, tt.config)
 			}
-			if _, err := Load(dir); err == nil {
+			_, err := Load(dir)
+			if err == nil {
 				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.wantInErr) {
+				t.Errorf("error %q should contain %q", err.Error(), tt.wantInErr)
 			}
 		})
 	}
@@ -120,6 +126,26 @@ PlayStation = "bios/ps1"
 	if cfg.BIOS["PlayStation"] != filepath.Join(dir, "bios", "ps1") {
 		t.Errorf("bios path = %q, want resolved path", cfg.BIOS["PlayStation"])
 	}
+}
+
+func FuzzLoad(f *testing.F) {
+	f.Add([]byte(`port = 8080
+[roms.NES]
+path = "/roms/nes"
+core = "fceumm"
+`))
+	f.Add([]byte(`invalid toml {{{{`))
+	f.Add([]byte(``))
+	f.Add([]byte(`port = -1`))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "freeplay.toml"), data, 0o644); err != nil {
+			t.Skip()
+		}
+		// Must not panic regardless of input
+		Load(dir)
+	})
 }
 
 func TestLoadIGDBPlatformIDs(t *testing.T) {
