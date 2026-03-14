@@ -4,9 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Freeplay</title>
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <h1>Freeplay</h1>
-    <p>Game shelf coming soon.</p>
+    <header>
+        <h1>Freeplay</h1>
+        <button id="rescan-btn">Rescan &#8635;</button>
+    </header>
+    <div class="filters" id="filters"></div>
+    <div class="search-bar" style="padding: 12px 24px; background: #151525;">
+        <input type="text" id="search" placeholder="Search games...">
+    </div>
+    <div class="game-grid" id="game-grid"></div>
+    <script src="/app.js"></script>
 </body>
 </html>
