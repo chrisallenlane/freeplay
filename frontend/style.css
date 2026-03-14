@@ -1,3 +1,11 @@
+@font-face {
+    font-family: 'Silkscreen';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/fonts/Silkscreen-Regular.woff2') format('woff2');
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -21,8 +29,9 @@ header {
 }
 
 header h1 {
+    font-family: 'Silkscreen', monospace;
     font-size: 1.5rem;
-    font-weight: 600;
+    font-weight: 400;
     color: #fff;
 }
 
