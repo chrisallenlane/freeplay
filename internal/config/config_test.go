@@ -8,7 +8,7 @@ import (
 
 func writeConfig(t *testing.T, dir, content string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, "freeplay.toml"), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "freeplay.toml"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -16,7 +16,7 @@ func writeConfig(t *testing.T, dir, content string) {
 func TestLoadBasic(t *testing.T) {
 	dir := t.TempDir()
 	romDir := filepath.Join(dir, "roms", "nes")
-	os.MkdirAll(romDir, 0755)
+	os.MkdirAll(romDir, 0o755)
 
 	writeConfig(t, dir, `
 port = 9090

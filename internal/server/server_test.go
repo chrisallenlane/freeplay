@@ -18,12 +18,12 @@ func testServer(t *testing.T) (*Server, string) {
 	dir := t.TempDir()
 
 	romDir := filepath.Join(dir, "roms", "NES")
-	os.MkdirAll(romDir, 0755)
-	os.WriteFile(filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0644)
+	os.MkdirAll(romDir, 0o755)
+	os.WriteFile(filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644)
 
 	biosDir := filepath.Join(dir, "bios", "PSX")
-	os.MkdirAll(biosDir, 0755)
-	os.WriteFile(filepath.Join(biosDir, "scph1001.bin"), []byte("biosdata"), 0644)
+	os.MkdirAll(biosDir, 0o755)
+	os.WriteFile(filepath.Join(biosDir, "scph1001.bin"), []byte("biosdata"), 0o644)
 
 	cfg := &config.Config{
 		Port: 8080,
@@ -169,7 +169,7 @@ func TestServeSecureFileBlocksDirectory(t *testing.T) {
 
 	// Create a subdirectory inside ROM dir
 	romDir := srv.cfg.ROMs["NES"].Path
-	os.MkdirAll(filepath.Join(romDir, "subdir"), 0755)
+	os.MkdirAll(filepath.Join(romDir, "subdir"), 0o755)
 
 	req := httptest.NewRequest("GET", "/roms/NES/subdir", nil)
 	w := httptest.NewRecorder()
@@ -265,8 +265,8 @@ func TestCoversServing(t *testing.T) {
 	srv, dir := testServer(t)
 
 	coverDir := filepath.Join(dir, "covers", "NES")
-	os.MkdirAll(coverDir, 0755)
-	os.WriteFile(filepath.Join(coverDir, "Mega Man.png"), []byte("pngdata"), 0644)
+	os.MkdirAll(coverDir, 0o755)
+	os.WriteFile(filepath.Join(coverDir, "Mega Man.png"), []byte("pngdata"), 0o644)
 
 	req := httptest.NewRequest("GET", "/covers/NES/Mega%20Man.png", nil)
 	w := httptest.NewRecorder()

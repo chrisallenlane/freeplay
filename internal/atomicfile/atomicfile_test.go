@@ -33,7 +33,7 @@ func TestWriteOverwrite(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.txt")
 
-	os.WriteFile(path, []byte("old"), 0644)
+	os.WriteFile(path, []byte("old"), 0o644)
 
 	err := Write(path, func(w io.Writer) error {
 		_, err := w.Write([]byte("new"))

@@ -3,4 +3,5 @@ testdata/
 emulatorjs/
 .tickets/
 .playwright-mcp/
+.tmp/
 PROJECT_PROGRESS.md
