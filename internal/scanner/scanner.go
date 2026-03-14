@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
+	"github.com/chrisallenlane/freeplay/internal/covers"
 )
 
 // Game represents a single ROM in the catalog.
@@ -98,8 +99,7 @@ func (s *Scanner) scan() {
 
 			filename := entry.Name()
 			nameNoExt := strings.TrimSuffix(filename, filepath.Ext(filename))
-			coverPath := filepath.Join(s.dataDir, "covers", consoleName, nameNoExt+".png")
-			_, coverErr := os.Stat(coverPath)
+			_, coverErr := os.Stat(covers.Path(s.dataDir, consoleName, nameNoExt))
 
 			games = append(games, Game{
 				Filename: filename,

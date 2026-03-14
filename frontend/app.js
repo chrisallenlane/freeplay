@@ -35,6 +35,11 @@
         });
     }
 
+    function renderAll() {
+        renderFilters();
+        renderGrid();
+    }
+
     function renderFilters() {
         filtersBar.innerHTML = '';
 
@@ -44,8 +49,7 @@
         favBtn.addEventListener('click', function () {
             activeFavorites = !activeFavorites;
             if (activeFavorites) activeConsole = null;
-            renderFilters();
-            renderGrid();
+            renderAll();
         });
         filtersBar.appendChild(favBtn);
 
@@ -55,8 +59,7 @@
         allBtn.addEventListener('click', function () {
             activeConsole = null;
             activeFavorites = false;
-            renderFilters();
-            renderGrid();
+            renderAll();
         });
         filtersBar.appendChild(allBtn);
 
@@ -67,8 +70,7 @@
             btn.addEventListener('click', function () {
                 activeConsole = name;
                 activeFavorites = false;
-                renderFilters();
-                renderGrid();
+                renderAll();
             });
             filtersBar.appendChild(btn);
         });
@@ -97,9 +99,10 @@
             card.className = 'game-card';
 
             // Favorite button
+            var isFav = favorites.has(favKey(game));
             var fav = document.createElement('button');
-            fav.className = 'fav-btn' + (favorites.has(favKey(game)) ? ' favorited' : '');
-            fav.textContent = favorites.has(favKey(game)) ? '\u2605' : '\u2606';
+            fav.className = 'fav-btn' + (isFav ? ' favorited' : '');
+            fav.textContent = isFav ? '\u2605' : '\u2606';
             fav.addEventListener('click', function (e) {
                 e.stopPropagation();
                 var key = favKey(game);
@@ -170,8 +173,7 @@
             .then(function (catalog) {
                 allGames = catalog.games || [];
                 consoles = catalog.consoles || [];
-                renderFilters();
-                renderGrid();
+                renderAll();
             })
             .catch(function () {
                 grid.innerHTML = '';

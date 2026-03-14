@@ -111,18 +111,19 @@
                     window.EJS_biosUrl = '/bios/' + encConsole + '/';
                 }
 
+                var saveBase = '/api/saves/' + encConsole + '/' + gameSlug;
+
                 // Load save state if one exists
-                var stateUrl = '/api/saves/' + encConsole + '/' + gameSlug + '/state';
                 var checkState = new XMLHttpRequest();
-                checkState.open('HEAD', stateUrl, false);
+                checkState.open('HEAD', saveBase + '/state', false);
                 checkState.send();
                 if (checkState.status === 200) {
-                    window.EJS_loadStateURL = stateUrl;
+                    window.EJS_loadStateURL = saveBase + '/state';
                 }
 
                 // Save state hook — fires when user clicks Save State
                 window.EJS_onSaveState = function(data) {
-                    fetch('/api/saves/' + encConsole + '/' + gameSlug + '/state', {
+                    fetch(saveBase + '/state', {
                         method: 'POST',
                         body: new Blob([data.state])
                     });
@@ -131,7 +132,7 @@
                 // SRAM save hook — fires when user clicks Export Save
                 window.EJS_onSaveSave = function(data) {
                     if (data.save) {
-                        fetch('/api/saves/' + encConsole + '/' + gameSlug + '/sram', {
+                        fetch(saveBase + '/sram', {
                             method: 'POST',
                             body: new Blob([data.save])
                         });
@@ -143,7 +144,7 @@
                     if (window.EJS_emulator) {
                         window.EJS_emulator.on('saveSaveFiles', function(data) {
                             if (data) {
-                                fetch('/api/saves/' + encConsole + '/' + gameSlug + '/sram', {
+                                fetch(saveBase + '/sram', {
                                     method: 'POST',
                                     body: new Blob([data])
                                 });
