@@ -4,15 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Freeplay - Player</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background: #0f0f1a;
             color: #e0e0e0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            min-height: 100vh;
+            height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
         header {
             display: flex;
@@ -21,6 +23,8 @@
             background: #1a1a2e;
             border-bottom: 1px solid #2a2a3e;
             gap: 16px;
+            position: relative;
+            z-index: 10;
         }
         header a {
             color: #8888ff;
@@ -35,7 +39,11 @@
         }
         #game {
             flex: 1;
-            min-height: 480px;
+            min-height: 0;
+            position: relative;
+        }
+        #game > .ejs_game {
+            height: 100% !important;
         }
         .error-msg {
             text-align: center;
@@ -106,6 +114,7 @@
                 window.EJS_pathtodata = '/emulatorjs/data/';
                 window.EJS_color = '#1a1a2e';
                 window.EJS_gameName = nameEl.textContent;
+                window.EJS_startOnLoaded = true;
 
                 if (game.hasBios) {
                     window.EJS_biosUrl = '/bios/' + encConsole + '/';
