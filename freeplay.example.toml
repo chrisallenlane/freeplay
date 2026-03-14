@@ -12,19 +12,20 @@ port = 8080
 # Paths are relative to the data directory (/data in Docker).
 #
 # igdb_platform_ids improves cover art search accuracy (optional).
-# See: https://api-docs.igdb.com/#platform
+# Include regional variants (e.g. NES + Famicom) for best results.
+# See: doc/igdb-platform-ids.md
 
 # --- Nintendo ---
 
 # [roms.NES]
 # path = "roms/nes"
 # core = "fceumm"                    # alt: nestopia
-# igdb_platform_ids = [18]
+# igdb_platform_ids = [18, 99, 51]   # NES + Famicom + FDS
 
 # [roms."Super Nintendo"]
 # path = "roms/snes"
 # core = "snes9x"
-# igdb_platform_ids = [19]
+# igdb_platform_ids = [19, 58]       # SNES + Super Famicom
 
 # [roms."Game Boy"]
 # path = "roms/gb"
@@ -183,7 +184,7 @@ port = 8080
 # [roms.Arcade]
 # path = "roms/arcade"
 # core = "fbneo"                     # alt: mame2003_plus, fbalpha2012_cps1, fbalpha2012_cps2
-# igdb_platform_ids = [52]
+# igdb_platform_ids = [52, 79, 80]   # Arcade + Neo Geo MVS + AES
 
 # --- Computers ---
 

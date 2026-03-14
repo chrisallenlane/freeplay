@@ -43,12 +43,62 @@ func TestCleanName(t *testing.T) {
 		{"(tag only)", ""},
 		{"3-in-1 Super Mario Bros", "3-in-1 Super Mario Bros"},
 		{"Mega Man 2 (U) [!]", "Mega Man 2"},
+		{"Front Mission - Gun Hazard (ENG) # SNES", "Front Mission - Gun Hazard"},
+		{"Ultraman - Towards the Future (U) [!]", "Ultraman - Towards the Future"},
+		{"Nobunaga's Ambition - Lord of Darkness (U)", "Nobunaga's Ambition - Lord of Darkness"},
+		{"Double Dragon V - The Shadow Falls (U)", "Double Dragon V - The Shadow Falls"},
+		{"Final Fantasy 6 (ENG) # SNES", "Final Fantasy 6"},
 	}
 
 	for _, tt := range tests {
 		got := CleanName(tt.input)
 		if got != tt.want {
 			t.Errorf("CleanName(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestNameVariants(t *testing.T) {
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		// No transformations produce new variants
+		{"Metroid", []string{"Metroid"}},
+		// Dash to colon
+		{"Game - Subtitle", []string{
+			"Game - Subtitle",
+			"Game: Subtitle",
+			"Game-Subtitle",
+			"Game",
+		}},
+		// Compound word (spaces removed)
+		{"Sim City", []string{"Sim City", "SimCity"}},
+		// All heuristics apply
+		{"Nobunaga's Ambition - Lord of Darkness", []string{
+			"Nobunaga's Ambition - Lord of Darkness",
+			"Nobunaga's Ambition: Lord of Darkness",
+			"Nobunaga'sAmbition-LordofDarkness",
+			"Nobunaga's Ambition",
+		}},
+		// Subtitle with colon (no dash)
+		{"SimCity: BuildIt", []string{
+			"SimCity: BuildIt",
+			"SimCity:BuildIt",
+			"SimCity",
+		}},
+	}
+
+	for _, tt := range tests {
+		got := nameVariants(tt.input)
+		if len(got) != len(tt.want) {
+			t.Errorf("nameVariants(%q) = %v, want %v", tt.input, got, tt.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Errorf("nameVariants(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+			}
 		}
 	}
 }

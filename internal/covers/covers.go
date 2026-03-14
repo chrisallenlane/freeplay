@@ -31,11 +31,48 @@ func New(dataDir string, fetcher Fetcher) *Manager {
 	return &Manager{dataDir: dataDir, fetcher: fetcher}
 }
 
-var tagPattern = regexp.MustCompile(`\s*[\(\[].*?[\)\]]`)
+var (
+	tagPattern = regexp.MustCompile(`\s*[\(\[].*?[\)\]]`)
+	hashSuffix = regexp.MustCompile(`\s+#\s+\S+$`)
+)
 
-// CleanName strips No-Intro tags from a ROM filename for API search.
+// CleanName strips No-Intro tags and hash suffixes from a ROM filename
+// for API search. Tags in parentheses/brackets (e.g. "(USA)", "[!]") and
+// translation-patch suffixes (e.g. "# SNES") are removed.
 func CleanName(nameWithoutExt string) string {
-	return strings.TrimSpace(tagPattern.ReplaceAllString(nameWithoutExt, ""))
+	name := tagPattern.ReplaceAllString(nameWithoutExt, "")
+	name = hashSuffix.ReplaceAllString(name, "")
+	return strings.TrimSpace(name)
+}
+
+// nameVariants returns search name variants ordered from highest to lowest
+// confidence. Each variant represents a different heuristic for matching
+// ROM filenames to IGDB game titles.
+func nameVariants(cleanName string) []string {
+	seen := map[string]bool{cleanName: true}
+	variants := []string{cleanName}
+
+	add := func(s string) {
+		if s != "" && !seen[s] {
+			seen[s] = true
+			variants = append(variants, s)
+		}
+	}
+
+	// Dashes to colons: No-Intro uses " - " for subtitles, IGDB uses ": "
+	add(strings.ReplaceAll(cleanName, " - ", ": "))
+
+	// Spaces removed: catches compound-word titles (SimCity, SimAnt)
+	add(strings.ReplaceAll(cleanName, " ", ""))
+
+	// Subtitle dropped: catches regional subtitle mismatches
+	if idx := strings.Index(cleanName, " - "); idx > 0 {
+		add(strings.TrimSpace(cleanName[:idx]))
+	} else if idx := strings.Index(cleanName, ": "); idx > 0 {
+		add(strings.TrimSpace(cleanName[:idx]))
+	}
+
+	return variants
 }
 
 // Path returns the expected filesystem path for a game's cover art.
@@ -76,24 +113,38 @@ func (m *Manager) FetchMissing(games []GameEntry) int {
 			continue
 		}
 
-		<-ticker.C
-		img, err := m.fetcher.Fetch(cleanName, g.Console, g.IGDBPlatformIDs)
-		if err != nil {
-			slog.Warn("cover art fetch failed", "game", nameNoExt, "error", err)
-			continue
-		}
-
-		// If no match with platform constraint, retry without it
-		if img == nil && len(g.IGDBPlatformIDs) > 0 {
+		// Try name variants in order of confidence. For each variant,
+		// try with platform constraint first, then without.
+		var img image.Image
+		var fetchErr bool
+		for _, name := range nameVariants(cleanName) {
 			<-ticker.C
-			img, err = m.fetcher.Fetch(cleanName, g.Console, nil)
+			var err error
+			img, err = m.fetcher.Fetch(name, g.Console, g.IGDBPlatformIDs)
 			if err != nil {
 				slog.Warn("cover art fetch failed", "game", nameNoExt, "error", err)
-				continue
+				fetchErr = true
+				break
+			}
+			if img != nil {
+				break
+			}
+
+			if len(g.IGDBPlatformIDs) > 0 {
+				<-ticker.C
+				img, err = m.fetcher.Fetch(name, g.Console, nil)
+				if err != nil {
+					slog.Warn("cover art fetch failed", "game", nameNoExt, "error", err)
+					fetchErr = true
+					break
+				}
+				if img != nil {
+					break
+				}
 			}
 		}
 
-		if img == nil {
+		if fetchErr || img == nil {
 			continue
 		}
 
