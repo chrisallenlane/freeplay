@@ -15,11 +15,12 @@ import (
 
 // Game represents a single ROM in the catalog.
 type Game struct {
-	Filename string `json:"filename"`
-	Console  string `json:"console"`
-	Core     string `json:"core"`
-	HasCover bool   `json:"hasCover"`
-	HasBios  bool   `json:"hasBios"`
+	Filename        string `json:"filename"`
+	Console         string `json:"console"`
+	Core            string `json:"core"`
+	HasCover        bool   `json:"hasCover"`
+	HasBios         bool   `json:"hasBios"`
+	IGDBPlatformIDs []int  `json:"igdbPlatformIds,omitempty"`
 }
 
 // Catalog is the full game library served by GET /api/games.
@@ -102,11 +103,12 @@ func (s *Scanner) scan() {
 			_, coverErr := os.Stat(coverPath)
 
 			games = append(games, Game{
-				Filename: filename,
-				Console:  consoleName,
-				Core:     rom.Core,
-				HasCover: coverErr == nil,
-				HasBios:  hasBios,
+				Filename:        filename,
+				Console:         consoleName,
+				Core:            rom.Core,
+				HasCover:        coverErr == nil,
+				HasBios:         hasBios,
+				IGDBPlatformIDs: rom.IGDBPlatformIDs,
 			})
 		}
 	}

@@ -16,7 +16,7 @@ import (
 
 // Fetcher fetches cover art images for games.
 type Fetcher interface {
-	Fetch(gameName string, console string) (image.Image, error)
+	Fetch(gameName string, console string, platformIDs []int) (image.Image, error)
 }
 
 // Manager coordinates cover art fetching and storage.
@@ -76,7 +76,7 @@ func (m *Manager) FetchMissing(games []GameEntry) int {
 		}
 
 		<-ticker.C
-		img, err := m.fetcher.Fetch(cleanName, g.Console)
+		img, err := m.fetcher.Fetch(cleanName, g.Console, g.IGDBPlatformIDs)
 		if err != nil {
 			slog.Warn("cover art fetch failed", "game", nameNoExt, "error", err)
 			continue
@@ -98,6 +98,7 @@ func (m *Manager) FetchMissing(games []GameEntry) int {
 
 // GameEntry describes a game for cover art fetching.
 type GameEntry struct {
-	Console  string
-	Filename string
+	Console         string
+	Filename        string
+	IGDBPlatformIDs []int
 }

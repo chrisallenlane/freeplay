@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -115,26 +116,53 @@ func (f *IGDBFetcher) apiRequestRetry(endpoint, body string, retried bool) ([]by
 }
 
 // Fetch retrieves a cover art image for the given game name.
-func (f *IGDBFetcher) Fetch(gameName string, console string) (image.Image, error) {
-	// Search for the game
-	query := fmt.Sprintf(`search "%s"; fields cover; limit 1;`, strings.ReplaceAll(gameName, `"`, `\"`))
+// When platformIDs is non-empty, results are filtered to those IGDB platform IDs.
+func (f *IGDBFetcher) Fetch(gameName string, console string, platformIDs []int) (image.Image, error) {
+	escaped := strings.ReplaceAll(gameName, `"`, `\"`)
+	var query string
+	if len(platformIDs) > 0 {
+		ids := intsToStrings(platformIDs)
+		query = fmt.Sprintf(`search "%s"; fields name, cover; where platforms = (%s); limit 5;`, escaped, strings.Join(ids, ","))
+	} else {
+		query = fmt.Sprintf(`search "%s"; fields name, cover; limit 5;`, escaped)
+	}
+
 	data, err := f.apiRequest("games", query)
 	if err != nil {
 		return nil, err
 	}
 
 	var games []struct {
-		Cover int `json:"cover"`
+		Name  string `json:"name"`
+		Cover int    `json:"cover"`
 	}
 	if err := json.Unmarshal(data, &games); err != nil {
 		return nil, fmt.Errorf("parsing game search: %w", err)
 	}
-	if len(games) == 0 || games[0].Cover == 0 {
+	if len(games) == 0 {
 		return nil, nil // no match
 	}
 
+	// Pick best match: prefer case-insensitive exact name match, else first result
+	best := -1
+	for i, g := range games {
+		if g.Cover == 0 {
+			continue
+		}
+		if strings.EqualFold(g.Name, gameName) {
+			best = i
+			break
+		}
+		if best == -1 {
+			best = i
+		}
+	}
+	if best == -1 {
+		return nil, nil // no result with cover art
+	}
+
 	// Get cover URL
-	coverQuery := fmt.Sprintf(`fields url; where id = %d; limit 1;`, games[0].Cover)
+	coverQuery := fmt.Sprintf(`fields url; where id = %d; limit 1;`, games[best].Cover)
 	coverData, err := f.apiRequest("covers", coverQuery)
 	if err != nil {
 		return nil, err
@@ -174,4 +202,12 @@ func (f *IGDBFetcher) Fetch(gameName string, console string) (image.Image, error
 	}
 
 	return img, nil
+}
+
+func intsToStrings(ids []int) []string {
+	s := make([]string, len(ids))
+	for i, id := range ids {
+		s[i] = strconv.Itoa(id)
+	}
+	return s
 }
