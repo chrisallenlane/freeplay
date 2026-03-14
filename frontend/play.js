@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    var FP = window.Freeplay;
+
     var params = new URLSearchParams(window.location.search);
     var consoleName = params.get('console');
     var rom = params.get('rom');
@@ -11,20 +13,13 @@
     }
 
     var nameEl = document.getElementById('game-name');
-    var dot = rom.lastIndexOf('.');
-    nameEl.textContent = dot > 0 ? rom.substring(0, dot) : rom;
+    nameEl.textContent = FP.stripExt(rom);
     document.title = 'Freeplay - ' + nameEl.textContent;
 
     fetch('/api/games')
         .then(function (res) { return res.json(); })
         .then(function (catalog) {
-            var game = null;
-            for (var i = 0; i < catalog.games.length; i++) {
-                if (catalog.games[i].console === consoleName && catalog.games[i].filename === rom) {
-                    game = catalog.games[i];
-                    break;
-                }
-            }
+            var game = FP.findGame(catalog.games, consoleName, rom);
             if (!game) {
                 showError('Game not found. It may have been removed from the library.');
                 return;
@@ -43,22 +38,19 @@
     }
 
     function startEmulator(game) {
-        var encConsole = encodeURIComponent(consoleName);
-        var gameSlug = encodeURIComponent(nameEl.textContent);
+        var saveBase = FP.saveBasePath(consoleName, nameEl.textContent);
 
         window.EJS_player = '#game';
         window.EJS_core = game.core;
-        window.EJS_gameUrl = '/roms/' + encConsole + '/' + encodeURIComponent(rom);
+        window.EJS_gameUrl = FP.romUrl(consoleName, rom);
         window.EJS_pathtodata = '/emulatorjs/data/';
         window.EJS_color = '#1a1a2e';
         window.EJS_gameName = nameEl.textContent;
         window.EJS_startOnLoaded = true;
 
         if (game.hasBios) {
-            window.EJS_biosUrl = '/bios/' + encConsole + '/';
+            window.EJS_biosUrl = FP.biosUrl(consoleName);
         }
-
-        var saveBase = '/api/saves/' + encConsole + '/' + gameSlug;
 
         function postSave(type, data) {
             if (data) fetch(saveBase + '/' + type, { method: 'POST', body: new Blob([data]) });

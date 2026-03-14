@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    var FP = window.Freeplay;
+
     let allGames = [];
     let consoles = [];
     let activeConsole = null;
@@ -16,22 +18,12 @@
         localStorage.setItem('freeplay-favorites', JSON.stringify(Array.from(favorites)));
     }
 
-    function favKey(game) {
-        return game.console + '/' + game.filename;
-    }
-
-    function stripExt(filename) {
-        const dot = filename.lastIndexOf('.');
-        return dot > 0 ? filename.substring(0, dot) : filename;
-    }
-
     function getFilteredGames() {
-        const query = searchInput.value.toLowerCase();
-        return allGames.filter(function (g) {
-            if (activeFavorites && !favorites.has(favKey(g))) return false;
-            if (activeConsole && g.console !== activeConsole) return false;
-            if (query && !g.filename.toLowerCase().includes(query)) return false;
-            return true;
+        return FP.filterGames(allGames, {
+            favorites: favorites,
+            favoritesOnly: activeFavorites,
+            console: activeConsole,
+            query: searchInput.value
         });
     }
 
@@ -99,13 +91,13 @@
             card.className = 'game-card';
 
             // Favorite button
-            var isFav = favorites.has(favKey(game));
+            var isFav = favorites.has(FP.favKey(game));
             var fav = document.createElement('button');
             fav.className = 'fav-btn' + (isFav ? ' favorited' : '');
             fav.textContent = isFav ? '\u2605' : '\u2606';
             fav.addEventListener('click', function (e) {
                 e.stopPropagation();
-                var key = favKey(game);
+                var key = FP.favKey(game);
                 if (favorites.has(key)) {
                     favorites.delete(key);
                     fav.textContent = '\u2606';
@@ -124,7 +116,7 @@
             if (game.hasCover) {
                 var img = document.createElement('img');
                 img.className = 'cover';
-                img.src = '/covers/' + encodeURIComponent(game.console) + '/' + encodeURIComponent(stripExt(game.filename)) + '.png';
+                img.src = FP.coverUrl(game);
                 img.alt = game.filename;
                 img.loading = 'lazy';
                 card.appendChild(img);
@@ -133,7 +125,7 @@
                 ph.className = 'placeholder-cover';
                 var phName = document.createElement('div');
                 phName.className = 'placeholder-name';
-                phName.textContent = stripExt(game.filename);
+                phName.textContent = FP.stripExt(game.filename);
                 var phConsole = document.createElement('div');
                 phConsole.className = 'placeholder-console';
                 phConsole.textContent = game.console;
@@ -147,7 +139,7 @@
             info.className = 'card-info';
             var title = document.createElement('div');
             title.className = 'card-title';
-            title.textContent = stripExt(game.filename);
+            title.textContent = FP.stripExt(game.filename);
             var consoleName = document.createElement('div');
             consoleName.className = 'card-console';
             consoleName.textContent = game.console;
@@ -157,7 +149,7 @@
 
             // Click to play
             card.addEventListener('click', function () {
-                window.location.href = '/play?console=' + encodeURIComponent(game.console) + '&rom=' + encodeURIComponent(game.filename);
+                window.location.href = FP.playUrl(game);
             });
 
             grid.appendChild(card);
