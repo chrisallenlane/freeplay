@@ -1,23 +1,30 @@
 # paths
 makefile := $(realpath $(lastword $(MAKEFILE_LIST)))
+cmd_dir  := ./cmd/freeplay
+dist_dir := ./dist
 
 # executables
 GO   := go
 FMT  := gofumpt
 LINT := revive
+MKDIR := mkdir -p
 
 # build flags
 BUILD_FLAGS := -ldflags="-s -w" -trimpath
 
 ## build: build the freeplay binary
 .PHONY: build
-build: emulatorjs
-	$(GO) build $(BUILD_FLAGS) -o freeplay .
+build: | emulatorjs $(dist_dir)
+	$(GO) build $(BUILD_FLAGS) -o $(dist_dir)/freeplay $(cmd_dir)
 
 ## run: build and run with test data
 .PHONY: run
 run: build
-	./freeplay -data ./testdata
+	$(dist_dir)/freeplay -data ./testdata
+
+# ./dist
+$(dist_dir):
+	$(MKDIR) $(dist_dir)
 
 ## fmt: format go source files
 .PHONY: fmt
@@ -63,7 +70,7 @@ check: fmt lint vet test
 ## clean: remove compiled binary and temporary files
 .PHONY: clean
 clean:
-	rm -f freeplay
+	rm -f $(dist_dir)/*
 	rm -rf .tmp
 
 ## setup: install dev dependencies (gofumpt, revive)

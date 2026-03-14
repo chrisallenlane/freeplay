@@ -2,23 +2,17 @@
 package main
 
 import (
-	"embed"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
 
+	freeplay "github.com/chrisallenlane/freeplay"
 	"github.com/chrisallenlane/freeplay/internal/config"
 	"github.com/chrisallenlane/freeplay/internal/covers"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 	"github.com/chrisallenlane/freeplay/internal/server"
 )
-
-//go:embed frontend
-var frontendFS embed.FS
-
-//go:embed emulatorjs
-var emulatorjsFS embed.FS
 
 func main() {
 	dataDir := flag.String("data", "/data", "path to data directory")
@@ -37,7 +31,7 @@ func main() {
 	}
 	coverMgr := covers.New(*dataDir, fetcher)
 
-	srv := server.New(cfg, *dataDir, frontendFS, emulatorjsFS)
+	srv := server.New(cfg, *dataDir, freeplay.FrontendFS, freeplay.EmulatorjsFS)
 
 	// Wire cover art fetching to run after each scan
 	srv.Scanner().SetOnScanComplete(func(games []scanner.Game) {

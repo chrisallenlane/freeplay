@@ -14,12 +14,12 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=emulatorjs /tmp/emulatorjs/ ./emulatorjs/
-RUN CGO_ENABLED=0 go build -o freeplay .
+RUN CGO_ENABLED=0 go build -o dist/freeplay ./cmd/freeplay
 
 # Stage 3: Runtime
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
-COPY --from=builder /build/freeplay /usr/local/bin/freeplay
+COPY --from=builder /build/dist/freeplay /usr/local/bin/freeplay
 RUN mkdir -p /data
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:8080/api/health || exit 1
