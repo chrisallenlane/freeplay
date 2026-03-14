@@ -1,7 +1,6 @@
 package server
 
 import (
-	"embed"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -21,13 +20,13 @@ type Server struct {
 	dataDir      string
 	scanner      *scanner.Scanner
 	saves        *saves.Manager
-	frontendFS   embed.FS
-	emulatorjsFS embed.FS
+	frontendFS   fs.FS
+	emulatorjsFS fs.FS
 	mux          *http.ServeMux
 }
 
 // New creates a configured Server ready to listen.
-func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS embed.FS) *Server {
+func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS) *Server {
 	s := &Server{
 		cfg:          cfg,
 		dataDir:      dataDir,

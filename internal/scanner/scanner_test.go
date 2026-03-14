@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -148,5 +149,74 @@ func TestScanConcurrentPrevention(t *testing.T) {
 
 	if ran {
 		t.Error("Scan should have returned false when mutex is held")
+	}
+}
+
+func TestCatalogJSON(t *testing.T) {
+	dir, cfg := setupTestDir(t)
+	s := New(cfg, dir)
+	s.ScanBlocking()
+
+	data, err := s.CatalogJSON()
+	if err != nil {
+		t.Fatalf("CatalogJSON error: %v", err)
+	}
+
+	var cat Catalog
+	if err := json.Unmarshal(data, &cat); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(cat.Games) != 3 {
+		t.Errorf("got %d games, want 3", len(cat.Games))
+	}
+}
+
+func TestCatalogJSONEmpty(t *testing.T) {
+	_, cfg := setupTestDir(t)
+	s := New(cfg, "")
+
+	data, err := s.CatalogJSON()
+	if err != nil {
+		t.Fatalf("CatalogJSON error: %v", err)
+	}
+
+	var cat Catalog
+	json.Unmarshal(data, &cat)
+	if len(cat.Games) != 0 {
+		t.Errorf("expected empty games, got %d", len(cat.Games))
+	}
+}
+
+func TestScanBIOSDetection(t *testing.T) {
+	dir, cfg := setupTestDir(t)
+	cfg.BIOS["NES"] = "/some/bios/dir"
+
+	s := New(cfg, dir)
+	s.ScanBlocking()
+
+	cat := s.Catalog()
+	for _, g := range cat.Games {
+		if g.Console == "NES" && !g.HasBios {
+			t.Errorf("NES game %s should have HasBios=true", g.Filename)
+		}
+		if g.Console == "Genesis" && g.HasBios {
+			t.Errorf("Genesis game %s should have HasBios=false", g.Filename)
+		}
+	}
+}
+
+func TestScanCallback(t *testing.T) {
+	dir, cfg := setupTestDir(t)
+	s := New(cfg, dir)
+
+	var callbackGames []Game
+	s.SetOnScanComplete(func(games []Game) {
+		callbackGames = games
+	})
+
+	s.ScanBlocking()
+
+	if len(callbackGames) != 3 {
+		t.Errorf("callback got %d games, want 3", len(callbackGames))
 	}
 }
