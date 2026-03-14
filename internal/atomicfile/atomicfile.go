@@ -11,7 +11,7 @@ import (
 // in the same directory and renaming. The directory is created if needed.
 func Write(path string, fn func(w io.Writer) error) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating directory: %w", err)
 	}
 

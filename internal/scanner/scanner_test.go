@@ -15,17 +15,17 @@ func setupTestDir(t *testing.T) (string, *config.Config) {
 
 	nesDir := filepath.Join(dir, "roms", "nes")
 	genDir := filepath.Join(dir, "roms", "genesis")
-	os.MkdirAll(nesDir, 0755)
-	os.MkdirAll(genDir, 0755)
+	os.MkdirAll(nesDir, 0o755)
+	os.MkdirAll(genDir, 0o755)
 
-	os.WriteFile(filepath.Join(nesDir, "Mega Man.zip"), []byte("rom"), 0644)
-	os.WriteFile(filepath.Join(nesDir, "Zelda.zip"), []byte("rom"), 0644)
-	os.WriteFile(filepath.Join(genDir, "Sonic.gen"), []byte("rom"), 0644)
+	os.WriteFile(filepath.Join(nesDir, "Mega Man.zip"), []byte("rom"), 0o644)
+	os.WriteFile(filepath.Join(nesDir, "Zelda.zip"), []byte("rom"), 0o644)
+	os.WriteFile(filepath.Join(genDir, "Sonic.gen"), []byte("rom"), 0o644)
 
 	// Create a cover for Sonic
 	coverDir := filepath.Join(dir, "covers", "Genesis")
-	os.MkdirAll(coverDir, 0755)
-	os.WriteFile(filepath.Join(coverDir, "Sonic.png"), []byte("img"), 0644)
+	os.MkdirAll(coverDir, 0o755)
+	os.WriteFile(filepath.Join(coverDir, "Sonic.png"), []byte("img"), 0o644)
 
 	cfg := &config.Config{
 		Port: 8080,
@@ -76,7 +76,7 @@ func TestScanSortOrder(t *testing.T) {
 func TestScanSkipsSubdirectories(t *testing.T) {
 	dir, cfg := setupTestDir(t)
 	// Add a subdirectory inside NES roms
-	os.MkdirAll(filepath.Join(cfg.ROMs["NES"].Path, "subdir"), 0755)
+	os.MkdirAll(filepath.Join(cfg.ROMs["NES"].Path, "subdir"), 0o755)
 
 	s := New(cfg, dir)
 	s.ScanBlocking()
