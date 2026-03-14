@@ -44,16 +44,18 @@ func Path(dataDir, console, filenameWithoutExt string) string {
 
 // FetchMissing downloads cover art for games that don't have local covers.
 // Each entry is {console, filename (with extension)}.
-func (m *Manager) FetchMissing(games []GameEntry) {
+// Returns the number of covers successfully saved.
+func (m *Manager) FetchMissing(games []GameEntry) int {
 	if m.fetcher == nil {
-		return
+		return 0
 	}
 
 	ticker := time.NewTicker(334 * time.Millisecond) // ~3 req/s
 	defer ticker.Stop()
 
 	total := len(games)
-	fetched := 0
+	attempted := 0
+	saved := 0
 
 	for _, g := range games {
 		ext := filepath.Ext(g.Filename)
@@ -65,8 +67,8 @@ func (m *Manager) FetchMissing(games []GameEntry) {
 			continue
 		}
 
-		fetched++
-		slog.Info("fetching cover art", "progress", fetched, "total", total, "game", nameNoExt)
+		attempted++
+		slog.Info("fetching cover art", "progress", attempted, "total", total, "game", nameNoExt)
 
 		cleanName := CleanName(nameNoExt)
 		if cleanName == "" {
@@ -87,8 +89,11 @@ func (m *Manager) FetchMissing(games []GameEntry) {
 			return png.Encode(w, img)
 		}); err != nil {
 			slog.Warn("could not save cover art", "game", nameNoExt, "error", err)
+			continue
 		}
+		saved++
 	}
+	return saved
 }
 
 // GameEntry describes a game for cover art fetching.
