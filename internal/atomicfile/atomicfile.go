@@ -1,3 +1,4 @@
+// Package atomicfile provides atomic file write operations.
 package atomicfile
 
 import (

@@ -53,7 +53,7 @@ func TestWriteErrorCleansUp(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.txt")
 
-	err := Write(path, func(w io.Writer) error {
+	err := Write(path, func(_ io.Writer) error {
 		return errors.New("deliberate error")
 	})
 	if err == nil {

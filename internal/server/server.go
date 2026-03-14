@@ -1,3 +1,4 @@
+// Package server implements the freeplay HTTP server.
 package server
 
 import (
@@ -85,11 +86,11 @@ func writeJSONOK(w http.ResponseWriter) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSONOK(w)
 }
 
-func (s *Server) handleGames(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGames(w http.ResponseWriter, _ *http.Request) {
 	data, err := s.scanner.CatalogJSON()
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -172,7 +173,7 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) handleRescan(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {
 	if !s.scanner.Scan() {
 		http.Error(w, `{"error":"scan already in progress"}`, http.StatusConflict)
 		return

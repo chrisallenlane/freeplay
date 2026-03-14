@@ -1,3 +1,4 @@
+// Package config handles loading and validating the freeplay configuration.
 package config
 
 import (

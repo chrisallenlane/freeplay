@@ -1,3 +1,4 @@
+// Package saves manages save-game file operations.
 package saves
 
 import (

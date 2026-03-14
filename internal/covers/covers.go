@@ -1,3 +1,4 @@
+// Package covers manages cover art fetching and caching.
 package covers
 
 import (

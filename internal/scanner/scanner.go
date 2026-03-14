@@ -1,3 +1,4 @@
+// Package scanner discovers and catalogs ROM files.
 package scanner
 
 import (
