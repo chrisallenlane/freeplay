@@ -58,6 +58,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/games", s.handleGames)
 	s.mux.HandleFunc("GET /api/saves/{console}/{game}/{type}", s.handleGetSave)
 	s.mux.HandleFunc("POST /api/saves/{console}/{game}/{type}", s.handlePostSave)
+	s.mux.HandleFunc("POST /api/rescan", s.handleRescan)
 
 	// ROM serving
 	s.mux.HandleFunc("GET /roms/{console}/{file}", s.handleROM)
@@ -176,6 +177,15 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleRescan(w http.ResponseWriter, r *http.Request) {
+	if !s.scanner.Scan() {
+		http.Error(w, `{"error":"scan already in progress"}`, http.StatusConflict)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir, file string) {
