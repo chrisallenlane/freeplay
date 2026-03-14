@@ -76,70 +76,30 @@ core = "fceumm"
 	}
 }
 
-func TestLoadMissingFile(t *testing.T) {
-	dir := t.TempDir()
-	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error for missing config")
+func TestLoadValidationErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		config string // empty means don't write a config file
+	}{
+		{"missing file", ""},
+		{"missing path", "[roms.NES]\ncore = \"fceumm\""},
+		{"missing core", "[roms.NES]\npath = \"roms/nes\""},
+		{"invalid cover_art_api", "cover_art_api = \"invalid\"\ncover_art_api_key = \"key\""},
+		{"cover_art_api missing key", "cover_art_api = \"igdb\""},
+		{"IGDB key missing separator", "cover_art_api = \"igdb\"\ncover_art_api_key = \"missingcolon\""},
+		{"invalid port", "port = 99999"},
 	}
-}
 
-func TestLoadMissingPath(t *testing.T) {
-	dir := t.TempDir()
-	writeConfig(t, dir, `
-[roms.NES]
-core = "fceumm"
-`)
-	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error for missing path")
-	}
-}
-
-func TestLoadMissingCore(t *testing.T) {
-	dir := t.TempDir()
-	writeConfig(t, dir, `
-[roms.NES]
-path = "roms/nes"
-`)
-	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error for missing core")
-	}
-}
-
-func TestLoadInvalidCoverArtAPI(t *testing.T) {
-	dir := t.TempDir()
-	writeConfig(t, dir, `
-cover_art_api = "invalid"
-cover_art_api_key = "key"
-`)
-	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error for invalid cover_art_api")
-	}
-}
-
-func TestLoadCoverArtAPIMissingKey(t *testing.T) {
-	dir := t.TempDir()
-	writeConfig(t, dir, `
-cover_art_api = "igdb"
-`)
-	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error when cover_art_api set without key")
-	}
-}
-
-func TestLoadIGDBKeyMissingSeparator(t *testing.T) {
-	dir := t.TempDir()
-	writeConfig(t, dir, `
-cover_art_api = "igdb"
-cover_art_api_key = "missingcolon"
-`)
-	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error for IGDB key without colon separator")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tt.config != "" {
+				writeConfig(t, dir, tt.config)
+			}
+			if _, err := Load(dir); err == nil {
+				t.Fatal("expected error")
+			}
+		})
 	}
 }
 
@@ -185,16 +145,5 @@ core = "genesis_plus_gx"
 	gen := cfg.ROMs["Genesis"]
 	if len(gen.IGDBPlatformIDs) != 0 {
 		t.Errorf("Genesis IGDBPlatformIDs should be empty, got %v", gen.IGDBPlatformIDs)
-	}
-}
-
-func TestLoadInvalidPort(t *testing.T) {
-	dir := t.TempDir()
-	writeConfig(t, dir, `
-port = 99999
-`)
-	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error for invalid port")
 	}
 }
