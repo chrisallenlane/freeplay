@@ -87,6 +87,23 @@ func Path(dataDir, console, filenameWithoutExt string) string {
 	return filepath.Join(dataDir, "covers", console, filenameWithoutExt+".png")
 }
 
+// tryVariants tries each name variant with the given platform IDs, returning
+// the first matching image or nil.
+func (m *Manager) tryVariants(variants []string, console string, platformIDs []int, nameNoExt string, ticker *time.Ticker) (image.Image, bool) {
+	for _, name := range variants {
+		<-ticker.C
+		img, err := m.fetcher.Fetch(name, console, platformIDs)
+		if err != nil {
+			slog.Warn("cover art fetch failed", "game", nameNoExt, "error", err)
+			return nil, true
+		}
+		if img != nil {
+			return img, false
+		}
+	}
+	return nil, false
+}
+
 // FetchMissing downloads cover art for games that don't have local covers.
 // Each entry is {console, filename (with extension)}.
 // Returns the number of covers successfully saved.
@@ -127,35 +144,9 @@ func (m *Manager) FetchMissing(games []GameEntry) int {
 		// tried with platform constraint first (higher confidence), then
 		// all variants again without platform constraint.
 		variants := nameVariants(cleanName)
-		var img image.Image
-		var fetchErr bool
-		for _, name := range variants {
-			<-ticker.C
-			var err error
-			img, err = m.fetcher.Fetch(name, g.Console, g.IGDBPlatformIDs)
-			if err != nil {
-				slog.Warn("cover art fetch failed", "game", nameNoExt, "error", err)
-				fetchErr = true
-				break
-			}
-			if img != nil {
-				break
-			}
-		}
+		img, fetchErr := m.tryVariants(variants, g.Console, g.IGDBPlatformIDs, nameNoExt, ticker)
 		if img == nil && !fetchErr && len(g.IGDBPlatformIDs) > 0 {
-			for _, name := range variants {
-				<-ticker.C
-				var err error
-				img, err = m.fetcher.Fetch(name, g.Console, nil)
-				if err != nil {
-					slog.Warn("cover art fetch failed", "game", nameNoExt, "error", err)
-					fetchErr = true
-					break
-				}
-				if img != nil {
-					break
-				}
-			}
+			img, fetchErr = m.tryVariants(variants, g.Console, nil, nameNoExt, ticker)
 		}
 
 		if fetchErr || img == nil {
