@@ -28,12 +28,16 @@ type Catalog struct {
 	Games    []Game   `json:"games"`
 }
 
+// ScanCallback is called after a scan completes with the list of games.
+type ScanCallback func(games []Game)
+
 // Scanner builds and stores the game catalog.
 type Scanner struct {
-	cfg     *config.Config
-	dataDir string
-	catalog atomic.Pointer[Catalog]
-	mu      sync.Mutex
+	cfg            *config.Config
+	dataDir        string
+	catalog        atomic.Pointer[Catalog]
+	mu             sync.Mutex
+	onScanComplete ScanCallback
 }
 
 // New creates a Scanner.
@@ -130,4 +134,13 @@ func (s *Scanner) scan() {
 	s.catalog.Store(catalog)
 
 	slog.Info("scan complete", "consoles", len(consoles), "games", len(games))
+
+	if s.onScanComplete != nil {
+		s.onScanComplete(games)
+	}
+}
+
+// SetOnScanComplete sets a callback that fires after each scan.
+func (s *Scanner) SetOnScanComplete(cb ScanCallback) {
+	s.onScanComplete = cb
 }
