@@ -193,6 +193,12 @@
     // Rescan button
     var statusPollTimer = null;
 
+    function resetRescanBtn() {
+        rescanBtn.disabled = false;
+        rescanBtn.textContent = 'Rescan \u21BB';
+        rescanBtn.classList.remove('fetching');
+    }
+
     function pollCoverStatus() {
         fetch('/api/status')
             .then(function (res) { return res.json(); })
@@ -203,17 +209,11 @@
                     rescanBtn.classList.add('fetching');
                     statusPollTimer = setTimeout(pollCoverStatus, 2000);
                 } else {
-                    rescanBtn.disabled = false;
-                    rescanBtn.textContent = 'Rescan \u21BB';
-                    rescanBtn.classList.remove('fetching');
+                    resetRescanBtn();
                     loadCatalog();
                 }
             })
-            .catch(function () {
-                rescanBtn.disabled = false;
-                rescanBtn.textContent = 'Rescan \u21BB';
-                rescanBtn.classList.remove('fetching');
-            });
+            .catch(resetRescanBtn);
     }
 
     rescanBtn.addEventListener('click', function () {
@@ -233,8 +233,7 @@
             })
             .finally(function () {
                 if (!statusPollTimer) {
-                    rescanBtn.disabled = false;
-                    rescanBtn.textContent = 'Rescan \u21BB';
+                    resetRescanBtn();
                 }
             });
     });
