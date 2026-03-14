@@ -149,9 +149,13 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !s.saves.Get(w, consoleName, game, saveType) {
+	data := s.saves.Get(consoleName, game, saveType)
+	if data == nil {
 		http.NotFound(w, r)
+		return
 	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(data)
 }
 
 func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {

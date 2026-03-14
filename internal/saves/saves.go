@@ -3,7 +3,6 @@ package saves
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -28,17 +27,14 @@ func (m *Manager) savePath(console, game, saveType string) string {
 	return filepath.Join(m.saveDir(console, game), saveType)
 }
 
-// Get reads a save file and writes it to the response.
-// Returns false if the save does not exist.
-func (m *Manager) Get(w http.ResponseWriter, console, game, saveType string) bool {
-	path := m.savePath(console, game, saveType)
-	data, err := os.ReadFile(path)
+// Get reads a save file and returns its contents.
+// Returns nil if the save does not exist.
+func (m *Manager) Get(console, game, saveType string) []byte {
+	data, err := os.ReadFile(m.savePath(console, game, saveType))
 	if err != nil {
-		return false
+		return nil
 	}
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write(data)
-	return true
+	return data
 }
 
 // Put writes save data to disk atomically.
