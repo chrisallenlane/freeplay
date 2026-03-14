@@ -2,4 +2,5 @@ freeplay
 testdata/
 emulatorjs/
 .tickets/
+.playwright-mcp/
 PROJECT_PROGRESS.md
