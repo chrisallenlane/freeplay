@@ -92,6 +92,11 @@ header h1 {
     background: #3a3a4e;
 }
 
+.filter-btn:focus-visible {
+    outline: 2px solid #4a4aff;
+    outline-offset: 2px;
+}
+
 .filter-btn.active {
     background: #4a4aff;
     border-color: #5a5aff;
@@ -114,8 +119,9 @@ header h1 {
 }
 
 #search:focus {
-    outline: none;
     border-color: #4a4aff;
+    outline: 2px solid #4a4aff;
+    outline-offset: 2px;
 }
 
 .game-grid {
@@ -126,6 +132,9 @@ header h1 {
 }
 
 .game-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
     background: #1a1a2e;
     border: 1px solid #2a2a3e;
     border-radius: 8px;
@@ -133,6 +142,11 @@ header h1 {
     cursor: pointer;
     transition: transform 0.15s, border-color 0.15s;
     position: relative;
+}
+
+.game-card:focus-visible {
+    outline: 2px solid #4a4aff;
+    outline-offset: 2px;
 }
 
 .game-card:hover {
@@ -233,4 +247,33 @@ header h1 {
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.875rem;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 16px;
+    background: #4a4aff;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 4px;
+    z-index: 100;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+
+.skip-link:focus {
+    top: 8px;
 }

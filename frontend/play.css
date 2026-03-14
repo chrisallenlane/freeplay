@@ -24,10 +24,17 @@ header a:hover {
     text-decoration: underline;
 }
 
+header a:focus-visible {
+    outline: 2px solid #8888ff;
+    outline-offset: 2px;
+}
+
 header .game-name {
+    font-family: inherit;
     font-size: 1rem;
     font-weight: 500;
     color: #fff;
+    margin: 0;
 }
 
 #game {

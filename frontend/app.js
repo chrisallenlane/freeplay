@@ -92,8 +92,9 @@
 		}
 
 		games.forEach((game) => {
-			const card = document.createElement("div");
+			const card = document.createElement("a");
 			card.className = "game-card";
+			card.href = FP.playUrl(game);
 
 			// Favorite button
 			const isFav = favorites.has(FP.favKey(game));
@@ -101,6 +102,7 @@
 			fav.className = `fav-btn${isFav ? " favorited" : ""}`;
 			fav.textContent = isFav ? "\u2605" : "\u2606";
 			fav.addEventListener("click", (e) => {
+				e.preventDefault();
 				e.stopPropagation();
 				const key = FP.favKey(game);
 				if (favorites.has(key)) {
@@ -122,7 +124,7 @@
 				const img = document.createElement("img");
 				img.className = "cover";
 				img.src = FP.coverUrl(game);
-				img.alt = game.filename;
+				img.alt = FP.stripExt(game.filename);
 				img.loading = "lazy";
 				card.appendChild(img);
 			} else {
@@ -151,11 +153,6 @@
 			info.appendChild(title);
 			info.appendChild(consoleName);
 			card.appendChild(info);
-
-			// Click to play
-			card.addEventListener("click", () => {
-				window.location.href = FP.playUrl(game);
-			});
 
 			grid.appendChild(card);
 		});
