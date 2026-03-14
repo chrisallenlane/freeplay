@@ -44,7 +44,12 @@ func main() {
 		for i, g := range games {
 			entries[i] = covers.GameEntry{Console: g.Console, Filename: g.Filename}
 		}
-		go coverMgr.FetchMissing(entries)
+		go func() {
+			if coverMgr.FetchMissing(entries) > 0 {
+				// Rescan so the catalog picks up newly fetched covers
+				srv.Scanner().ScanBlocking()
+			}
+		}()
 	})
 
 	// Trigger initial ROM scan asynchronously
