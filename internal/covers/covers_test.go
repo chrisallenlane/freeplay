@@ -136,6 +136,38 @@ func FuzzCleanName(f *testing.F) {
 	})
 }
 
+func FuzzNameVariants(f *testing.F) {
+	f.Add("Metroid")
+	f.Add("Game - Subtitle")
+	f.Add("Sim City")
+	f.Add("SimCity: BuildIt")
+	f.Add("")
+	f.Add(" - ")
+	f.Add(": ")
+	f.Add("   ")
+
+	f.Fuzz(func(t *testing.T, input string) {
+		result := nameVariants(input)
+		if input == "" {
+			if len(result) != 0 {
+				t.Error("nameVariants(\"\") should return nil")
+			}
+			return
+		}
+		if len(result) == 0 {
+			t.Error("nameVariants must return at least one element for non-empty input")
+		}
+		if result[0] != input {
+			t.Errorf("first element must be the input itself, got %q", result[0])
+		}
+		for i, v := range result {
+			if v == "" {
+				t.Errorf("nameVariants[%d] is empty string", i)
+			}
+		}
+	})
+}
+
 // mockFetcher is a test double for the Fetcher interface.
 type mockFetcher struct {
 	img   image.Image

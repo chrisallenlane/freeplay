@@ -95,17 +95,27 @@ func TestScanCoverDetection(t *testing.T) {
 	s.ScanBlocking()
 
 	cat := s.getCatalog()
+	foundSonic := false
+	foundNES := false
 	for _, g := range cat.Games {
 		if g.Console == "Genesis" && g.Filename == "Sonic.gen" {
+			foundSonic = true
 			if !g.HasCover {
 				t.Error("Sonic should have cover")
 			}
 		}
 		if g.Console == "NES" {
+			foundNES = true
 			if g.HasCover {
 				t.Errorf("NES game %s should not have cover", g.Filename)
 			}
 		}
+	}
+	if !foundSonic {
+		t.Error("Sonic.gen not found in catalog")
+	}
+	if !foundNES {
+		t.Error("no NES games found in catalog")
 	}
 }
 
@@ -142,13 +152,22 @@ func TestScanConcurrentPrevention(t *testing.T) {
 	dir, cfg := setupTestDir(t)
 	s := New(cfg, dir)
 
-	// Lock the mutex to simulate a running scan
-	s.mu.Lock()
+	// Use a callback to hold the scan in progress while we attempt a second.
+	started := make(chan struct{})
+	release := make(chan struct{})
+	s.SetOnScanComplete(func(_ []Game) {
+		close(started)
+		<-release
+	})
+
+	go s.ScanBlocking()
+	<-started
+
 	ran := s.Scan()
-	s.mu.Unlock()
+	close(release)
 
 	if ran {
-		t.Error("Scan should have returned false when mutex is held")
+		t.Error("Scan should have returned false when another scan is in progress")
 	}
 }
 

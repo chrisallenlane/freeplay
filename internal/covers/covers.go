@@ -56,6 +56,10 @@ func CleanName(nameWithoutExt string) string {
 // confidence. Each variant represents a different heuristic for matching
 // ROM filenames to IGDB game titles.
 func nameVariants(cleanName string) []string {
+	if cleanName == "" {
+		return nil
+	}
+
 	seen := map[string]bool{cleanName: true}
 	variants := []string{cleanName}
 
