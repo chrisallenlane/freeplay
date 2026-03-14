@@ -77,42 +77,42 @@ func (f *IGDBFetcher) getToken() (string, error) {
 }
 
 func (f *IGDBFetcher) apiRequest(endpoint, body string) ([]byte, error) {
-	return f.apiRequestRetry(endpoint, body, false)
-}
+	for attempt := range 2 {
+		token, err := f.getToken()
+		if err != nil {
+			return nil, err
+		}
 
-func (f *IGDBFetcher) apiRequestRetry(endpoint, body string, retried bool) ([]byte, error) {
-	token, err := f.getToken()
-	if err != nil {
-		return nil, err
+		req, err := http.NewRequest("POST", "https://api.igdb.com/v4/"+endpoint, strings.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Client-ID", f.clientID)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := f.client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("IGDB request failed: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 {
+			// Token expired, clear and retry once
+			f.mu.Lock()
+			f.token = ""
+			f.mu.Unlock()
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			respBody, _ := io.ReadAll(resp.Body)
+			return nil, fmt.Errorf("IGDB returned %d: %s", resp.StatusCode, string(respBody))
+		}
+
+		return io.ReadAll(resp.Body)
 	}
-
-	req, err := http.NewRequest("POST", "https://api.igdb.com/v4/"+endpoint, strings.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Client-ID", f.clientID)
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := f.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("IGDB request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusUnauthorized && !retried {
-		// Token expired, clear and retry once
-		f.mu.Lock()
-		f.token = ""
-		f.mu.Unlock()
-		return f.apiRequestRetry(endpoint, body, true)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("IGDB returned %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	return io.ReadAll(resp.Body)
+	// Unreachable: loop always returns or continues
+	return nil, fmt.Errorf("IGDB request failed after retry")
 }
 
 // Fetch retrieves a cover art image for the given game name.
