@@ -30,6 +30,12 @@ Freeplay is deliberately minimal. It has no:
 Your ROMs live on the filesystem. Freeplay reads them and gets out of your
 way.
 
+## Network security
+
+Freeplay intentionally does not implement authentication. It is designed for
+trusted environments like a home network or VPN, where every user on the
+network is allowed to play.
+
 ## Quick start
 
 ```bash
