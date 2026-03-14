@@ -82,6 +82,17 @@ func (m *Manager) FetchMissing(games []GameEntry) int {
 			slog.Warn("cover art fetch failed", "game", nameNoExt, "error", err)
 			continue
 		}
+
+		// If no match with platform constraint, retry without it
+		if img == nil && len(g.IGDBPlatformIDs) > 0 {
+			<-ticker.C
+			img, err = m.fetcher.Fetch(cleanName, g.Console, nil)
+			if err != nil {
+				slog.Warn("cover art fetch failed", "game", nameNoExt, "error", err)
+				continue
+			}
+		}
+
 		if img == nil {
 			continue
 		}

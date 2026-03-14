@@ -173,6 +173,66 @@ func TestFetchMissingNilImage(t *testing.T) {
 	}
 }
 
+// platformFallbackFetcher returns nil when platform IDs are provided,
+// and an image when they are not, simulating an IGDB miss on a specific
+// platform with a hit on the unconstrained search.
+type platformFallbackFetcher struct {
+	calls int
+}
+
+func (f *platformFallbackFetcher) Fetch(
+	_ string,
+	_ string,
+	platformIDs []int,
+) (image.Image, error) {
+	f.calls++
+	if len(platformIDs) > 0 {
+		return nil, nil
+	}
+	return image.NewRGBA(image.Rect(0, 0, 1, 1)), nil
+}
+
+func TestFetchMissingPlatformFallback(t *testing.T) {
+	dir := t.TempDir()
+	fetcher := &platformFallbackFetcher{}
+	m := New(dir, fetcher)
+
+	game := GameEntry{
+		Console:         "NES",
+		Filename:        "Q-Bert.nes",
+		IGDBPlatformIDs: []int{18, 99},
+	}
+	got := m.FetchMissing([]GameEntry{game})
+
+	if got != 1 {
+		t.Errorf("FetchMissing() = %d, want 1", got)
+	}
+	if fetcher.calls != 2 {
+		t.Errorf("Fetch() called %d times, want 2 (platform + fallback)", fetcher.calls)
+	}
+
+	coverPath := Path(dir, "NES", "Q-Bert")
+	if _, err := os.Stat(coverPath); err != nil {
+		t.Errorf("expected cover file at %q, got stat error: %v", coverPath, err)
+	}
+}
+
+func TestFetchMissingNoFallbackWithoutPlatformIDs(t *testing.T) {
+	dir := t.TempDir()
+	fetcher := &mockFetcher{img: nil, err: nil}
+	m := New(dir, fetcher)
+
+	game := GameEntry{Console: "NES", Filename: "Q-Bert.nes"}
+	got := m.FetchMissing([]GameEntry{game})
+
+	if got != 0 {
+		t.Errorf("FetchMissing() = %d, want 0", got)
+	}
+	if fetcher.calls != 1 {
+		t.Errorf("Fetch() called %d times, want 1 (no fallback without platform IDs)", fetcher.calls)
+	}
+}
+
 func TestFetchMissingSkipsEmptyCleanName(t *testing.T) {
 	dir := t.TempDir()
 	fetcher := &mockFetcher{img: image.NewRGBA(image.Rect(0, 0, 1, 1))}
