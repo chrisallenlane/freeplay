@@ -37,6 +37,7 @@ fmt:
 lint:
 	$(LINT) ./...
 	npx --yes @biomejs/biome check frontend/*.js
+	npx --yes html-validate frontend/*.html
 
 ## vet: vet go source files
 .PHONY: vet
