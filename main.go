@@ -29,6 +29,9 @@ func main() {
 
 	srv := server.New(cfg, *dataDir, frontendFS, emulatorjsFS)
 
+	// Trigger initial ROM scan asynchronously
+	go srv.Scanner().ScanBlocking()
+
 	slog.Info("starting freeplay", "port", cfg.Port, "data", *dataDir)
 	if err := srv.ListenAndServe(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
