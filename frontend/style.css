@@ -6,6 +6,13 @@
     src: url('/Silkscreen-Regular.woff2') format('woff2');
 }
 
+:root {
+    --color-accent: #4a4aff;
+    --color-surface: #1a1a2e;
+    --color-border: #2a2a3e;
+    --color-border-hi: #3a3a4e;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -24,8 +31,8 @@ header {
     align-items: center;
     justify-content: space-between;
     padding: 16px 24px;
-    background: #1a1a2e;
-    border-bottom: 1px solid #2a2a3e;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
 }
 
 header h1 {
@@ -36,8 +43,8 @@ header h1 {
 }
 
 #rescan-btn {
-    background: #2a2a3e;
-    border: 1px solid #3a3a4e;
+    background: var(--color-border);
+    border: 1px solid var(--color-border-hi);
     color: #ccc;
     padding: 8px 16px;
     border-radius: 6px;
@@ -46,7 +53,7 @@ header h1 {
 }
 
 #rescan-btn:hover {
-    background: #3a3a4e;
+    background: var(--color-border-hi);
 }
 
 #rescan-btn:disabled {
@@ -75,12 +82,12 @@ header h1 {
     gap: 8px;
     align-items: center;
     background: #151525;
-    border-bottom: 1px solid #2a2a3e;
+    border-bottom: 1px solid var(--color-border);
 }
 
 .filter-btn {
-    background: #2a2a3e;
-    border: 1px solid #3a3a4e;
+    background: var(--color-border);
+    border: 1px solid var(--color-border-hi);
     color: #ccc;
     padding: 6px 14px;
     border-radius: 4px;
@@ -89,16 +96,16 @@ header h1 {
 }
 
 .filter-btn:hover {
-    background: #3a3a4e;
+    background: var(--color-border-hi);
 }
 
 .filter-btn:focus-visible {
-    outline: 2px solid #4a4aff;
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
 }
 
 .filter-btn.active {
-    background: #4a4aff;
+    background: var(--color-accent);
     border-color: #5a5aff;
     color: #fff;
 }
@@ -110,8 +117,8 @@ header h1 {
 
 #search {
     margin-left: auto;
-    background: #1a1a2e;
-    border: 1px solid #3a3a4e;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-hi);
     color: #e0e0e0;
     padding: 6px 12px;
     border-radius: 4px;
@@ -124,8 +131,8 @@ header h1 {
 }
 
 #search:focus {
-    border-color: #4a4aff;
-    outline: 2px solid #4a4aff;
+    border-color: var(--color-accent);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
 }
 
@@ -140,8 +147,8 @@ header h1 {
     display: block;
     text-decoration: none;
     color: inherit;
-    background: #1a1a2e;
-    border: 1px solid #2a2a3e;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     overflow: hidden;
     cursor: pointer;
@@ -151,7 +158,7 @@ header h1 {
 
 .game-card:hover,
 .game-card:focus-visible {
-    outline: 2px solid #4a4aff;
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
 }
 
@@ -245,7 +252,7 @@ header h1 {
 
 .message button {
     margin-top: 12px;
-    background: #4a4aff;
+    background: var(--color-accent);
     border: none;
     color: #fff;
     padding: 8px 20px;
@@ -270,7 +277,7 @@ header h1 {
     position: absolute;
     top: -100%;
     left: 16px;
-    background: #4a4aff;
+    background: var(--color-accent);
     color: #fff;
     padding: 8px 16px;
     border-radius: 4px;
