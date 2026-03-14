@@ -113,11 +113,13 @@ func (m *Manager) FetchMissing(games []GameEntry) int {
 			continue
 		}
 
-		// Try name variants in order of confidence. For each variant,
-		// try with platform constraint first, then without.
+		// Try name variants in order of confidence. All variants are
+		// tried with platform constraint first (higher confidence), then
+		// all variants again without platform constraint.
+		variants := nameVariants(cleanName)
 		var img image.Image
 		var fetchErr bool
-		for _, name := range nameVariants(cleanName) {
+		for _, name := range variants {
 			<-ticker.C
 			var err error
 			img, err = m.fetcher.Fetch(name, g.Console, g.IGDBPlatformIDs)
@@ -129,9 +131,11 @@ func (m *Manager) FetchMissing(games []GameEntry) int {
 			if img != nil {
 				break
 			}
-
-			if len(g.IGDBPlatformIDs) > 0 {
+		}
+		if img == nil && !fetchErr && len(g.IGDBPlatformIDs) > 0 {
+			for _, name := range variants {
 				<-ticker.C
+				var err error
 				img, err = m.fetcher.Fetch(name, g.Console, nil)
 				if err != nil {
 					slog.Warn("cover art fetch failed", "game", nameNoExt, "error", err)
