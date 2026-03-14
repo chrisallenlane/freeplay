@@ -245,22 +245,6 @@ func TestRescanEndpoint(t *testing.T) {
 	}
 }
 
-func TestRescanConflict(t *testing.T) {
-	srv, _ := testServer(t)
-
-	// Hold the scanner mutex to simulate an in-progress scan
-	srv.scanner.ScanBlocking()
-	// Lock manually to block
-	// We need to access the mutex - use ScanBlocking in a goroutine instead
-	// Actually, let's just trigger two quick scans
-	// The simpler approach: the scanner test already tests this.
-	// Here we test the HTTP endpoint returns 409.
-
-	// Actually, we can't easily hold the mutex from the test.
-	// Let's just verify the 200 case works (above) and trust the
-	// scanner's own TestScanConcurrentPrevention covers the mutex logic.
-}
-
 func TestCoversServing(t *testing.T) {
 	srv, dir := testServer(t)
 
