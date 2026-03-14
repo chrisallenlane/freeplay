@@ -73,8 +73,11 @@ func (c *Config) validate() error {
 		return fmt.Errorf("cover_art_api_key is required when cover_art_api is set")
 	}
 
-	if c.CoverArtAPI == "igdb" && c.CoverArtKey != "" && !strings.Contains(c.CoverArtKey, ":") {
-		return fmt.Errorf("cover_art_api_key for igdb must be in \"client_id:client_secret\" format")
+	if c.CoverArtAPI == "igdb" && c.CoverArtKey != "" {
+		parts := strings.SplitN(c.CoverArtKey, ":", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return fmt.Errorf("cover_art_api_key for igdb must be in \"client_id:client_secret\" format")
+		}
 	}
 
 	if c.ROMs == nil {

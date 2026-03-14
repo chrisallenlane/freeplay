@@ -20,9 +20,9 @@ check: fmt vet test
 clean:
 	rm -f freeplay
 
-# Download EmulatorJS for local dev (batch-1/05 creates the script)
+# Download EmulatorJS for local dev
 emulatorjs:
-	@if [ ! -d emulatorjs ]; then ./scripts/download-emulatorjs.sh; fi
+	@if [ ! -f emulatorjs/data/loader.js ]; then ./scripts/download-emulatorjs.sh; fi
 
 docker:
 	docker build -t freeplay .
