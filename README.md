@@ -63,6 +63,12 @@ cover art configuration.
 | [ARCHITECTURE.md](ARCHITECTURE.md)             | Understanding the internal design  |
 | [freeplay.example.toml](freeplay.example.toml) | Annotated configuration reference  |
 
+## Acknowledgements
+
+Freeplay is a thin wrapper around [EmulatorJS][], which does all of the heavy
+lifting. Thanks to the EmulatorJS team for making browser-based retro gaming
+possible.
+
 ## License
 
 MIT
