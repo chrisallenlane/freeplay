@@ -49,7 +49,7 @@ func New(cfg *config.Config, dataDir string) *Scanner {
 }
 
 // Catalog returns the current catalog.
-func (s *Scanner) GetCatalog() *Catalog {
+func (s *Scanner) Catalog() *Catalog {
 	return s.catalog.Load()
 }
 
