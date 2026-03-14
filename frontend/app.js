@@ -191,9 +191,34 @@
     searchInput.addEventListener('input', renderGrid);
 
     // Rescan button
+    var statusPollTimer = null;
+
+    function pollCoverStatus() {
+        fetch('/api/status')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data.fetchingCovers) {
+                    rescanBtn.disabled = true;
+                    rescanBtn.innerHTML = '<span class="spinner">\u21BB</span> Fetching covers\u2026';
+                    rescanBtn.classList.add('fetching');
+                    statusPollTimer = setTimeout(pollCoverStatus, 2000);
+                } else {
+                    rescanBtn.disabled = false;
+                    rescanBtn.textContent = 'Rescan \u21BB';
+                    rescanBtn.classList.remove('fetching');
+                    loadCatalog();
+                }
+            })
+            .catch(function () {
+                rescanBtn.disabled = false;
+                rescanBtn.textContent = 'Rescan \u21BB';
+                rescanBtn.classList.remove('fetching');
+            });
+    }
+
     rescanBtn.addEventListener('click', function () {
         rescanBtn.disabled = true;
-        rescanBtn.textContent = 'Scanning...';
+        rescanBtn.textContent = 'Scanning\u2026';
         fetch('/api/rescan', { method: 'POST' })
             .then(function (res) {
                 if (res.status === 409) {
@@ -201,14 +226,16 @@
                     return;
                 }
                 if (!res.ok) throw new Error('HTTP ' + res.status);
-                return loadCatalog();
+                return loadCatalog().then(pollCoverStatus);
             })
             .catch(function () {
                 alert('Rescan failed. Check that Freeplay is running.');
             })
             .finally(function () {
-                rescanBtn.disabled = false;
-                rescanBtn.textContent = 'Rescan \u21BB';
+                if (!statusPollTimer) {
+                    rescanBtn.disabled = false;
+                    rescanBtn.textContent = 'Rescan \u21BB';
+                }
             });
     });
 

@@ -45,7 +45,7 @@ func testServer(t *testing.T) (*Server, string) {
 		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
 	}
 
-	srv, err := New(cfg, dir, frontendFS, emulatorjsFS)
+	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
