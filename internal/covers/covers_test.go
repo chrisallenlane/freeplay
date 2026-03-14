@@ -5,6 +5,29 @@ import (
 	"testing"
 )
 
+func TestIntsToStrings(t *testing.T) {
+	tests := []struct {
+		input []int
+		want  []string
+	}{
+		{[]int{18}, []string{"18"}},
+		{[]int{18, 99}, []string{"18", "99"}},
+		{[]int{}, []string{}},
+	}
+	for _, tt := range tests {
+		got := intsToStrings(tt.input)
+		if len(got) != len(tt.want) {
+			t.Errorf("intsToStrings(%v) = %v, want %v", tt.input, got, tt.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Errorf("intsToStrings(%v)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+			}
+		}
+	}
+}
+
 func TestCleanName(t *testing.T) {
 	tests := []struct {
 		input string

@@ -162,6 +162,32 @@ PlayStation = "bios/ps1"
 	}
 }
 
+func TestLoadIGDBPlatformIDs(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+[roms.NES]
+path = "/roms/nes"
+core = "fceumm"
+igdb_platform_ids = [18, 99]
+
+[roms.Genesis]
+path = "/roms/genesis"
+core = "genesis_plus_gx"
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nes := cfg.ROMs["NES"]
+	if len(nes.IGDBPlatformIDs) != 2 || nes.IGDBPlatformIDs[0] != 18 || nes.IGDBPlatformIDs[1] != 99 {
+		t.Errorf("NES IGDBPlatformIDs = %v, want [18 99]", nes.IGDBPlatformIDs)
+	}
+	gen := cfg.ROMs["Genesis"]
+	if len(gen.IGDBPlatformIDs) != 0 {
+		t.Errorf("Genesis IGDBPlatformIDs should be empty, got %v", gen.IGDBPlatformIDs)
+	}
+}
+
 func TestLoadInvalidPort(t *testing.T) {
 	dir := t.TempDir()
 	writeConfig(t, dir, `

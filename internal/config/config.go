@@ -21,8 +21,9 @@ type Config struct {
 
 // ROM describes a single console's ROM directory and emulator core.
 type ROM struct {
-	Path string `toml:"path"`
-	Core string `toml:"core"`
+	Path            string `toml:"path"`
+	Core            string `toml:"core"`
+	IGDBPlatformIDs []int  `toml:"igdb_platform_ids"`
 }
 
 // Load reads and validates freeplay.toml from the given data directory.

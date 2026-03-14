@@ -42,7 +42,7 @@ func main() {
 	srv.Scanner().SetOnScanComplete(func(games []scanner.Game) {
 		entries := make([]covers.GameEntry, len(games))
 		for i, g := range games {
-			entries[i] = covers.GameEntry{Console: g.Console, Filename: g.Filename}
+			entries[i] = covers.GameEntry{Console: g.Console, Filename: g.Filename, IGDBPlatformIDs: g.IGDBPlatformIDs}
 		}
 		go func() {
 			if coverMgr.FetchMissing(entries) > 0 {
