@@ -103,6 +103,11 @@ header h1 {
     color: #fff;
 }
 
+.search-bar {
+    padding: 12px 24px;
+    background: #151525;
+}
+
 #search {
     margin-left: auto;
     background: #1a1a2e;
