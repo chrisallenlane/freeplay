@@ -26,15 +26,17 @@ run: build
 $(dist_dir):
 	$(MKDIR) $(dist_dir)
 
-## fmt: format go source files
+## fmt: format source files
 .PHONY: fmt
 fmt:
 	$(FMT) -w .
+	npx --yes @biomejs/biome check --write frontend/*.js
 
-## lint: lint go source files
+## lint: lint source files
 .PHONY: lint
 lint:
 	$(LINT) ./...
+	npx --yes @biomejs/biome check frontend/*.js
 
 ## vet: vet go source files
 .PHONY: vet
