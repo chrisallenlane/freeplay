@@ -1,0 +1,35 @@
+# Freeplay configuration
+port = 8080
+
+# Cover art API (optional)
+# Requires a Twitch developer application: https://dev.twitch.tv/console
+# Format: "client_id:client_secret"
+# cover_art_api = "igdb"
+# cover_art_api_key = "your_client_id:your_client_secret"
+
+# ROM directories
+# Each entry maps a display name to a path and EmulatorJS core.
+# Paths are relative to the data directory (/data in Docker).
+#
+# Common cores: nes/fceumm, snes9x, genesis_plus_gx, mgba, gambatte,
+#               mupen64plus_next, pcsx_rearmed, fbneo, stella2014
+
+# [roms.NES]
+# path = "roms/nes"
+# core = "fceumm"
+
+# [roms."Super Nintendo"]
+# path = "roms/snes"
+# core = "snes9x"
+
+# [roms.Genesis]
+# path = "roms/genesis"
+# core = "genesis_plus_gx"
+
+# [roms."Game Boy Advance"]
+# path = "roms/gba"
+# core = "mgba"
+
+# BIOS directories (optional, needed for some consoles like PlayStation)
+# [bios]
+# PlayStation = "bios/ps1"
