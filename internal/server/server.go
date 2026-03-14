@@ -17,28 +17,41 @@ import (
 
 // Server is the Freeplay HTTP server.
 type Server struct {
-	cfg          *config.Config
-	dataDir      string
-	scanner      *scanner.Scanner
-	saves        *saves.Manager
-	frontendFS   fs.FS
-	emulatorjsFS fs.FS
-	mux          *http.ServeMux
+	cfg           *config.Config
+	dataDir       string
+	scanner       *scanner.Scanner
+	saves         *saves.Manager
+	frontendFS    fs.FS
+	frontendSub   fs.FS
+	emulatorjsSub fs.FS
+	mux           *http.ServeMux
+	handler       http.Handler
 }
 
 // New creates a configured Server ready to listen.
-func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS) *Server {
+func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS) (*Server, error) {
+	frontendSub, err := fs.Sub(frontendFS, "frontend")
+	if err != nil {
+		return nil, fmt.Errorf("frontend fs: %w", err)
+	}
+	emulatorjsSub, err := fs.Sub(emulatorjsFS, "emulatorjs")
+	if err != nil {
+		return nil, fmt.Errorf("emulatorjs fs: %w", err)
+	}
+
 	s := &Server{
-		cfg:          cfg,
-		dataDir:      dataDir,
-		scanner:      scanner.New(cfg, dataDir),
-		saves:        saves.New(dataDir),
-		frontendFS:   frontendFS,
-		emulatorjsFS: emulatorjsFS,
-		mux:          http.NewServeMux(),
+		cfg:           cfg,
+		dataDir:       dataDir,
+		scanner:       scanner.New(cfg, dataDir),
+		saves:         saves.New(dataDir),
+		frontendFS:    frontendFS,
+		frontendSub:   frontendSub,
+		emulatorjsSub: emulatorjsSub,
+		mux:           http.NewServeMux(),
 	}
 	s.routes()
-	return s
+	s.handler = securityHeaders(s.mux)
+	return s, nil
 }
 
 // Scanner returns the server's scanner for triggering async scans.
@@ -49,7 +62,16 @@ func (s *Server) Scanner() *scanner.Scanner {
 // ListenAndServe starts the HTTP server.
 func (s *Server) ListenAndServe() error {
 	addr := fmt.Sprintf(":%d", s.cfg.Port)
-	return http.ListenAndServe(addr, s.mux)
+	return http.ListenAndServe(addr, s.handler)
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "same-origin")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) routes() {
@@ -70,15 +92,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /covers/{rest...}", s.handleCovers)
 
 	// Embedded EmulatorJS
-	emulatorjsSub, _ := fs.Sub(s.emulatorjsFS, "emulatorjs")
-	s.mux.Handle("/emulatorjs/", http.StripPrefix("/emulatorjs/", http.FileServerFS(emulatorjsSub)))
+	s.mux.Handle("/emulatorjs/", http.StripPrefix("/emulatorjs/", http.FileServerFS(s.emulatorjsSub)))
 
 	// Player page (explicit route before catch-all)
 	s.mux.HandleFunc("GET /play", s.handlePlay)
 
 	// Embedded frontend (catch-all)
-	frontendSub, _ := fs.Sub(s.frontendFS, "frontend")
-	s.mux.Handle("/", http.FileServerFS(frontendSub))
+	s.mux.Handle("/", http.FileServerFS(s.frontendSub))
 }
 
 func writeJSONOK(w http.ResponseWriter) {
@@ -131,18 +151,26 @@ func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
 	http.ServeFileFS(w, r, s.frontendFS, "frontend/play.html")
 }
 
+func safeName(s string) bool {
+	return s != "" &&
+		!strings.Contains(s, "..") &&
+		!strings.Contains(s, "/") &&
+		!strings.Contains(s, "\\") &&
+		!strings.ContainsRune(s, 0)
+}
+
 func parseSaveParams(r *http.Request) (console, game, saveType string, ok bool) {
 	console = r.PathValue("console")
 	game = r.PathValue("game")
 	saveType = r.PathValue("type")
-	ok = saves.ValidType(saveType)
+	ok = safeName(console) && safeName(game) && saves.ValidType(saveType)
 	return
 }
 
 func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 	consoleName, game, saveType, ok := parseSaveParams(r)
 	if !ok {
-		http.Error(w, "invalid save type", http.StatusBadRequest)
+		http.Error(w, "invalid save parameters", http.StatusBadRequest)
 		return
 	}
 
@@ -158,10 +186,11 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	consoleName, game, saveType, ok := parseSaveParams(r)
 	if !ok {
-		http.Error(w, "invalid save type", http.StatusBadRequest)
+		http.Error(w, "invalid save parameters", http.StatusBadRequest)
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20) // 64 MB
 	if err := s.saves.Put(consoleName, game, saveType, r.Body); err != nil {
 		http.Error(w, "save failed", http.StatusInternalServerError)
 		return

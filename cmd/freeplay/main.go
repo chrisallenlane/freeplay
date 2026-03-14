@@ -31,7 +31,11 @@ func main() {
 	}
 	coverMgr := covers.New(*dataDir, fetcher)
 
-	srv := server.New(cfg, *dataDir, freeplay.FrontendFS, freeplay.EmulatorjsFS)
+	srv, err := server.New(cfg, *dataDir, freeplay.FrontendFS, freeplay.EmulatorjsFS)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
 
 	// Wire cover art fetching to run after each scan
 	srv.Scanner().SetOnScanComplete(func(games []scanner.Game) {
