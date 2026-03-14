@@ -117,7 +117,7 @@ func (f *IGDBFetcher) apiRequestRetry(endpoint, body string, retried bool) ([]by
 
 // Fetch retrieves a cover art image for the given game name.
 // When platformIDs is non-empty, results are filtered to those IGDB platform IDs.
-func (f *IGDBFetcher) Fetch(gameName string, console string, platformIDs []int) (image.Image, error) {
+func (f *IGDBFetcher) Fetch(gameName string, _ string, platformIDs []int) (image.Image, error) {
 	escaped := strings.ReplaceAll(gameName, `"`, `\"`)
 	var query string
 	if len(platformIDs) > 0 {

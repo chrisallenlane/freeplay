@@ -1,3 +1,4 @@
+// Package main implements the freeplay retro-gaming server.
 package main
 
 import (
