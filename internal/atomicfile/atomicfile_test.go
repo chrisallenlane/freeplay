@@ -88,3 +88,27 @@ func TestWriteCreatesDirectories(t *testing.T) {
 		t.Errorf("got %q, want %q", string(data), "deep")
 	}
 }
+
+func TestWriteDirectoryCreationFails(t *testing.T) {
+	err := Write("/dev/null/impossible/file.txt", func(w io.Writer) error {
+		_, err := w.Write([]byte("data"))
+		return err
+	})
+	if err == nil {
+		t.Fatal("expected error when directory cannot be created")
+	}
+}
+
+func TestWriteReadOnlyDirectory(t *testing.T) {
+	dir := t.TempDir()
+	os.Chmod(dir, 0o444)
+	t.Cleanup(func() { os.Chmod(dir, 0o755) })
+
+	err := Write(filepath.Join(dir, "file.txt"), func(w io.Writer) error {
+		_, err := w.Write([]byte("data"))
+		return err
+	})
+	if err == nil {
+		t.Fatal("expected error when directory is read-only")
+	}
+}

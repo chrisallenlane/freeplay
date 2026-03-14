@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // newTestServer creates an httptest.Server that mimics the IGDB API.
@@ -187,4 +189,71 @@ func (t *rewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	// Extract just the host:port from target
 	req.URL.Host = strings.TrimPrefix(t.target, "http://")
 	return t.base.RoundTrip(req)
+}
+
+// TestFetchTokenRetryOn401 verifies that apiRequestRetry clears the stale
+// token and retries the request when the server responds with 401.
+func TestFetchTokenRetryOn401(t *testing.T) {
+	var gamesCallCount atomic.Int32
+
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.RGBA{R: 255, A: 255})
+
+	gamesResp, _ := json.Marshal([]map[string]any{
+		{"name": "Test Game", "cover": 1},
+	})
+
+	ts := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+				json.NewEncoder(w).Encode(map[string]any{
+					"access_token": "fresh-token",
+					"expires_in":   3600,
+				})
+
+			case strings.HasSuffix(r.URL.Path, "/v4/games"):
+				n := gamesCallCount.Add(1)
+				if n == 1 {
+					// Simulate an expired token on the first request.
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				w.Write(gamesResp)
+
+			case strings.HasSuffix(r.URL.Path, "/v4/covers"):
+				json.NewEncoder(w).Encode([]map[string]string{
+					{"url": "//images.igdb.com/t_thumb/cover.jpg"},
+				})
+
+			default:
+				// Serve a cover image for all other paths (image download).
+				w.Header().Set("Content-Type", "image/png")
+				png.Encode(w, img)
+			}
+		}),
+	)
+	t.Cleanup(ts.Close)
+
+	f := NewIGDBFetcher("test-id:test-secret")
+	f.client = &http.Client{
+		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
+	}
+
+	// Pre-set a stale token so the first request uses it without calling the
+	// token endpoint, triggering the 401 path.
+	f.token = "stale-token"
+	f.tokenExpiry = time.Now().Add(time.Hour)
+
+	result, err := f.Fetch("Test Game", "NES", nil)
+	if err != nil {
+		t.Fatalf("Fetch returned unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil image, got nil")
+	}
+
+	if n := gamesCallCount.Load(); n < 2 {
+		t.Errorf("expected at least 2 /v4/games requests (initial + retry), got %d", n)
+	}
 }

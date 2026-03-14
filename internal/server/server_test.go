@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -247,6 +248,19 @@ func TestRescanEndpoint(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
+
+	ct := w.Header().Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if body["status"] != "ok" {
+		t.Errorf("status = %q, want %q", body["status"], "ok")
+	}
 }
 
 func TestCoversServing(t *testing.T) {
@@ -346,5 +360,81 @@ func TestSecurityHeaders(t *testing.T) {
 		if got != want {
 			t.Errorf("%s = %q, want %q", name, got, want)
 		}
+	}
+}
+
+func FuzzSafeName(f *testing.F) {
+	f.Add("game1")
+	f.Add("")
+	f.Add("..")
+	f.Add("../etc/passwd")
+	f.Add("game\\..\\secret")
+	f.Add("name\x00evil")
+
+	f.Fuzz(func(t *testing.T, input string) {
+		result := safeName(input)
+		if result {
+			// If safeName says it's safe, verify the invariants hold
+			if input == "" {
+				t.Error("safeName returned true for empty string")
+			}
+			if strings.Contains(input, "..") {
+				t.Errorf("safeName returned true for input containing '..': %q", input)
+			}
+			if strings.Contains(input, "/") {
+				t.Errorf("safeName returned true for input containing '/': %q", input)
+			}
+			if strings.Contains(input, "\\") {
+				t.Errorf("safeName returned true for input containing '\\': %q", input)
+			}
+			if strings.ContainsRune(input, 0) {
+				t.Errorf("safeName returned true for input containing null byte: %q", input)
+			}
+		}
+	})
+}
+
+func TestRescanConflict(t *testing.T) {
+	srv, _ := testServer(t)
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	srv.scanner.SetOnScanComplete(func(_ []scanner.Game) {
+		close(started)
+		<-release
+	})
+
+	go srv.scanner.ScanBlocking()
+	<-started
+
+	req := httptest.NewRequest("POST", "/api/rescan", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	close(release)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("got status %d, want 409", w.Code)
+	}
+}
+
+func TestPostSavePutError(t *testing.T) {
+	srv, dir := testServer(t)
+
+	savesDir := filepath.Join(dir, "saves")
+	os.MkdirAll(savesDir, 0o755)
+	os.Chmod(savesDir, 0o444)
+	t.Cleanup(func() { os.Chmod(savesDir, 0o755) })
+
+	req := httptest.NewRequest(
+		"POST",
+		"/api/saves/NES/game1/state",
+		bytes.NewReader([]byte("data")),
+	)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("got status %d, want 500", w.Code)
 	}
 }

@@ -1,6 +1,9 @@
 package covers
 
 import (
+	"errors"
+	"image"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -60,6 +63,129 @@ func TestPath(t *testing.T) {
 
 func TestFetchMissingNilFetcher(t *testing.T) {
 	m := New(t.TempDir(), nil)
-	// Should return immediately without panic
-	m.FetchMissing([]GameEntry{{Console: "NES", Filename: "game.nes"}})
+	got := m.FetchMissing([]GameEntry{{Console: "NES", Filename: "game.nes"}})
+	if got != 0 {
+		t.Errorf("FetchMissing() = %d, want 0 (nil fetcher)", got)
+	}
+}
+
+func FuzzCleanName(f *testing.F) {
+	f.Add("Super Mario Bros (USA)")
+	f.Add("Zelda [!]")
+	f.Add("(tag only)")
+	f.Add("")
+	f.Add("Game (Rev 1) [!] (USA)")
+
+	f.Fuzz(func(t *testing.T, input string) {
+		// Must not panic
+		got := CleanName(input)
+		// Output should never be longer than input
+		if len(got) > len(input) {
+			t.Errorf("CleanName(%q) produced longer output %q", input, got)
+		}
+	})
+}
+
+// mockFetcher is a test double for the Fetcher interface.
+type mockFetcher struct {
+	img   image.Image
+	err   error
+	calls int
+}
+
+func (f *mockFetcher) Fetch(
+	_ string,
+	_ string,
+	_ []int,
+) (image.Image, error) {
+	f.calls++
+	return f.img, f.err
+}
+
+func TestFetchMissingSavesCovers(t *testing.T) {
+	dir := t.TempDir()
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	fetcher := &mockFetcher{img: img}
+	m := New(dir, fetcher)
+
+	game := GameEntry{Console: "NES", Filename: "Super Mario Bros (USA).nes"}
+	got := m.FetchMissing([]GameEntry{game})
+
+	if got != 1 {
+		t.Errorf("FetchMissing() = %d, want 1", got)
+	}
+
+	coverPath := Path(dir, "NES", "Super Mario Bros (USA)")
+	if _, err := os.Stat(coverPath); err != nil {
+		t.Errorf("expected cover file at %q, got stat error: %v", coverPath, err)
+	}
+}
+
+func TestFetchMissingSkipsExisting(t *testing.T) {
+	dir := t.TempDir()
+	fetcher := &mockFetcher{img: image.NewRGBA(image.Rect(0, 0, 1, 1))}
+	m := New(dir, fetcher)
+
+	game := GameEntry{Console: "NES", Filename: "Super Mario Bros (USA).nes"}
+	coverPath := Path(dir, "NES", "Super Mario Bros (USA)")
+
+	// Pre-create the cover directory and file.
+	if err := os.MkdirAll(filepath.Dir(coverPath), 0o755); err != nil {
+		t.Fatalf("failed to create cover dir: %v", err)
+	}
+	if err := os.WriteFile(coverPath, []byte("placeholder"), 0o644); err != nil {
+		t.Fatalf("failed to pre-create cover file: %v", err)
+	}
+
+	got := m.FetchMissing([]GameEntry{game})
+
+	if got != 0 {
+		t.Errorf("FetchMissing() = %d, want 0 (cover already exists)", got)
+	}
+	if fetcher.calls != 0 {
+		t.Errorf("Fetch() called %d times, want 0", fetcher.calls)
+	}
+}
+
+func TestFetchMissingFetchError(t *testing.T) {
+	dir := t.TempDir()
+	fetcher := &mockFetcher{err: errors.New("network error")}
+	m := New(dir, fetcher)
+
+	game := GameEntry{Console: "NES", Filename: "Super Mario Bros (USA).nes"}
+	got := m.FetchMissing([]GameEntry{game})
+
+	if got != 0 {
+		t.Errorf("FetchMissing() = %d, want 0 (fetch failed)", got)
+	}
+}
+
+func TestFetchMissingNilImage(t *testing.T) {
+	dir := t.TempDir()
+	fetcher := &mockFetcher{img: nil, err: nil}
+	m := New(dir, fetcher)
+
+	game := GameEntry{Console: "NES", Filename: "Super Mario Bros (USA).nes"}
+	got := m.FetchMissing([]GameEntry{game})
+
+	if got != 0 {
+		t.Errorf("FetchMissing() = %d, want 0 (nil image)", got)
+	}
+}
+
+func TestFetchMissingSkipsEmptyCleanName(t *testing.T) {
+	dir := t.TempDir()
+	fetcher := &mockFetcher{img: image.NewRGBA(image.Rect(0, 0, 1, 1))}
+	m := New(dir, fetcher)
+
+	// CleanName strips all tags, leaving an empty string.
+	game := GameEntry{Console: "NES", Filename: "(tag only).nes"}
+	got := m.FetchMissing([]GameEntry{game})
+
+	if got != 0 {
+		t.Errorf("FetchMissing() = %d, want 0 (empty clean name)", got)
+	}
+	if fetcher.calls != 0 {
+		t.Errorf("Fetch() called %d times, want 0", fetcher.calls)
+	}
 }
