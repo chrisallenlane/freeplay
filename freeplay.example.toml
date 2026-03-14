@@ -11,25 +11,241 @@ port = 8080
 # Each entry maps a display name to a path and EmulatorJS core.
 # Paths are relative to the data directory (/data in Docker).
 #
-# Common cores: nes/fceumm, snes9x, genesis_plus_gx, mgba, gambatte,
-#               mupen64plus_next, pcsx_rearmed, fbneo, stella2014
+# igdb_platform_ids improves cover art search accuracy (optional).
+# See: https://api-docs.igdb.com/#platform
+
+# --- Nintendo ---
 
 # [roms.NES]
 # path = "roms/nes"
-# core = "fceumm"
+# core = "fceumm"                    # alt: nestopia
+# igdb_platform_ids = [18]
 
 # [roms."Super Nintendo"]
 # path = "roms/snes"
 # core = "snes9x"
+# igdb_platform_ids = [19]
 
-# [roms.Genesis]
-# path = "roms/genesis"
-# core = "genesis_plus_gx"
+# [roms."Game Boy"]
+# path = "roms/gb"
+# core = "gambatte"                  # alt: mgba
+# igdb_platform_ids = [33]
+
+# [roms."Game Boy Color"]
+# path = "roms/gbc"
+# core = "gambatte"                  # alt: mgba
+# igdb_platform_ids = [22]
 
 # [roms."Game Boy Advance"]
 # path = "roms/gba"
 # core = "mgba"
+# igdb_platform_ids = [24]
 
-# BIOS directories (optional, needed for some consoles like PlayStation)
+# [roms."Nintendo 64"]
+# path = "roms/n64"
+# core = "mupen64plus_next"          # alt: parallel_n64
+# igdb_platform_ids = [4]
+
+# [roms."Nintendo DS"]
+# path = "roms/nds"
+# core = "melonds"                   # alt: desmume, desmume2015
+# igdb_platform_ids = [20]
+
+# [roms."Virtual Boy"]
+# path = "roms/vb"
+# core = "beetle_vb"
+# igdb_platform_ids = [87]
+
+# --- Sega ---
+
+# [roms.Genesis]
+# path = "roms/genesis"
+# core = "genesis_plus_gx"           # alt: picodrive
+# igdb_platform_ids = [29]
+
+# [roms."Master System"]
+# path = "roms/sms"
+# core = "genesis_plus_gx"           # alt: smsplus
+# igdb_platform_ids = [64]
+
+# [roms."Game Gear"]
+# path = "roms/gg"
+# core = "genesis_plus_gx"           # alt: smsplus
+# igdb_platform_ids = [35]
+
+# [roms."SG-1000"]
+# path = "roms/sg1000"
+# core = "genesis_plus_gx"
+# igdb_platform_ids = [84]
+
+# [roms."Sega 32X"]
+# path = "roms/32x"
+# core = "picodrive"
+# igdb_platform_ids = [30]
+
+# [roms."Sega Saturn"]
+# path = "roms/saturn"
+# core = "yabause"
+# igdb_platform_ids = [32]
+
+# --- Sony ---
+
+# [roms.PlayStation]
+# path = "roms/ps1"
+# core = "pcsx_rearmed"              # alt: mednafen_psx_hw
+# igdb_platform_ids = [7]
+
+# [roms.PSP]
+# path = "roms/psp"
+# core = "ppsspp"
+# igdb_platform_ids = [38]
+
+# --- Atari ---
+
+# [roms."Atari 2600"]
+# path = "roms/2600"
+# core = "stella2014"
+# igdb_platform_ids = [59]
+
+# [roms."Atari 5200"]
+# path = "roms/5200"
+# core = "a5200"
+# igdb_platform_ids = [66]
+
+# [roms."Atari 7800"]
+# path = "roms/7800"
+# core = "prosystem"
+# igdb_platform_ids = [60]
+
+# [roms."Atari Lynx"]
+# path = "roms/lynx"
+# core = "handy"
+# igdb_platform_ids = [61]
+
+# [roms."Atari Jaguar"]
+# path = "roms/jaguar"
+# core = "virtualjaguar"
+# igdb_platform_ids = [62]
+
+# --- NEC ---
+
+# [roms."TurboGrafx-16"]
+# path = "roms/tg16"
+# core = "mednafen_pce"
+# igdb_platform_ids = [86]
+
+# [roms."PC-FX"]
+# path = "roms/pcfx"
+# core = "mednafen_pcfx"
+# igdb_platform_ids = [274]
+
+# --- SNK ---
+
+# [roms."Neo Geo Pocket"]
+# path = "roms/ngp"
+# core = "mednafen_ngp"
+# igdb_platform_ids = [119]
+
+# [roms."Neo Geo Pocket Color"]
+# path = "roms/ngpc"
+# core = "mednafen_ngp"
+# igdb_platform_ids = [120]
+
+# --- Bandai ---
+
+# [roms.WonderSwan]
+# path = "roms/ws"
+# core = "mednafen_wswan"
+# igdb_platform_ids = [57]
+
+# [roms."WonderSwan Color"]
+# path = "roms/wsc"
+# core = "mednafen_wswan"
+# igdb_platform_ids = [123]
+
+# --- Other consoles ---
+
+# [roms."3DO"]
+# path = "roms/3do"
+# core = "opera"
+# igdb_platform_ids = [50]
+
+# [roms.ColecoVision]
+# path = "roms/coleco"
+# core = "gearcoleco"
+# igdb_platform_ids = [68]
+
+# [roms."Philips CD-i"]
+# path = "roms/cdi"
+# core = "same_cdi"
+# igdb_platform_ids = [117]
+
+# [roms.Arcade]
+# path = "roms/arcade"
+# core = "fbneo"                     # alt: mame2003_plus, fbalpha2012_cps1, fbalpha2012_cps2
+# igdb_platform_ids = [52]
+
+# --- Computers ---
+
+# [roms."Commodore 64"]
+# path = "roms/c64"
+# core = "vice_x64"                  # alt: vice_x64sc
+# igdb_platform_ids = [15]
+
+# [roms."Commodore 128"]
+# path = "roms/c128"
+# core = "vice_x128"
+# igdb_platform_ids = [15]           # IGDB groups C64/128/MAX under one ID
+
+# [roms."Commodore VIC-20"]
+# path = "roms/vic20"
+# core = "vice_xvic"
+# igdb_platform_ids = [71]
+
+# [roms."Commodore PET"]
+# path = "roms/pet"
+# core = "vice_xpet"
+# igdb_platform_ids = [90]
+
+# [roms."Commodore Plus/4"]
+# path = "roms/plus4"
+# core = "vice_xplus4"
+# igdb_platform_ids = [94]
+
+# [roms.Amiga]
+# path = "roms/amiga"
+# core = "puae"
+# igdb_platform_ids = [16]
+
+# [roms."ZX Spectrum"]
+# path = "roms/spectrum"
+# core = "fuse"
+# igdb_platform_ids = [26]
+
+# [roms.ZX81]
+# path = "roms/zx81"
+# core = "81"
+# igdb_platform_ids = [373]
+
+# [roms."Amstrad CPC"]
+# path = "roms/cpc"
+# core = "cap32"                     # alt: crocods
+# igdb_platform_ids = [25]
+
+# [roms.DOS]
+# path = "roms/dos"
+# core = "dosbox_pure"
+# igdb_platform_ids = [13]
+
+# [roms.Doom]
+# path = "roms/doom"
+# core = "prboom"
+
+# BIOS directories (optional, needed for some consoles)
 # [bios]
 # PlayStation = "bios/ps1"
+# "Sega Saturn" = "bios/saturn"
+# "3DO" = "bios/3do"
+# "Nintendo DS" = "bios/nds"
+# "TurboGrafx-16" = "bios/tg16"
+# "PC-FX" = "bios/pcfx"
