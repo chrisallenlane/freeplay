@@ -30,7 +30,7 @@ func main() {
 	}
 
 	// Set up cover art fetcher if configured
-	var fetcher covers.CoverFetcher
+	var fetcher covers.Fetcher
 	if cfg.CoverArtAPI == "igdb" {
 		fetcher = covers.NewIGDBFetcher(cfg.CoverArtKey)
 	}

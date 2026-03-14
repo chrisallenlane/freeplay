@@ -63,10 +63,10 @@ func (c *Config) validate() error {
 	}
 
 	switch c.CoverArtAPI {
-	case "", "igdb", "thegamesdb":
+	case "", "igdb":
 		// valid
 	default:
-		return fmt.Errorf("cover_art_api must be \"igdb\", \"thegamesdb\", or empty; got %q", c.CoverArtAPI)
+		return fmt.Errorf("cover_art_api must be \"igdb\" or empty; got %q", c.CoverArtAPI)
 	}
 
 	if c.CoverArtAPI != "" && c.CoverArtKey == "" {

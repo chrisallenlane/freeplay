@@ -3,27 +3,30 @@ package covers
 import (
 	"image"
 	"image/png"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/chrisallenlane/freeplay/internal/atomicfile"
 )
 
-// CoverFetcher fetches cover art images for games.
-type CoverFetcher interface {
+// Fetcher fetches cover art images for games.
+type Fetcher interface {
 	Fetch(gameName string, console string) (image.Image, error)
 }
 
 // Manager coordinates cover art fetching and storage.
 type Manager struct {
 	dataDir string
-	fetcher CoverFetcher
+	fetcher Fetcher
 }
 
 // New creates a cover art Manager.
-func New(dataDir string, fetcher CoverFetcher) *Manager {
+func New(dataDir string, fetcher Fetcher) *Manager {
 	return &Manager{dataDir: dataDir, fetcher: fetcher}
 }
 
@@ -85,32 +88,10 @@ func (m *Manager) FetchMissing(games []GameEntry) {
 			continue
 		}
 
-		// Save as PNG
-		coverDir := filepath.Dir(coverPath)
-		if err := os.MkdirAll(coverDir, 0755); err != nil {
-			slog.Warn("could not create cover directory", "path", coverDir, "error", err)
-			continue
-		}
-
-		// Write to temp file, then rename
-		tmp, err := os.CreateTemp(coverDir, ".cover-*")
-		if err != nil {
-			slog.Warn("could not create temp file for cover", "error", err)
-			continue
-		}
-
-		if err := png.Encode(tmp, img); err != nil {
-			tmp.Close()
-			os.Remove(tmp.Name())
-			slog.Warn("could not encode cover as PNG", "error", err)
-			continue
-		}
-		tmp.Close()
-
-		if err := os.Rename(tmp.Name(), coverPath); err != nil {
-			os.Remove(tmp.Name())
-			slog.Warn("could not rename cover file", "error", err)
-			continue
+		if err := atomicfile.Write(coverPath, func(w io.Writer) error {
+			return png.Encode(w, img)
+		}); err != nil {
+			slog.Warn("could not save cover art", "game", nameNoExt, "error", err)
 		}
 	}
 }
