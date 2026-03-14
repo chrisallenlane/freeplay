@@ -1,0 +1,8 @@
+services:
+  freeplay:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - /path/to/your/games:/data
+    restart: unless-stopped
