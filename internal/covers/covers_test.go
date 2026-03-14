@@ -103,11 +103,11 @@ func TestNameVariants(t *testing.T) {
 	}
 }
 
-func TestPath(t *testing.T) {
-	got := Path("/data", "NES", "Mega Man")
+func TestCoverPath(t *testing.T) {
+	got := coverPath("/data", "NES", "Mega Man")
 	want := filepath.Join("/data", "covers", "NES", "Mega Man.png")
 	if got != want {
-		t.Errorf("Path() = %q, want %q", got, want)
+		t.Errorf("coverPath() = %q, want %q", got, want)
 	}
 }
 
@@ -165,7 +165,7 @@ func TestFetchMissingSavesCovers(t *testing.T) {
 		t.Errorf("FetchMissing() = %d, want 1", got)
 	}
 
-	coverPath := Path(dir, "NES", "Super Mario Bros (USA)")
+	coverPath := coverPath(dir, "NES", "Super Mario Bros (USA)")
 	if _, err := os.Stat(coverPath); err != nil {
 		t.Errorf("expected cover file at %q, got stat error: %v", coverPath, err)
 	}
@@ -177,7 +177,7 @@ func TestFetchMissingSkipsExisting(t *testing.T) {
 	m := New(dir, fetcher)
 
 	game := GameEntry{Console: "NES", Filename: "Super Mario Bros (USA).nes"}
-	coverPath := Path(dir, "NES", "Super Mario Bros (USA)")
+	coverPath := coverPath(dir, "NES", "Super Mario Bros (USA)")
 
 	// Pre-create the cover directory and file.
 	if err := os.MkdirAll(filepath.Dir(coverPath), 0o755); err != nil {
@@ -261,7 +261,7 @@ func TestFetchMissingPlatformFallback(t *testing.T) {
 		t.Errorf("Fetch() called %d times, want 2 (platform + fallback)", fetcher.calls)
 	}
 
-	coverPath := Path(dir, "NES", "Q-Bert")
+	coverPath := coverPath(dir, "NES", "Q-Bert")
 	if _, err := os.Stat(coverPath); err != nil {
 		t.Errorf("expected cover file at %q, got stat error: %v", coverPath, err)
 	}
