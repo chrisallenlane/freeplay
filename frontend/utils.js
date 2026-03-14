@@ -17,14 +17,9 @@
 		});
 	};
 
-	exports.findGame = (games, consoleName, filename) => {
-		for (let i = 0; i < games.length; i++) {
-			if (games[i].console === consoleName && games[i].filename === filename) {
-				return games[i];
-			}
-		}
-		return null;
-	};
+	exports.findGame = (games, consoleName, filename) =>
+		games.find((g) => g.console === consoleName && g.filename === filename) ??
+		null;
 
 	exports.coverUrl = (game) =>
 		`/covers/${encodeURIComponent(game.console)}/${encodeURIComponent(exports.stripExt(game.filename))}.png`;

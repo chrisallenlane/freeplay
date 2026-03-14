@@ -101,20 +101,22 @@
 		}
 
 		games.forEach((game) => {
+			const key = FP.favKey(game);
+			const displayName = FP.stripExt(game.filename);
+
 			const card = document.createElement("a");
 			card.className = "game-card";
 			card.href = FP.playUrl(game);
-			card.dataset.key = FP.favKey(game);
+			card.dataset.key = key;
 
 			// Favorite button
-			const isFav = favorites.has(FP.favKey(game));
+			const isFav = favorites.has(key);
 			const fav = document.createElement("button");
 			fav.className = `fav-btn${isFav ? " favorited" : ""}`;
 			fav.textContent = isFav ? "\u2605" : "\u2606";
 			fav.addEventListener("click", (e) => {
 				e.preventDefault();
 				e.stopPropagation();
-				const key = FP.favKey(game);
 				if (favorites.has(key)) {
 					favorites.delete(key);
 					fav.textContent = "\u2606";
@@ -134,7 +136,7 @@
 				const img = document.createElement("img");
 				img.className = "cover";
 				img.src = FP.coverUrl(game);
-				img.alt = FP.stripExt(game.filename);
+				img.alt = displayName;
 				img.loading = "lazy";
 				card.appendChild(img);
 			} else {
@@ -142,7 +144,7 @@
 				ph.className = "placeholder-cover";
 				const phName = document.createElement("div");
 				phName.className = "placeholder-name";
-				phName.textContent = FP.stripExt(game.filename);
+				phName.textContent = displayName;
 				const phConsole = document.createElement("div");
 				phConsole.className = "placeholder-console";
 				phConsole.textContent = game.console;
@@ -156,7 +158,7 @@
 			info.className = "card-info";
 			const title = document.createElement("div");
 			title.className = "card-title";
-			title.textContent = FP.stripExt(game.filename);
+			title.textContent = displayName;
 			const consoleName = document.createElement("div");
 			consoleName.className = "card-console";
 			consoleName.textContent = game.console;
