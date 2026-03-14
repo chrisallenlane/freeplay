@@ -76,6 +76,10 @@ func (f *IGDBFetcher) getToken() (string, error) {
 }
 
 func (f *IGDBFetcher) apiRequest(endpoint, body string) ([]byte, error) {
+	return f.apiRequestRetry(endpoint, body, false)
+}
+
+func (f *IGDBFetcher) apiRequestRetry(endpoint, body string, retried bool) ([]byte, error) {
 	token, err := f.getToken()
 	if err != nil {
 		return nil, err
@@ -94,12 +98,12 @@ func (f *IGDBFetcher) apiRequest(endpoint, body string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusUnauthorized {
+	if resp.StatusCode == http.StatusUnauthorized && !retried {
 		// Token expired, clear and retry once
 		f.mu.Lock()
 		f.token = ""
 		f.mu.Unlock()
-		return f.apiRequest(endpoint, body)
+		return f.apiRequestRetry(endpoint, body, true)
 	}
 
 	if resp.StatusCode != http.StatusOK {
