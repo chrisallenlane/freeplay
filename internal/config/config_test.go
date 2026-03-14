@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,6 +62,28 @@ core = "fceumm"
 	}
 }
 
+func TestLoadPortBoundaries(t *testing.T) {
+	for _, port := range []int{1, 65535} {
+		t.Run(fmt.Sprintf("port=%d", port), func(t *testing.T) {
+			dir := t.TempDir()
+			writeConfig(t, dir, fmt.Sprintf(`
+port = %d
+
+[roms.NES]
+path = "/roms/nes"
+core = "fceumm"
+`, port))
+			cfg, err := Load(dir)
+			if err != nil {
+				t.Fatalf("port %d should be valid: %v", port, err)
+			}
+			if cfg.Port != port {
+				t.Errorf("port = %d, want %d", cfg.Port, port)
+			}
+		})
+	}
+}
+
 func TestLoadAbsolutePath(t *testing.T) {
 	dir := t.TempDir()
 	writeConfig(t, dir, `
@@ -90,6 +113,8 @@ func TestLoadValidationErrors(t *testing.T) {
 		{"cover_art_api missing key", "cover_art_api = \"igdb\"", "cover_art_api_key is required"},
 		{"IGDB key missing separator", "cover_art_api = \"igdb\"\ncover_art_api_key = \"missingcolon\"", "client_id:client_secret"},
 		{"invalid port", "port = 99999", "port must be"},
+		{"IGDB key empty client_id", "cover_art_api = \"igdb\"\ncover_art_api_key = \":secret\"", "client_id:client_secret"},
+		{"IGDB key empty secret", "cover_art_api = \"igdb\"\ncover_art_api_key = \"clientid:\"", "client_id:client_secret"},
 	}
 
 	for _, tt := range tests {

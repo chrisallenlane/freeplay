@@ -171,6 +171,76 @@ func TestFetchNameMatching(t *testing.T) {
 	}
 }
 
+func TestFetchFirstCoverFallback(t *testing.T) {
+	f, _, ts := newTestFetcher(t, []map[string]any{
+		{"name": "Mega Man X", "cover": 10},
+		{"name": "Mega Man 2", "cover": 20},
+	})
+
+	var coverQueries []string
+	origHandler := ts.Config.Handler
+	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/v4/covers") {
+			body := make([]byte, r.ContentLength)
+			r.Body.Read(body)
+			coverQueries = append(coverQueries, string(body))
+		}
+		origHandler.ServeHTTP(w, r)
+	})
+
+	// Search for a name that doesn't exactly match any result
+	img, err := f.Fetch("Mega Man", "NES", nil)
+	if err != nil {
+		t.Fatalf("Fetch returned error: %v", err)
+	}
+	if img == nil {
+		t.Fatal("expected non-nil image when results with covers exist")
+	}
+	// Should pick the first result with a cover (cover ID 10)
+	if len(coverQueries) == 0 {
+		t.Fatal("no cover queries recorded")
+	}
+	if !strings.Contains(coverQueries[0], "where id = 10") {
+		t.Errorf("should fall back to first result with cover (10), got query: %s", coverQueries[0])
+	}
+}
+
+func TestFetchCaseInsensitiveMatch(t *testing.T) {
+	// First result is a different game; second is a case-insensitive match.
+	// EqualFold should prefer the case-insensitive match over the first result.
+	f, _, ts := newTestFetcher(t, []map[string]any{
+		{"name": "Mega Man X", "cover": 10},
+		{"name": "mega man", "cover": 20},
+	})
+
+	var coverQueries []string
+	origHandler := ts.Config.Handler
+	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/v4/covers") {
+			body := make([]byte, r.ContentLength)
+			r.Body.Read(body)
+			coverQueries = append(coverQueries, string(body))
+		}
+		origHandler.ServeHTTP(w, r)
+	})
+
+	// Search with different casing — should match case-insensitively
+	img, err := f.Fetch("Mega Man", "NES", nil)
+	if err != nil {
+		t.Fatalf("Fetch returned error: %v", err)
+	}
+	if img == nil {
+		t.Fatal("expected non-nil image for case-insensitive match")
+	}
+	// Should pick the case-insensitive match (cover ID 20), not first result (10)
+	if len(coverQueries) == 0 {
+		t.Fatal("no cover queries recorded")
+	}
+	if !strings.Contains(coverQueries[0], "where id = 20") {
+		t.Errorf("should pick case-insensitive match (20), got query: %s", coverQueries[0])
+	}
+}
+
 func TestFetchNoResults(t *testing.T) {
 	f, _, _ := newTestFetcher(t, []map[string]any{})
 
