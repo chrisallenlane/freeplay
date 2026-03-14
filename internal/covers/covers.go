@@ -42,11 +42,6 @@ func Path(dataDir, console, filenameWithoutExt string) string {
 	return filepath.Join(dataDir, "covers", console, filenameWithoutExt+".png")
 }
 
-// CoverPath returns the expected filesystem path for a game's cover art.
-func (m *Manager) CoverPath(console, filenameWithoutExt string) string {
-	return Path(m.dataDir, console, filenameWithoutExt)
-}
-
 // FetchMissing downloads cover art for games that don't have local covers.
 // Each entry is {console, filename (with extension)}.
 func (m *Manager) FetchMissing(games []GameEntry) {
@@ -63,7 +58,7 @@ func (m *Manager) FetchMissing(games []GameEntry) {
 	for _, g := range games {
 		ext := filepath.Ext(g.Filename)
 		nameNoExt := strings.TrimSuffix(g.Filename, ext)
-		coverPath := m.CoverPath(g.Console, nameNoExt)
+		coverPath := Path(m.dataDir, g.Console, nameNoExt)
 
 		// Skip if cover already exists
 		if _, err := os.Stat(coverPath); err == nil {

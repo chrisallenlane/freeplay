@@ -81,9 +81,13 @@ func (s *Server) routes() {
 	s.mux.Handle("/", http.FileServerFS(frontendSub))
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+func writeJSONOK(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	writeJSONOK(w)
 }
 
 func (s *Server) handleGames(w http.ResponseWriter, r *http.Request) {
@@ -123,23 +127,7 @@ func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
-	rest := r.PathValue("rest")
-	coversDir := filepath.Join(s.dataDir, "covers")
-	fullPath := filepath.Join(coversDir, filepath.Clean(rest))
-
-	// Path traversal check
-	if !strings.HasPrefix(fullPath, coversDir+string(filepath.Separator)) {
-		http.NotFound(w, r)
-		return
-	}
-
-	info, err := os.Stat(fullPath)
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-
-	http.ServeFile(w, r, fullPath)
+	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "covers"), r.PathValue("rest"))
 }
 
 func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
@@ -186,8 +174,7 @@ func (s *Server) handleRescan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"scan already in progress"}`, http.StatusConflict)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSONOK(w)
 }
 
 func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir, file string) {
@@ -201,6 +188,12 @@ func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir
 
 	// Verify resolved path is within base directory
 	if !strings.HasPrefix(fullPath, baseDir+string(filepath.Separator)) && fullPath != baseDir {
+		http.NotFound(w, r)
+		return
+	}
+
+	info, err := os.Stat(fullPath)
+	if err != nil || info.IsDir() {
 		http.NotFound(w, r)
 		return
 	}
