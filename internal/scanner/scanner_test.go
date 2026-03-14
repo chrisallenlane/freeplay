@@ -43,7 +43,7 @@ func TestScanFindsGames(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := s.GetCatalog()
+	cat := s.Catalog()
 	if len(cat.Games) != 3 {
 		t.Fatalf("got %d games, want 3", len(cat.Games))
 	}
@@ -57,7 +57,7 @@ func TestScanSortOrder(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := s.GetCatalog()
+	cat := s.Catalog()
 	// Consoles should be alphabetical
 	if cat.Consoles[0] != "Genesis" || cat.Consoles[1] != "NES" {
 		t.Errorf("consoles not sorted: %v", cat.Consoles)
@@ -80,7 +80,7 @@ func TestScanSkipsSubdirectories(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := s.GetCatalog()
+	cat := s.Catalog()
 	for _, g := range cat.Games {
 		if g.Filename == "subdir" {
 			t.Error("subdirectory should be skipped")
@@ -93,7 +93,7 @@ func TestScanCoverDetection(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := s.GetCatalog()
+	cat := s.Catalog()
 	for _, g := range cat.Games {
 		if g.Console == "Genesis" && g.Filename == "Sonic.gen" {
 			if !g.HasCover {
@@ -112,7 +112,7 @@ func TestScanEmptyBeforeFirstScan(t *testing.T) {
 	_, cfg := setupTestDir(t)
 	s := New(cfg, "")
 
-	cat := s.GetCatalog()
+	cat := s.Catalog()
 	if len(cat.Games) != 0 {
 		t.Errorf("expected empty games before scan, got %d", len(cat.Games))
 	}
@@ -131,7 +131,7 @@ func TestScanMissingDirectory(t *testing.T) {
 	s := New(cfg, "")
 	s.ScanBlocking()
 
-	cat := s.GetCatalog()
+	cat := s.Catalog()
 	if len(cat.Games) != 0 {
 		t.Errorf("expected no games for missing dir, got %d", len(cat.Games))
 	}

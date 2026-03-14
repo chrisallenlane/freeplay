@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // Manager handles save state persistence to disk.
@@ -77,10 +76,4 @@ func (m *Manager) Put(console, game, saveType string, body io.Reader) error {
 // ValidType returns true if the save type is valid.
 func ValidType(t string) bool {
 	return t == "state" || t == "sram"
-}
-
-// CleanGameSlug sanitizes a game name for use as a directory name.
-func CleanGameSlug(filename string) string {
-	ext := filepath.Ext(filename)
-	return strings.TrimSuffix(filename, ext)
 }
