@@ -1,6 +1,7 @@
 .git/
 testdata/
+dist/
 .tickets/
-emulatorjs/
-freeplay
+.playwright-mcp/
+.tmp/
 PROJECT_PROGRESS.md
