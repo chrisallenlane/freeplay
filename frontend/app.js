@@ -38,39 +38,35 @@
 		renderGrid();
 	}
 
+	function addFilterBtn(label, isActive, onClick) {
+		const btn = document.createElement("button");
+		btn.className = `filter-btn${isActive ? " active" : ""}`;
+		btn.textContent = label;
+		btn.addEventListener("click", onClick);
+		filtersBar.appendChild(btn);
+	}
+
 	function renderFilters() {
 		filtersBar.innerHTML = "";
 
-		const favBtn = document.createElement("button");
-		favBtn.className = `filter-btn${activeFavorites ? " active" : ""}`;
-		favBtn.textContent = "\u2605 Favorites";
-		favBtn.addEventListener("click", () => {
+		addFilterBtn("\u2605 Favorites", activeFavorites, () => {
 			activeFavorites = !activeFavorites;
 			if (activeFavorites) activeConsole = null;
 			renderAll();
 		});
-		filtersBar.appendChild(favBtn);
 
-		const allBtn = document.createElement("button");
-		allBtn.className = `filter-btn${!activeConsole && !activeFavorites ? " active" : ""}`;
-		allBtn.textContent = "All";
-		allBtn.addEventListener("click", () => {
+		addFilterBtn("All", !activeConsole && !activeFavorites, () => {
 			activeConsole = null;
 			activeFavorites = false;
 			renderAll();
 		});
-		filtersBar.appendChild(allBtn);
 
 		consoles.forEach((name) => {
-			const btn = document.createElement("button");
-			btn.className = `filter-btn${activeConsole === name ? " active" : ""}`;
-			btn.textContent = name;
-			btn.addEventListener("click", () => {
+			addFilterBtn(name, activeConsole === name, () => {
 				activeConsole = name;
 				activeFavorites = false;
 				renderAll();
 			});
-			filtersBar.appendChild(btn);
 		});
 	}
 
