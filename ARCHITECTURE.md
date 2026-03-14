@@ -50,6 +50,7 @@ change without notice.
 |--------|--------------------------------------|---------------------------------------------------|
 | `GET`  | `/api/health`                        | Health check -- returns `{"status":"ok"}`         |
 | `GET`  | `/api/games`                         | Full game catalog (consoles + games list)         |
+| `GET`  | `/api/status`                        | Cover art fetch status (`{"fetchingCovers":bool}`) |
 | `POST` | `/api/rescan`                        | Trigger a ROM directory rescan                    |
 | `GET`  | `/api/saves/{console}/{game}/{type}` | Download a save file (`type`: `state` or `sram`)  |
 | `POST` | `/api/saves/{console}/{game}/{type}` | Upload a save file (64 MB max)                    |

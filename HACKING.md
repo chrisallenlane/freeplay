@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Go 1.24 or later (<https://go.dev/dl/>)
+- Go 1.26 or later (<https://go.dev/dl/>)
 - [gofumpt][] (formatter) and [revive][] (linter) — install both with:
 
 ```bash

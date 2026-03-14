@@ -67,7 +67,7 @@ Freeplay will be available at `http://localhost:8080`.
 
 ### 1. Install Go
 
-Freeplay requires Go 1.24 or later. Install it from <https://go.dev/dl/>.
+Freeplay requires Go 1.26 or later. Install it from <https://go.dev/dl/>.
 
 ### 2. Build the binary
 
