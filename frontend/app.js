@@ -38,6 +38,13 @@
 		renderGrid();
 	}
 
+	function el(tag, cls, text) {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text) e.textContent = text;
+		return e;
+	}
+
 	function addFilterBtn(label, isActive, onClick) {
 		const btn = document.createElement("button");
 		btn.className = `filter-btn${isActive ? " active" : ""}`;
@@ -81,8 +88,7 @@
 		const games = getFilteredGames();
 
 		if (games.length === 0) {
-			const msg = document.createElement("div");
-			msg.className = "message";
+			const msg = el("div", "message");
 			if (allGames.length === 0) {
 				msg.textContent =
 					"No games found. Add ROMs to your library and check your freeplay.toml configuration.";
@@ -136,28 +142,18 @@
 				img.loading = "lazy";
 				card.appendChild(img);
 			} else {
-				const ph = document.createElement("div");
-				ph.className = "placeholder-cover";
-				const phName = document.createElement("div");
-				phName.className = "placeholder-name";
-				phName.textContent = displayName;
-				const phConsole = document.createElement("div");
-				phConsole.className = "placeholder-console";
-				phConsole.textContent = game.console;
+				const ph = el("div", "placeholder-cover");
+				const phName = el("div", "placeholder-name", displayName);
+				const phConsole = el("div", "placeholder-console", game.console);
 				ph.appendChild(phName);
 				ph.appendChild(phConsole);
 				card.appendChild(ph);
 			}
 
 			// Card info
-			const info = document.createElement("div");
-			info.className = "card-info";
-			const title = document.createElement("div");
-			title.className = "card-title";
-			title.textContent = displayName;
-			const consoleName = document.createElement("div");
-			consoleName.className = "card-console";
-			consoleName.textContent = game.console;
+			const info = el("div", "card-info");
+			const title = el("div", "card-title", displayName);
+			const consoleName = el("div", "card-console", game.console);
 			info.appendChild(title);
 			info.appendChild(consoleName);
 			card.appendChild(info);
@@ -190,12 +186,12 @@
 			})
 			.catch(() => {
 				grid.innerHTML = "";
-				const msg = document.createElement("div");
-				msg.className = "message";
-				msg.textContent =
-					"Could not load game library. Check that Freeplay is running.";
-				const retry = document.createElement("button");
-				retry.textContent = "Retry";
+				const msg = el(
+					"div",
+					"message",
+					"Could not load game library. Check that Freeplay is running.",
+				);
+				const retry = el("button", null, "Retry");
 				retry.addEventListener("click", loadCatalog);
 				msg.appendChild(retry);
 				grid.appendChild(msg);
