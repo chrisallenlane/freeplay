@@ -145,18 +145,18 @@ header h1 {
     border-radius: 8px;
     overflow: hidden;
     cursor: pointer;
-    transition: transform 0.15s, border-color 0.15s;
+    transition: outline-color 0.15s;
     position: relative;
 }
 
+.game-card:hover,
 .game-card:focus-visible {
     outline: 2px solid #4a4aff;
     outline-offset: 2px;
 }
 
-.game-card:hover {
-    transform: translateY(-2px);
-    border-color: #4a4aff;
+.game-grid[data-input="gamepad"] .game-card:hover {
+    outline: none;
 }
 
 .game-card .cover {

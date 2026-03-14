@@ -206,6 +206,17 @@
 
 	searchInput.addEventListener("input", renderGrid);
 
+	// Input mode: suppress hover effects during gamepad navigation,
+	// and clear gamepad focus when the mouse takes over.
+	grid.addEventListener("mousemove", () => {
+		if (grid.dataset.input === "gamepad") {
+			grid.dataset.input = "pointer";
+			if (document.activeElement?.classList.contains("game-card")) {
+				document.activeElement.blur();
+			}
+		}
+	});
+
 	// Rescan button
 	let statusPollTimer = null;
 
@@ -332,6 +343,7 @@
 	 * @param {string} action
 	 */
 	function handleAction(action) {
+		grid.dataset.input = "gamepad";
 		const cards = grid.querySelectorAll(".game-card");
 
 		switch (action) {
