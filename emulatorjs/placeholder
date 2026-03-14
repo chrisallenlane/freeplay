@@ -1,0 +1,2 @@
+This file exists so go:embed can embed the emulatorjs directory.
+It will be replaced by the real EmulatorJS files.
