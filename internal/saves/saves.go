@@ -20,12 +20,8 @@ func New(dataDir string) *Manager {
 	return &Manager{dataDir: dataDir}
 }
 
-func (m *Manager) saveDir(console, game string) string {
-	return filepath.Join(m.dataDir, "saves", console, game)
-}
-
 func (m *Manager) savePath(console, game, saveType string) string {
-	return filepath.Join(m.saveDir(console, game), saveType)
+	return filepath.Join(m.dataDir, "saves", console, game, saveType)
 }
 
 // Get reads a save file and returns its contents.
