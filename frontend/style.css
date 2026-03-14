@@ -119,14 +119,14 @@ header h1 {
 
 .game-card .cover {
     width: 100%;
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 3 / 4;
     object-fit: cover;
     display: block;
 }
 
 .game-card .placeholder-cover {
     width: 100%;
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 3 / 4;
     background: linear-gradient(135deg, #1e1e3a, #2a2a4e);
     display: flex;
     flex-direction: column;
