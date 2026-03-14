@@ -15,12 +15,18 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
+// CoverStatus reports whether cover art is being fetched.
+type CoverStatus interface {
+	Fetching() bool
+}
+
 // Server is the Freeplay HTTP server.
 type Server struct {
 	cfg           *config.Config
 	dataDir       string
 	scanner       *scanner.Scanner
 	saves         *saves.Manager
+	coverStatus   CoverStatus
 	frontendFS    fs.FS
 	frontendSub   fs.FS
 	emulatorjsSub fs.FS
@@ -29,7 +35,8 @@ type Server struct {
 }
 
 // New creates a configured Server ready to listen.
-func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS) (*Server, error) {
+// coverStatus may be nil if cover art fetching is not configured.
+func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS, coverStatus CoverStatus) (*Server, error) {
 	frontendSub, err := fs.Sub(frontendFS, "frontend")
 	if err != nil {
 		return nil, fmt.Errorf("frontend fs: %w", err)
@@ -44,6 +51,7 @@ func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS) (*S
 		dataDir:       dataDir,
 		scanner:       scanner.New(cfg, dataDir),
 		saves:         saves.New(dataDir),
+		coverStatus:   coverStatus,
 		frontendFS:    frontendFS,
 		frontendSub:   frontendSub,
 		emulatorjsSub: emulatorjsSub,
@@ -81,6 +89,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/saves/{console}/{game}/{type}", s.handleGetSave)
 	s.mux.HandleFunc("POST /api/saves/{console}/{game}/{type}", s.handlePostSave)
 	s.mux.HandleFunc("POST /api/rescan", s.handleRescan)
+	s.mux.HandleFunc("GET /api/status", s.handleStatus)
 
 	// ROM serving
 	s.mux.HandleFunc("GET /roms/{console}/{file}", s.handleROM)
@@ -197,6 +206,12 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
+	fetching := s.coverStatus != nil && s.coverStatus.Fetching()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"fetchingCovers": fetching})
 }
 
 func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {

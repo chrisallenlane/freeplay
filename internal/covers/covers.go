@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/chrisallenlane/freeplay/internal/atomicfile"
@@ -22,8 +23,14 @@ type Fetcher interface {
 
 // Manager coordinates cover art fetching and storage.
 type Manager struct {
-	dataDir string
-	fetcher Fetcher
+	dataDir  string
+	fetcher  Fetcher
+	fetching atomic.Bool
+}
+
+// Fetching reports whether cover art is currently being fetched.
+func (m *Manager) Fetching() bool {
+	return m.fetching.Load()
 }
 
 // New creates a cover art Manager.
@@ -87,6 +94,9 @@ func (m *Manager) FetchMissing(games []GameEntry) int {
 	if m.fetcher == nil {
 		return 0
 	}
+
+	m.fetching.Store(true)
+	defer m.fetching.Store(false)
 
 	ticker := time.NewTicker(334 * time.Millisecond) // ~3 req/s
 	defer ticker.Stop()

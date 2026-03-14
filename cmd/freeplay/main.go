@@ -31,7 +31,7 @@ func main() {
 	}
 	coverMgr := covers.New(*dataDir, fetcher)
 
-	srv, err := server.New(cfg, *dataDir, freeplay.FrontendFS, freeplay.EmulatorjsFS)
+	srv, err := server.New(cfg, *dataDir, freeplay.FrontendFS, freeplay.EmulatorjsFS, coverMgr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
