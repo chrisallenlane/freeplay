@@ -103,6 +103,10 @@ describe("filterGames", () => {
 		var result = FP.filterGames(games, { query: "" });
 		assert.equal(result.length, 4);
 	});
+
+	it("throws when favoritesOnly is true but favorites is missing", () => {
+		assert.throws(() => FP.filterGames(games, { favoritesOnly: true }));
+	});
 });
 
 describe("findGame", () => {
@@ -191,5 +195,225 @@ describe("biosUrl", () => {
 
 	it("encodes special characters", () => {
 		assert.equal(FP.biosUrl("Game Boy"), "/bios/Game%20Boy/");
+	});
+});
+
+describe("gridColumns", () => {
+	it("returns 1 for empty list", () => {
+		assert.equal(FP.gridColumns([]), 1);
+	});
+
+	it("counts cards sharing the same offsetTop", () => {
+		var cards = [
+			{ offsetTop: 0 },
+			{ offsetTop: 0 },
+			{ offsetTop: 0 },
+			{ offsetTop: 100 },
+			{ offsetTop: 100 },
+		];
+		assert.equal(FP.gridColumns(cards), 3);
+	});
+
+	it("returns total count when all cards are on one row", () => {
+		var cards = [{ offsetTop: 0 }, { offsetTop: 0 }];
+		assert.equal(FP.gridColumns(cards), 2);
+	});
+
+	it("returns 1 when each card is on its own row", () => {
+		var cards = [{ offsetTop: 0 }, { offsetTop: 50 }, { offsetTop: 100 }];
+		assert.equal(FP.gridColumns(cards), 1);
+	});
+});
+
+describe("findCardIndex", () => {
+	var items = ["a", "b", "c", "d"];
+
+	it("returns index of first match", () => {
+		assert.equal(
+			FP.findCardIndex(items, (x) => x === "c"),
+			2,
+		);
+	});
+
+	it("returns -1 when nothing matches", () => {
+		assert.equal(
+			FP.findCardIndex(items, (x) => x === "z"),
+			-1,
+		);
+	});
+
+	it("returns first match when multiple exist", () => {
+		var dupes = ["x", "y", "x"];
+		assert.equal(
+			FP.findCardIndex(dupes, (x) => x === "x"),
+			0,
+		);
+	});
+
+	it("works with empty list", () => {
+		assert.equal(
+			FP.findCardIndex([], () => true),
+			-1,
+		);
+	});
+});
+
+describe("readGamepadAction", () => {
+	function makeGamepad(overrides) {
+		var buttons = Array.from({ length: 16 }, () => ({ pressed: false }));
+		var gp = { buttons: buttons, axes: [0, 0] };
+		if (overrides) overrides(gp);
+		return gp;
+	}
+
+	it("returns null when nothing is pressed", () => {
+		assert.equal(FP.readGamepadAction(makeGamepad()), null);
+	});
+
+	it("maps D-pad up (button 12) to ACTION_UP", () => {
+		var gp = makeGamepad((g) => (g.buttons[12].pressed = true));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_UP);
+	});
+
+	it("maps D-pad down (button 13) to ACTION_DOWN", () => {
+		var gp = makeGamepad((g) => (g.buttons[13].pressed = true));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_DOWN);
+	});
+
+	it("maps D-pad left (button 14) to ACTION_LEFT", () => {
+		var gp = makeGamepad((g) => (g.buttons[14].pressed = true));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_LEFT);
+	});
+
+	it("maps D-pad right (button 15) to ACTION_RIGHT", () => {
+		var gp = makeGamepad((g) => (g.buttons[15].pressed = true));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_RIGHT);
+	});
+
+	it("maps button 0 (A/Cross) to ACTION_ACTIVATE", () => {
+		var gp = makeGamepad((g) => (g.buttons[0].pressed = true));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_ACTIVATE);
+	});
+
+	it("maps button 9 (Start) to ACTION_ACTIVATE", () => {
+		var gp = makeGamepad((g) => (g.buttons[9].pressed = true));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_ACTIVATE);
+	});
+
+	it("maps L1 (button 4) to ACTION_PREV_FILTER", () => {
+		var gp = makeGamepad((g) => (g.buttons[4].pressed = true));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_PREV_FILTER);
+	});
+
+	it("maps R1 (button 5) to ACTION_NEXT_FILTER", () => {
+		var gp = makeGamepad((g) => (g.buttons[5].pressed = true));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_NEXT_FILTER);
+	});
+
+	it("falls back to axes when no buttons pressed", () => {
+		var gp = makeGamepad((g) => (g.axes = [0, -0.8]));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_UP);
+	});
+
+	it("maps positive Y axis to ACTION_DOWN", () => {
+		var gp = makeGamepad((g) => (g.axes = [0, 0.8]));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_DOWN);
+	});
+
+	it("maps negative X axis to ACTION_LEFT", () => {
+		var gp = makeGamepad((g) => (g.axes = [-0.8, 0]));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_LEFT);
+	});
+
+	it("maps positive X axis to ACTION_RIGHT", () => {
+		var gp = makeGamepad((g) => (g.axes = [0.8, 0]));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_RIGHT);
+	});
+
+	it("ignores axes below threshold", () => {
+		var gp = makeGamepad((g) => (g.axes = [0.3, -0.4]));
+		assert.equal(FP.readGamepadAction(gp), null);
+	});
+
+	it("buttons take priority over axes", () => {
+		var gp = makeGamepad((g) => {
+			g.buttons[12].pressed = true;
+			g.axes = [0.8, 0];
+		});
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_UP);
+	});
+
+	it("handles gamepads with fewer than 16 buttons", () => {
+		var gp = { buttons: [{ pressed: false }], axes: [0, 0] };
+		assert.equal(FP.readGamepadAction(gp), null);
+	});
+});
+
+describe("initThemeToggle", () => {
+	function withThemeMocks(theme, hasButton, fn) {
+		var clickHandler;
+		var btn = hasButton
+			? {
+					textContent: "",
+					addEventListener: (event, handler) => {
+						if (event === "click") clickHandler = handler;
+					},
+				}
+			: null;
+		var dataset = { theme: theme };
+		var storage = {};
+		var origDoc = globalThis.document;
+		var origStorage = globalThis.localStorage;
+		globalThis.document = {
+			getElementById: (id) => (id === "theme-toggle" ? btn : null),
+			documentElement: { dataset: dataset },
+		};
+		globalThis.localStorage = {
+			setItem: (k, v) => (storage[k] = v),
+		};
+		try {
+			fn({ btn, dataset, storage, click: () => clickHandler() });
+		} finally {
+			globalThis.document = origDoc;
+			globalThis.localStorage = origStorage;
+		}
+	}
+
+	it("sets sun icon for dark theme", () => {
+		withThemeMocks("dark", true, ({ btn }) => {
+			FP.initThemeToggle();
+			assert.equal(btn.textContent, "\u2600");
+		});
+	});
+
+	it("sets moon icon for light theme", () => {
+		withThemeMocks("light", true, ({ btn }) => {
+			FP.initThemeToggle();
+			assert.equal(btn.textContent, "\u263D");
+		});
+	});
+
+	it("does nothing when button is not found", () => {
+		withThemeMocks("dark", false, ({ storage }) => {
+			FP.initThemeToggle();
+			assert.deepEqual(storage, {});
+		});
+	});
+
+	it("toggles theme on click", () => {
+		withThemeMocks("dark", true, ({ btn, dataset, storage, click }) => {
+			FP.initThemeToggle();
+			assert.equal(btn.textContent, "\u2600");
+
+			click();
+			assert.equal(dataset.theme, "light");
+			assert.equal(storage["freeplay-theme"], "light");
+			assert.equal(btn.textContent, "\u263D");
+
+			click();
+			assert.equal(dataset.theme, "dark");
+			assert.equal(storage["freeplay-theme"], "dark");
+			assert.equal(btn.textContent, "\u2600");
+		});
 	});
 });
