@@ -1,4 +1,4 @@
-# Freeplay
+# 🕹️Freeplay
 
 A self-hosted retro gaming server. Point it at your ROMs, open a browser,
 and play.
