@@ -7,12 +7,14 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/play.css">
+    <script>(function(){var s=localStorage.getItem("freeplay-theme");document.documentElement.dataset.theme=s||(matchMedia("(prefers-color-scheme:light)").matches?"light":"dark")})()</script>
 </head>
 <body>
     <header>
         <a href="/">&larr; Back to Library</a>
         <!-- [html-validate-disable-next empty-heading -- populated by play.js] -->
         <h1 class="game-name" id="game-name"></h1>
+        <button type="button" id="theme-toggle" title="Toggle light/dark mode" aria-label="Toggle light/dark mode"></button>
     </header>
     <div id="game"></div>
     <div id="error" class="error-msg" style="display:none;"></div>

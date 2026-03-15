@@ -14,6 +14,8 @@
 	nameEl.textContent = FP.stripExt(rom);
 	document.title = `Freeplay - ${nameEl.textContent}`;
 
+	FP.initThemeToggle();
+
 	fetch("/api/games")
 		.then((res) => res.json())
 		.then((catalog) => {
@@ -42,7 +44,10 @@
 		window.EJS_core = game.core;
 		window.EJS_gameUrl = FP.romUrl(consoleName, rom);
 		window.EJS_pathtodata = "/emulatorjs/data/";
-		window.EJS_color = "#1a1a2e";
+		window.EJS_color =
+			document.documentElement.dataset.theme === "light"
+				? "#f0f0f5"
+				: "#1a1a2e";
 		window.EJS_gameName = nameEl.textContent;
 		window.EJS_startOnLoaded = true;
 
