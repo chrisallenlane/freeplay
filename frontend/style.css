@@ -85,17 +85,20 @@ header h1 {
     align-items: center;
 }
 
-.header-btn {
+.btn {
     background: var(--color-border);
     border: 1px solid var(--color-border-hi);
     color: var(--color-text-muted);
-    border-radius: 6px;
     cursor: pointer;
-    line-height: 1.25rem;
 }
 
-.header-btn:hover {
+.btn:hover {
     background: var(--color-border-hi);
+}
+
+.header-btn {
+    border-radius: 6px;
+    line-height: 1.25rem;
 }
 
 #theme-toggle {
@@ -138,17 +141,9 @@ header h1 {
 }
 
 .filter-btn {
-    background: var(--color-border);
-    border: 1px solid var(--color-border-hi);
-    color: var(--color-text-muted);
     padding: 6px 14px;
     border-radius: 4px;
-    cursor: pointer;
     font-size: 0.8125rem;
-}
-
-.filter-btn:hover {
-    background: var(--color-border-hi);
 }
 
 .filter-btn:focus-visible {
