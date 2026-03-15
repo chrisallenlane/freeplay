@@ -4,7 +4,7 @@
 
 - Go 1.26 or later (<https://go.dev/dl/>)
 - Node.js and npm — required for JavaScript formatting, linting, and testing
-- [gofumpt][] (formatter) and [revive][] (linter) — install both with:
+- [gofumpt][] (formatter) and [golangci-lint][] (linter) — install both with:
 
 ```bash
 make setup
@@ -37,7 +37,7 @@ Run `make help` for the full list. The most useful targets:
 | `make build`         | Build binary to `dist/freeplay`         |
 | `make run`           | Build and run against `testdata/`       |
 | `make fmt`           | Format Go (gofumpt) and JS (Biome)      |
-| `make lint`          | Lint Go (revive), JS and HTML (Biome/html-validate) |
+| `make lint`          | Lint Go (golangci-lint), JS and HTML (Biome/html-validate) |
 | `make test`          | Run Go and JS unit tests                |
 | `make coverage`      | Generate HTML coverage report           |
 | `make coverage-text` | Show per-function coverage in terminal  |
@@ -122,4 +122,4 @@ docker compose up --build
 ```
 
 [gofumpt]: https://github.com/mvdan/gofumpt
-[revive]: https://github.com/mgechev/revive
+[golangci-lint]: https://github.com/golangci/golangci-lint

@@ -1,8 +1,9 @@
 # Stage 1: Build
 FROM golang:1.26-alpine AS builder
+ARG VERSION=dev
 WORKDIR /build
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -mod vendor -trimpath -o dist/freeplay ./cmd/freeplay
+RUN CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/chrisallenlane/freeplay.Version=${VERSION}" -mod vendor -trimpath -o dist/freeplay ./cmd/freeplay
 
 # Stage 2: Runtime
 FROM alpine:3.21
