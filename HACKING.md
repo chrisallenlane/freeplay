@@ -3,6 +3,7 @@
 ## Prerequisites
 
 - Go 1.26 or later (<https://go.dev/dl/>)
+- Node.js and npm — required for JavaScript formatting, linting, and testing
 - [gofumpt][] (formatter) and [revive][] (linter) — install both with:
 
 ```bash
@@ -35,9 +36,9 @@ Run `make help` for the full list. The most useful targets:
 | `make check`         | Format, lint, vet, and test             |
 | `make build`         | Build binary to `dist/freeplay`         |
 | `make run`           | Build and run against `testdata/`       |
-| `make fmt`           | Format source with gofumpt              |
-| `make lint`          | Lint with revive                        |
-| `make test`          | Run unit tests                          |
+| `make fmt`           | Format Go (gofumpt) and JS (Biome)      |
+| `make lint`          | Lint Go (revive), JS and HTML (Biome/html-validate) |
+| `make test`          | Run Go and JS unit tests                |
 | `make coverage`      | Generate HTML coverage report           |
 | `make coverage-text` | Show per-function coverage in terminal  |
 | `make vendor`        | Tidy and re-vendor Go dependencies      |
