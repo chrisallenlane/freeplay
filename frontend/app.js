@@ -214,44 +214,17 @@
 	// Directional navigation (shared by keyboard and gamepad)
 	// ---------------------------------------------------------------------------
 
-	// Logical actions.
-	const ACTION_LEFT = "left";
-	const ACTION_RIGHT = "right";
-	const ACTION_UP = "up";
-	const ACTION_DOWN = "down";
-	const ACTION_ACTIVATE = "activate";
-	const ACTION_PREV_FILTER = "prevFilter";
-	const ACTION_NEXT_FILTER = "nextFilter";
-
-	/**
-	 * Returns the number of columns in the game grid by counting cards that
-	 * share the same offsetTop as the first card.
-	 * @param {NodeList} cards
-	 * @returns {number}
-	 */
-	function gridColumns(cards) {
-		if (cards.length === 0) return 1;
-		const firstTop = cards[0].offsetTop;
-		let cols = 0;
-		for (const card of cards) {
-			if (card.offsetTop !== firstTop) break;
-			cols++;
-		}
-		return cols;
-	}
-
-	/**
-	 * Returns the index of the card matching a predicate, or -1 if none match.
-	 * @param {NodeList} cards
-	 * @param {function} predicate
-	 * @returns {number}
-	 */
-	function findCardIndex(cards, predicate) {
-		for (let i = 0; i < cards.length; i++) {
-			if (predicate(cards[i])) return i;
-		}
-		return -1;
-	}
+	const {
+		ACTION_LEFT,
+		ACTION_RIGHT,
+		ACTION_UP,
+		ACTION_DOWN,
+		ACTION_ACTIVATE,
+		ACTION_PREV_FILTER,
+		ACTION_NEXT_FILTER,
+		gridColumns,
+		findCardIndex,
+	} = FP;
 
 	/**
 	 * Sets the `.highlighted` class on the given card, removing it from any
@@ -447,39 +420,6 @@
 	// Debounce intervals (ms).
 	const REPEAT_DELAY = 180;
 
-	// Axis threshold for treating an analog stick / D-pad axis as pressed.
-	const AXIS_THRESHOLD = 0.5;
-
-	/**
-	 * Reads the current logical action (if any) from a gamepad snapshot.
-	 * Combines D-pad buttons (12–15) and axes.
-	 * @param {Gamepad} gp
-	 * @returns {string|null}
-	 */
-	function readGamepadAction(gp) {
-		const b = gp.buttons;
-
-		// Buttons take priority over axes.
-		if (b[12]?.pressed) return ACTION_UP;
-		if (b[13]?.pressed) return ACTION_DOWN;
-		if (b[14]?.pressed) return ACTION_LEFT;
-		if (b[15]?.pressed) return ACTION_RIGHT;
-		if (b[0]?.pressed || b[9]?.pressed) return ACTION_ACTIVATE;
-		if (b[4]?.pressed) return ACTION_PREV_FILTER;
-		if (b[5]?.pressed) return ACTION_NEXT_FILTER;
-
-		// Fall back to axes (axis 0 = left/right, axis 1 = up/down for most controllers).
-		const ax = gp.axes;
-		if (ax.length >= 2) {
-			if (ax[1] < -AXIS_THRESHOLD) return ACTION_UP;
-			if (ax[1] > AXIS_THRESHOLD) return ACTION_DOWN;
-			if (ax[0] < -AXIS_THRESHOLD) return ACTION_LEFT;
-			if (ax[0] > AXIS_THRESHOLD) return ACTION_RIGHT;
-		}
-
-		return null;
-	}
-
 	/**
 	 * The main poll loop. Runs every animation frame while a gamepad is connected.
 	 * @param {DOMHighResTimeStamp} now
@@ -495,7 +435,7 @@
 
 		for (const gp of gamepads) {
 			if (!gp) continue;
-			const candidate = readGamepadAction(gp);
+			const candidate = FP.readGamepadAction(gp);
 			if (candidate) {
 				action = candidate;
 				break;
