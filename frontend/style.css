@@ -146,11 +146,6 @@ header h1 {
     font-size: 0.8125rem;
 }
 
-.filter-btn:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
-}
-
 .filter-btn.active {
     background: var(--color-accent);
     border-color: var(--color-accent-hi);
@@ -207,6 +202,7 @@ header h1 {
     outline: none;
 }
 
+.filter-btn:focus-visible,
 .game-card.highlighted {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
@@ -233,13 +229,13 @@ header h1 {
     text-align: center;
 }
 
-.game-card .placeholder-cover .placeholder-name {
+.placeholder-cover .placeholder-name {
     font-size: 0.75rem;
     color: var(--color-text-dim);
     word-break: break-word;
 }
 
-.game-card .placeholder-cover .placeholder-console {
+.placeholder-cover .placeholder-console {
     font-size: 0.625rem;
     color: var(--color-text-faint);
     margin-top: 4px;
