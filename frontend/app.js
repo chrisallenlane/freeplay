@@ -248,13 +248,14 @@
 	}
 
 	/**
-	 * Returns the index of the focused game card, or -1 if none is focused.
+	 * Returns the index of the card matching a predicate, or -1 if none match.
 	 * @param {NodeList} cards
+	 * @param {function} predicate
 	 * @returns {number}
 	 */
-	function focusedCardIndex(cards) {
+	function findCardIndex(cards, predicate) {
 		for (let i = 0; i < cards.length; i++) {
-			if (cards[i] === document.activeElement) return i;
+			if (predicate(cards[i])) return i;
 		}
 		return -1;
 	}
@@ -316,15 +317,10 @@
 			default: {
 				if (cards.length === 0) return;
 
-				let current = focusedCardIndex(cards);
+				let current = findCardIndex(cards, (c) => c === document.activeElement);
 				// Fall back to the last mouse-hovered card when no card has focus.
 				if (current < 0 && hoveredKey !== null) {
-					for (let i = 0; i < cards.length; i++) {
-						if (cards[i].dataset.key === hoveredKey) {
-							current = i;
-							break;
-						}
-					}
+					current = findCardIndex(cards, (c) => c.dataset.key === hoveredKey);
 				}
 				if (current < 0) {
 					focusCard(cards, 0);
@@ -355,19 +351,12 @@
 		}
 	}
 
-	// Keyboard shortcut: [ / ] cycle through filter buttons.
-	document.addEventListener("keydown", (e) => {
-		if (e.key !== "[" && e.key !== "]") return;
-		if (document.activeElement === searchInput) return;
-
-		e.preventDefault();
-		handleAction(e.key === "[" ? ACTION_PREV_FILTER : ACTION_NEXT_FILTER);
-	});
-
-	// Arrow-key navigation across game cards.
+	// Keyboard shortcuts: [/] cycle filters, arrow keys navigate cards.
 	document.addEventListener("keydown", (e) => {
 		if (document.activeElement === searchInput) return;
 		const actionMap = {
+			"[": ACTION_PREV_FILTER,
+			"]": ACTION_NEXT_FILTER,
 			ArrowLeft: ACTION_LEFT,
 			ArrowRight: ACTION_RIGHT,
 			ArrowUp: ACTION_UP,
