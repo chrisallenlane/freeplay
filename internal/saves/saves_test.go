@@ -87,8 +87,12 @@ func TestPutOverwrites(t *testing.T) {
 	dir := t.TempDir()
 	m := New(dir)
 
-	m.Put("NES", "game", "state", bytes.NewReader([]byte("old")))
-	m.Put("NES", "game", "state", bytes.NewReader([]byte("new")))
+	if err := m.Put("NES", "game", "state", bytes.NewReader([]byte("old"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put("NES", "game", "state", bytes.NewReader([]byte("new"))); err != nil {
+		t.Fatal(err)
+	}
 
 	got := m.Get("NES", "game", "state")
 	if string(got) != "new" {

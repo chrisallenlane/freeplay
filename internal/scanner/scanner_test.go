@@ -15,17 +15,31 @@ func setupTestDir(t *testing.T) (string, *config.Config) {
 
 	nesDir := filepath.Join(dir, "roms", "nes")
 	genDir := filepath.Join(dir, "roms", "genesis")
-	os.MkdirAll(nesDir, 0o755)
-	os.MkdirAll(genDir, 0o755)
+	if err := os.MkdirAll(nesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(genDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
-	os.WriteFile(filepath.Join(nesDir, "Mega Man.zip"), []byte("rom"), 0o644)
-	os.WriteFile(filepath.Join(nesDir, "Zelda.zip"), []byte("rom"), 0o644)
-	os.WriteFile(filepath.Join(genDir, "Sonic.gen"), []byte("rom"), 0o644)
+	if err := os.WriteFile(filepath.Join(nesDir, "Mega Man.zip"), []byte("rom"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nesDir, "Zelda.zip"), []byte("rom"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(genDir, "Sonic.gen"), []byte("rom"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a cover for Sonic
 	coverDir := filepath.Join(dir, "covers", "Genesis")
-	os.MkdirAll(coverDir, 0o755)
-	os.WriteFile(filepath.Join(coverDir, "Sonic.png"), []byte("img"), 0o644)
+	if err := os.MkdirAll(coverDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(coverDir, "Sonic.png"), []byte("img"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg := &config.Config{
 		Port: 8080,
@@ -76,7 +90,9 @@ func TestScanSortOrder(t *testing.T) {
 func TestScanSkipsSubdirectories(t *testing.T) {
 	dir, cfg := setupTestDir(t)
 	// Add a subdirectory inside NES roms
-	os.MkdirAll(filepath.Join(cfg.ROMs["NES"].Path, "subdir"), 0o755)
+	if err := os.MkdirAll(filepath.Join(cfg.ROMs["NES"].Path, "subdir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	s := New(cfg, dir)
 	s.ScanBlocking()
@@ -200,7 +216,9 @@ func TestCatalogJSONEmpty(t *testing.T) {
 	}
 
 	var cat Catalog
-	json.Unmarshal(data, &cat)
+	if err := json.Unmarshal(data, &cat); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
 	if len(cat.Games) != 0 {
 		t.Errorf("expected empty games, got %d", len(cat.Games))
 	}

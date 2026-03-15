@@ -33,7 +33,9 @@ func TestWriteOverwrite(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.txt")
 
-	os.WriteFile(path, []byte("old"), 0o644)
+	if err := os.WriteFile(path, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	err := Write(path, func(w io.Writer) error {
 		_, err := w.Write([]byte("new"))
@@ -101,8 +103,10 @@ func TestWriteDirectoryCreationFails(t *testing.T) {
 
 func TestWriteReadOnlyDirectory(t *testing.T) {
 	dir := t.TempDir()
-	os.Chmod(dir, 0o444)
-	t.Cleanup(func() { os.Chmod(dir, 0o755) })
+	if err := os.Chmod(dir, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
 
 	err := Write(filepath.Join(dir, "file.txt"), func(w io.Writer) error {
 		_, err := w.Write([]byte("data"))

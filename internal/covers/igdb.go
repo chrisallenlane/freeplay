@@ -61,7 +61,7 @@ func (f *IGDBFetcher) getToken() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("token request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -99,7 +99,7 @@ func (f *IGDBFetcher) apiRequest(endpoint, body string) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("IGDB request failed: %w", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 {
 			// Token expired, clear and retry once
@@ -195,7 +195,7 @@ func (f *IGDBFetcher) Fetch(gameName string, _ string, platformIDs []int) (image
 	if err != nil {
 		return nil, fmt.Errorf("downloading cover image: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("cover image returned %d", resp.StatusCode)
