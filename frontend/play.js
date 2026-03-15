@@ -70,13 +70,37 @@
 			postSave("sram", data.save);
 		};
 
-		// Register periodic SRAM save after game starts
+		// Load SRAM save from server (if exists), then register periodic saves
 		window.EJS_onGameStart = () => {
-			if (window.EJS_emulator) {
-				window.EJS_emulator.on("saveSaveFiles", (data) => {
-					postSave("sram", data);
-				});
-			}
+			if (!window.EJS_emulator) return;
+
+			// Load existing SRAM save from server
+			fetch(`${saveBase}/sram`)
+				.then((res) => {
+					if (!res.ok) return;
+					return res.arrayBuffer();
+				})
+				.then((buf) => {
+					if (!buf) return;
+					const gm = window.EJS_emulator.gameManager;
+					const path = gm.getSaveFilePath();
+					const parts = path.split("/");
+					let cp = "";
+					for (let i = 0; i < parts.length - 1; i++) {
+						if (parts[i] === "") continue;
+						cp += `/${parts[i]}`;
+						if (!gm.FS.analyzePath(cp).exists) gm.FS.mkdir(cp);
+					}
+					if (gm.FS.analyzePath(path).exists) gm.FS.unlink(path);
+					gm.FS.writeFile(path, new Uint8Array(buf));
+					gm.loadSaveFiles();
+				})
+				.catch(() => {});
+
+			// Register periodic SRAM save
+			window.EJS_emulator.on("saveSaveFiles", (data) => {
+				postSave("sram", data);
+			});
 		};
 
 		// Load save state if one exists, then start the emulator
