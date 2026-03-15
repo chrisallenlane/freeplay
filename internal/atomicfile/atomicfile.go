@@ -22,14 +22,14 @@ func Write(path string, fn func(w io.Writer) error) error {
 	}
 
 	if err := fn(tmp); err != nil {
-		tmp.Close()
-		os.Remove(tmp.Name())
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
 		return err
 	}
-	tmp.Close()
+	_ = tmp.Close()
 
 	if err := os.Rename(tmp.Name(), path); err != nil {
-		os.Remove(tmp.Name())
+		_ = os.Remove(tmp.Name())
 		return fmt.Errorf("renaming temp file: %w", err)
 	}
 

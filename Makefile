@@ -6,7 +6,7 @@ dist_dir := ./dist
 # executables
 GO   := go
 FMT  := gofumpt
-LINT := revive
+LINT := golangci-lint
 MKDIR := mkdir -p
 
 # build flags
@@ -36,7 +36,7 @@ fmt:
 ## lint: lint source files
 .PHONY: lint
 lint:
-	$(LINT) ./...
+	$(LINT) run ./...
 	npx --yes @biomejs/biome check frontend/*.js
 	npx --yes html-validate frontend/*.html
 
@@ -88,11 +88,11 @@ vendor:
 vendor-update:
 	$(GO) get -t -u ./... && $(GO) mod vendor && $(GO) mod tidy && $(GO) mod verify
 
-## setup: install dev dependencies (gofumpt, revive)
+## setup: install dev dependencies (gofumpt, golangci-lint)
 .PHONY: setup
 setup:
 	$(GO) install mvdan.cc/gofumpt@latest
-	$(GO) install github.com/mgechev/revive@v1.9.0
+	$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
 ## docker: build docker image
 .PHONY: docker

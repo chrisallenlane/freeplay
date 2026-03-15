@@ -18,7 +18,9 @@ func writeConfig(t *testing.T, dir, content string) {
 func TestLoadBasic(t *testing.T) {
 	dir := t.TempDir()
 	romDir := filepath.Join(dir, "roms", "nes")
-	os.MkdirAll(romDir, 0o755)
+	if err := os.MkdirAll(romDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	writeConfig(t, dir, `
 port = 9090
@@ -169,7 +171,7 @@ core = "fceumm"
 			t.Skip()
 		}
 		// Must not panic regardless of input
-		Load(dir)
+		_, _ = Load(dir)
 	})
 }
 

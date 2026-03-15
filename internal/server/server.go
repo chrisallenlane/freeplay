@@ -110,7 +110,7 @@ func (s *Server) routes() {
 
 func writeJSONOK(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -124,7 +124,7 @@ func (s *Server) handleGames(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
 func (s *Server) serveConsoleFile(w http.ResponseWriter, r *http.Request, resolve func(string) (string, bool)) {
@@ -187,7 +187,7 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
 func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
@@ -209,7 +209,7 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	fetching := s.coverStatus != nil && s.coverStatus.Fetching()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"fetchingCovers": fetching})
+	_ = json.NewEncoder(w).Encode(map[string]bool{"fetchingCovers": fetching})
 }
 
 func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {

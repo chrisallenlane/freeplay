@@ -26,30 +26,30 @@ func newTestServer(t *testing.T, queryLog *[]string, gamesResp []byte) *httptest
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"access_token": "test-token",
 				"expires_in":   3600,
 			})
 
 		case strings.HasSuffix(r.URL.Path, "/v4/games"):
 			body := make([]byte, r.ContentLength)
-			r.Body.Read(body)
+			_, _ = r.Body.Read(body)
 			*queryLog = append(*queryLog, string(body))
-			w.Write(gamesResp)
+			_, _ = w.Write(gamesResp)
 
 		case strings.HasSuffix(r.URL.Path, "/v4/covers"):
-			json.NewEncoder(w).Encode([]map[string]string{
+			_ = json.NewEncoder(w).Encode([]map[string]string{
 				{"url": "//images.igdb.com/t_thumb/cover.jpg"},
 			})
 
 		case strings.Contains(r.URL.Path, "t_cover_big"):
 			w.Header().Set("Content-Type", "image/png")
-			png.Encode(w, img)
+			_ = png.Encode(w, img)
 
 		default:
 			// Serve the cover image for any other path (covers URL rewrite)
 			w.Header().Set("Content-Type", "image/png")
-			png.Encode(w, img)
+			_ = png.Encode(w, img)
 		}
 	}))
 }
@@ -151,7 +151,7 @@ func TestFetchNameMatching(t *testing.T) {
 	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/v4/covers") {
 			body := make([]byte, r.ContentLength)
-			r.Body.Read(body)
+			_, _ = r.Body.Read(body)
 			coverQueries = append(coverQueries, string(body))
 		}
 		origHandler.ServeHTTP(w, r)
@@ -182,7 +182,7 @@ func TestFetchFirstCoverFallback(t *testing.T) {
 	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/v4/covers") {
 			body := make([]byte, r.ContentLength)
-			r.Body.Read(body)
+			_, _ = r.Body.Read(body)
 			coverQueries = append(coverQueries, string(body))
 		}
 		origHandler.ServeHTTP(w, r)
@@ -218,7 +218,7 @@ func TestFetchCaseInsensitiveMatch(t *testing.T) {
 	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/v4/covers") {
 			body := make([]byte, r.ContentLength)
-			r.Body.Read(body)
+			_, _ = r.Body.Read(body)
 			coverQueries = append(coverQueries, string(body))
 		}
 		origHandler.ServeHTTP(w, r)
@@ -285,7 +285,7 @@ func TestGetTokenNon200(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/oauth2/token") {
 			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte("forbidden"))
+			_, _ = w.Write([]byte("forbidden"))
 			return
 		}
 	}))
@@ -308,7 +308,7 @@ func TestGetTokenNon200(t *testing.T) {
 func TestGetTokenDecodeError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/oauth2/token") {
-			w.Write([]byte("not json"))
+			_, _ = w.Write([]byte("not json"))
 			return
 		}
 	}))
@@ -332,13 +332,13 @@ func TestFetchAPIErrorNon200(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"access_token": "test-token",
 				"expires_in":   3600,
 			})
 		case strings.HasSuffix(r.URL.Path, "/v4/games"):
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("server error"))
+			_, _ = w.Write([]byte("server error"))
 		}
 	}))
 	t.Cleanup(ts.Close)
@@ -361,16 +361,16 @@ func TestFetchEmptyCoverURL(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"access_token": "test-token",
 				"expires_in":   3600,
 			})
 		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			json.NewEncoder(w).Encode([]map[string]any{
+			_ = json.NewEncoder(w).Encode([]map[string]any{
 				{"name": "Test Game", "cover": 1},
 			})
 		case strings.HasSuffix(r.URL.Path, "/v4/covers"):
-			json.NewEncoder(w).Encode([]map[string]string{
+			_ = json.NewEncoder(w).Encode([]map[string]string{
 				{"url": ""},
 			})
 		}
@@ -395,16 +395,16 @@ func TestFetchCoverImageNon200(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"access_token": "test-token",
 				"expires_in":   3600,
 			})
 		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			json.NewEncoder(w).Encode([]map[string]any{
+			_ = json.NewEncoder(w).Encode([]map[string]any{
 				{"name": "Test Game", "cover": 1},
 			})
 		case strings.HasSuffix(r.URL.Path, "/v4/covers"):
-			json.NewEncoder(w).Encode([]map[string]string{
+			_ = json.NewEncoder(w).Encode([]map[string]string{
 				{"url": "//images.igdb.com/t_thumb/cover.jpg"},
 			})
 		default:
@@ -443,7 +443,7 @@ func TestFetchTokenRetryOn401(t *testing.T) {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-				json.NewEncoder(w).Encode(map[string]any{
+				_ = json.NewEncoder(w).Encode(map[string]any{
 					"access_token": "fresh-token",
 					"expires_in":   3600,
 				})
@@ -455,17 +455,17 @@ func TestFetchTokenRetryOn401(t *testing.T) {
 					w.WriteHeader(http.StatusUnauthorized)
 					return
 				}
-				w.Write(gamesResp)
+				_, _ = w.Write(gamesResp)
 
 			case strings.HasSuffix(r.URL.Path, "/v4/covers"):
-				json.NewEncoder(w).Encode([]map[string]string{
+				_ = json.NewEncoder(w).Encode([]map[string]string{
 					{"url": "//images.igdb.com/t_thumb/cover.jpg"},
 				})
 
 			default:
 				// Serve a cover image for all other paths (image download).
 				w.Header().Set("Content-Type", "image/png")
-				png.Encode(w, img)
+				_ = png.Encode(w, img)
 			}
 		}),
 	)

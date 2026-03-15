@@ -20,12 +20,20 @@ func testServer(t *testing.T) (*Server, string) {
 	dir := t.TempDir()
 
 	romDir := filepath.Join(dir, "roms", "NES")
-	os.MkdirAll(romDir, 0o755)
-	os.WriteFile(filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644)
+	if err := os.MkdirAll(romDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	biosDir := filepath.Join(dir, "bios", "PSX")
-	os.MkdirAll(biosDir, 0o755)
-	os.WriteFile(filepath.Join(biosDir, "scph1001.bin"), []byte("biosdata"), 0o644)
+	if err := os.MkdirAll(biosDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(biosDir, "scph1001.bin"), []byte("biosdata"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg := &config.Config{
 		Port: 8080,
@@ -69,7 +77,9 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 
 	var body map[string]string
-	json.Unmarshal(w.Body.Bytes(), &body)
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
 	if body["status"] != "ok" {
 		t.Errorf("status = %q, want %q", body["status"], "ok")
 	}
@@ -174,7 +184,9 @@ func TestServeSecureFileBlocksDirectory(t *testing.T) {
 
 	// Create a subdirectory inside ROM dir
 	romDir := srv.cfg.ROMs["NES"].Path
-	os.MkdirAll(filepath.Join(romDir, "subdir"), 0o755)
+	if err := os.MkdirAll(filepath.Join(romDir, "subdir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	req := httptest.NewRequest("GET", "/roms/NES/subdir", nil)
 	w := httptest.NewRecorder()
@@ -267,8 +279,12 @@ func TestCoversServing(t *testing.T) {
 	srv, dir := testServer(t)
 
 	coverDir := filepath.Join(dir, "covers", "NES")
-	os.MkdirAll(coverDir, 0o755)
-	os.WriteFile(filepath.Join(coverDir, "Mega Man.png"), []byte("pngdata"), 0o644)
+	if err := os.MkdirAll(coverDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(coverDir, "Mega Man.png"), []byte("pngdata"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	req := httptest.NewRequest("GET", "/covers/NES/Mega%20Man.png", nil)
 	w := httptest.NewRecorder()
@@ -311,7 +327,9 @@ func TestSavePathTraversalBlocked(t *testing.T) {
 
 	// Create a sentinel file outside the saves directory
 	sentinel := filepath.Join(dir, "secret")
-	os.WriteFile(sentinel, []byte("sensitive"), 0o644)
+	if err := os.WriteFile(sentinel, []byte("sensitive"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name   string
@@ -450,7 +468,9 @@ func TestStatusEndpointFetching(t *testing.T) {
 	dir := t.TempDir()
 
 	romDir := filepath.Join(dir, "roms", "NES")
-	os.MkdirAll(romDir, 0o755)
+	if err := os.MkdirAll(romDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg := &config.Config{
 		Port: 8080,
@@ -494,9 +514,13 @@ func TestPostSavePutError(t *testing.T) {
 	srv, dir := testServer(t)
 
 	savesDir := filepath.Join(dir, "saves")
-	os.MkdirAll(savesDir, 0o755)
-	os.Chmod(savesDir, 0o444)
-	t.Cleanup(func() { os.Chmod(savesDir, 0o755) })
+	if err := os.MkdirAll(savesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(savesDir, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(savesDir, 0o755) })
 
 	req := httptest.NewRequest(
 		"POST",
