@@ -104,8 +104,8 @@ func (s *Server) routes() {
 	// Player page (explicit route before catch-all)
 	s.mux.HandleFunc("GET /play", s.handlePlay)
 
-	// Embedded frontend (catch-all)
-	s.mux.Handle("/", http.FileServerFS(s.frontendSub))
+	// Embedded frontend (catch-all) — no-cache so deploys are picked up immediately
+	s.mux.Handle("/", noCache(http.FileServerFS(s.frontendSub)))
 }
 
 func writeJSONOK(w http.ResponseWriter) {
@@ -155,7 +155,15 @@ func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFileFS(w, r, s.frontendSub, "play.html")
+}
+
+func noCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func safeName(s string) bool {
