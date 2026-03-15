@@ -8,6 +8,12 @@ dependencies. There's no database to provision, no background workers to
 monitor, and no multi-container orchestration to debug. Install it, configure
 a TOML file, and you're done.
 
+## Screenshots
+
+| Dark theme | Light theme |
+|:----------:|:-----------:|
+| [![Dark theme](.screenshots/dark-thumb.png)](.screenshots/dark.png) | [![Light theme](.screenshots/light-thumb.png)](.screenshots/light.png) |
+
 ## What it does
 
 - Serves your ROM library through a browser-based emulator
