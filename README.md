@@ -57,7 +57,7 @@ network is allowed to play.
 cp freeplay.example.toml /path/to/your/games/freeplay.toml
 
 # Point docker-compose at your data directory and start
-docker compose up --build
+docker compose up
 ```
 
 See [INSTALLING.md](INSTALLING.md) for detailed setup instructions, including

@@ -11,6 +11,9 @@ Before installing Freeplay, you need:
 
 ## Docker (recommended)
 
+Freeplay is published to the GitHub Container Registry at
+`ghcr.io/chrisallenlane/freeplay`.
+
 ### 1. Create your data directory
 
 Create a directory that will hold your config, ROMs, and (optionally) BIOS
@@ -40,14 +43,14 @@ cp freeplay.example.toml /path/to/data/freeplay.toml
 
 See [Configuration](#configuration) for details.
 
-### 3. Edit `docker-compose.yml`
+### 3. Create a `docker-compose.yml`
 
-Update the volume mount to point to your data directory:
+Create a `docker-compose.yml` that points to your data directory:
 
 ```yaml
 services:
   freeplay:
-    build: .
+    image: ghcr.io/chrisallenlane/freeplay:latest
     ports:
       - "8080:8080"
     volumes:
@@ -58,7 +61,7 @@ services:
 ### 4. Start the server
 
 ```bash
-docker compose up --build -d
+docker compose up -d
 ```
 
 Freeplay will be available at `http://localhost:8080`.

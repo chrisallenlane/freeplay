@@ -1,6 +1,6 @@
 services:
   freeplay:
-    build: .
+    image: ghcr.io/chrisallenlane/freeplay:latest
     ports:
       - "8080:8080"
     volumes:

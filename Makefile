@@ -97,7 +97,7 @@ setup:
 ## docker: build docker image
 .PHONY: docker
 docker:
-	docker build -t freeplay .
+	docker build --build-arg VERSION=$(VERSION) -t freeplay .
 
 # .tmp
 .tmp:
