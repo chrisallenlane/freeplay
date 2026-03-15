@@ -9,6 +9,8 @@ env:
 
 jobs:
   build-and-push:
+    # Repo is mirrored from Gitea to GitHub. Only run on GitHub.
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
 
     permissions:
