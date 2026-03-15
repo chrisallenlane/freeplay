@@ -209,7 +209,7 @@ header h1 {
     outline-offset: 2px;
 }
 
-.game-grid[data-input="gamepad"] .game-card:hover {
+.game-grid[data-input="directional"] .game-card:hover {
     outline: none;
 }
 
