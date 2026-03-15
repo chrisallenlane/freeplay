@@ -21,7 +21,13 @@ func fatal(err error) {
 
 func main() {
 	dataDir := flag.String("data", "/data", "path to data directory")
+	version := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *version {
+		fmt.Println(freeplay.Version)
+		return
+	}
 
 	cfg, err := config.Load(*dataDir)
 	if err != nil {

@@ -19,14 +19,15 @@ a TOML file, and you're done.
 - Serves your ROM library through a browser-based emulator
 - Persists save states and battery saves server-side
 - Optionally fetches cover art from [IGDB][]
+- Filters games by console, search query, or favorites
 - Runs as a single binary or a single Docker container with one volume mount
 - Switches between light and dark themes (auto-detects system preference,
   with manual toggle)
 - Adapts to mobile, tablet, and desktop screens
 - Supports gamepad navigation in the library UI (D-pad to browse, shoulder
   buttons to switch filters, A/Start to launch)
-- Supports keyboard navigation — semantic HTML, visible focus indicators,
-  skip links
+- Supports keyboard navigation — arrow keys to browse, `[`/`]` to cycle
+  filters, semantic HTML, visible focus indicators, skip links
 
 ## What it doesn't do
 
