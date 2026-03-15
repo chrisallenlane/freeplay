@@ -30,19 +30,23 @@
 
 	function getFilteredGames() {
 		return FP.filterGames(allGames, {
-			favorites: favorites,
+			favorites,
 			favoritesOnly: activeFavorites,
 			console: activeConsole,
 			query: searchInput.value,
 		});
 	}
 
-	function renderAll() {
-		focusedKey = null;
-		hoveredKey = null;
+	function blurActiveCard() {
 		if (document.activeElement?.classList.contains("game-card")) {
 			document.activeElement.blur();
 		}
+	}
+
+	function renderAll() {
+		focusedKey = null;
+		hoveredKey = null;
+		blurActiveCard();
 		renderFilters();
 		renderGrid();
 	}
@@ -55,9 +59,11 @@
 	}
 
 	function addFilterBtn(label, isActive, onClick) {
-		const btn = document.createElement("button");
-		btn.className = `btn filter-btn${isActive ? " active" : ""}`;
-		btn.textContent = label;
+		const btn = el(
+			"button",
+			`btn filter-btn${isActive ? " active" : ""}`,
+			label,
+		);
 		btn.addEventListener("click", onClick);
 		filtersBar.appendChild(btn);
 	}
@@ -353,15 +359,7 @@
 		if (document.activeElement === searchInput) return;
 
 		e.preventDefault();
-		const btns = filtersBar.querySelectorAll(".filter-btn");
-		if (btns.length === 0) return;
-		const activeBtn = filtersBar.querySelector(".filter-btn.active");
-		const sibling =
-			e.key === "["
-				? activeBtn?.previousElementSibling
-				: activeBtn?.nextElementSibling;
-		if (!sibling) return;
-		sibling.click();
+		handleAction(e.key === "[" ? ACTION_PREV_FILTER : ACTION_NEXT_FILTER);
 	});
 
 	// Arrow-key navigation across game cards.
@@ -394,11 +392,7 @@
 	});
 
 	// Clear directional focus when the mouse takes over.
-	grid.addEventListener("mousemove", () => {
-		if (document.activeElement?.classList.contains("game-card")) {
-			document.activeElement.blur();
-		}
-	});
+	grid.addEventListener("mousemove", blurActiveCard);
 
 	// Rescan button
 	let statusPollTimer = null;
