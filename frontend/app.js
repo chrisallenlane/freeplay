@@ -200,6 +200,29 @@
 
 	searchInput.addEventListener("input", renderGrid);
 
+	// Keyboard shortcut: [ / ] cycle through filter buttons.
+	document.addEventListener("keydown", (e) => {
+		if (e.key !== "[" && e.key !== "]") return;
+		if (document.activeElement === searchInput) return;
+
+		e.preventDefault();
+		const btns = filtersBar.querySelectorAll(".filter-btn");
+		if (btns.length === 0) return;
+		const activeBtn = filtersBar.querySelector(".filter-btn.active");
+		const sibling =
+			e.key === "["
+				? activeBtn?.previousElementSibling
+				: activeBtn?.nextElementSibling;
+		if (!sibling) return;
+		focusedKey = null;
+		sibling.click();
+		const cards = grid.querySelectorAll(".game-card");
+		if (cards.length > 0) {
+			cards[0].focus();
+			focusedKey = cards[0].dataset.key ?? null;
+		}
+	});
+
 	// Input mode: suppress hover effects during gamepad navigation,
 	// and clear gamepad focus when the mouse takes over.
 	grid.addEventListener("mousemove", () => {
