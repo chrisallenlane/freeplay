@@ -135,8 +135,7 @@
 			const ph = el("div", "placeholder-cover");
 			const phName = el("div", "placeholder-name", displayName);
 			const phConsole = el("div", "placeholder-console", game.console);
-			ph.appendChild(phName);
-			ph.appendChild(phConsole);
+			ph.append(phName, phConsole);
 			card.appendChild(ph);
 		}
 
@@ -144,8 +143,7 @@
 		const info = el("div", "card-info");
 		const title = el("div", "card-title", displayName);
 		const consoleName = el("div", "card-console", game.console);
-		info.appendChild(title);
-		info.appendChild(consoleName);
+		info.append(title, consoleName);
 		card.appendChild(info);
 
 		grid.appendChild(card);
