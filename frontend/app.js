@@ -92,6 +92,65 @@
 		});
 	}
 
+	function renderCard(game) {
+		const key = FP.favKey(game);
+		const displayName = FP.stripExt(game.filename);
+
+		const card = el("a", "game-card");
+		card.href = FP.playUrl(game);
+		card.dataset.key = key;
+
+		// Favorite button
+		const isFav = favorites.has(key);
+		const fav = el(
+			"button",
+			`fav-btn${isFav ? " favorited" : ""}`,
+			isFav ? "\u2605" : "\u2606",
+		);
+		fav.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			if (favorites.has(key)) {
+				favorites.delete(key);
+				fav.textContent = "\u2606";
+				fav.classList.remove("favorited");
+			} else {
+				favorites.add(key);
+				fav.textContent = "\u2605";
+				fav.classList.add("favorited");
+			}
+			saveFavorites();
+			if (activeFavorites) renderGrid();
+		});
+		card.appendChild(fav);
+
+		// Cover art or placeholder
+		if (game.hasCover) {
+			const img = el("img", "cover");
+			img.src = FP.coverUrl(game);
+			img.alt = displayName;
+			img.loading = "lazy";
+			card.appendChild(img);
+		} else {
+			const ph = el("div", "placeholder-cover");
+			const phName = el("div", "placeholder-name", displayName);
+			const phConsole = el("div", "placeholder-console", game.console);
+			ph.appendChild(phName);
+			ph.appendChild(phConsole);
+			card.appendChild(ph);
+		}
+
+		// Card info
+		const info = el("div", "card-info");
+		const title = el("div", "card-title", displayName);
+		const consoleName = el("div", "card-console", game.console);
+		info.appendChild(title);
+		info.appendChild(consoleName);
+		card.appendChild(info);
+
+		grid.appendChild(card);
+	}
+
 	function renderGrid() {
 		// Capture focused key before destroying the DOM.
 		const activeEl = document.activeElement;
@@ -117,64 +176,7 @@
 			return;
 		}
 
-		games.forEach((game) => {
-			const key = FP.favKey(game);
-			const displayName = FP.stripExt(game.filename);
-
-			const card = el("a", "game-card");
-			card.href = FP.playUrl(game);
-			card.dataset.key = key;
-
-			// Favorite button
-			const isFav = favorites.has(key);
-			const fav = el(
-				"button",
-				`fav-btn${isFav ? " favorited" : ""}`,
-				isFav ? "\u2605" : "\u2606",
-			);
-			fav.addEventListener("click", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				if (favorites.has(key)) {
-					favorites.delete(key);
-					fav.textContent = "\u2606";
-					fav.classList.remove("favorited");
-				} else {
-					favorites.add(key);
-					fav.textContent = "\u2605";
-					fav.classList.add("favorited");
-				}
-				saveFavorites();
-				if (activeFavorites) renderGrid();
-			});
-			card.appendChild(fav);
-
-			// Cover art or placeholder
-			if (game.hasCover) {
-				const img = el("img", "cover");
-				img.src = FP.coverUrl(game);
-				img.alt = displayName;
-				img.loading = "lazy";
-				card.appendChild(img);
-			} else {
-				const ph = el("div", "placeholder-cover");
-				const phName = el("div", "placeholder-name", displayName);
-				const phConsole = el("div", "placeholder-console", game.console);
-				ph.appendChild(phName);
-				ph.appendChild(phConsole);
-				card.appendChild(ph);
-			}
-
-			// Card info
-			const info = el("div", "card-info");
-			const title = el("div", "card-title", displayName);
-			const consoleName = el("div", "card-console", game.console);
-			info.appendChild(title);
-			info.appendChild(consoleName);
-			card.appendChild(info);
-
-			grid.appendChild(card);
-		});
+		games.forEach(renderCard);
 
 		// Restore focus to the previously focused card, or the first card if
 		// the key is no longer present (e.g. after a filter change).
