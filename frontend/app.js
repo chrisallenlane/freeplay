@@ -200,6 +200,130 @@
 
 	searchInput.addEventListener("input", renderGrid);
 
+	// ---------------------------------------------------------------------------
+	// Directional navigation (shared by keyboard and gamepad)
+	// ---------------------------------------------------------------------------
+
+	// Logical actions.
+	const ACTION_LEFT = "left";
+	const ACTION_RIGHT = "right";
+	const ACTION_UP = "up";
+	const ACTION_DOWN = "down";
+	const ACTION_ACTIVATE = "activate";
+	const ACTION_PREV_FILTER = "prevFilter";
+	const ACTION_NEXT_FILTER = "nextFilter";
+
+	/**
+	 * Returns the number of columns in the game grid by counting cards that
+	 * share the same offsetTop as the first card.
+	 * @param {NodeList} cards
+	 * @returns {number}
+	 */
+	function gridColumns(cards) {
+		if (cards.length === 0) return 1;
+		const firstTop = cards[0].offsetTop;
+		let cols = 0;
+		for (const card of cards) {
+			if (card.offsetTop !== firstTop) break;
+			cols++;
+		}
+		return cols;
+	}
+
+	/**
+	 * Returns the index of the focused game card, or -1 if none is focused.
+	 * @param {NodeList} cards
+	 * @returns {number}
+	 */
+	function focusedCardIndex(cards) {
+		for (let i = 0; i < cards.length; i++) {
+			if (cards[i] === document.activeElement) return i;
+		}
+		return -1;
+	}
+
+	/**
+	 * Moves focus to the card at the given index, clamped to valid range.
+	 * @param {NodeList} cards
+	 * @param {number} index
+	 */
+	function focusCard(cards, index) {
+		if (cards.length === 0) return;
+		const clamped = Math.max(0, Math.min(index, cards.length - 1));
+		cards[clamped].focus();
+		focusedKey = cards[clamped].dataset.key ?? null;
+	}
+
+	/**
+	 * Handles a single logical directional action.
+	 * @param {string} action
+	 */
+	function handleAction(action) {
+		grid.dataset.input = "directional";
+		const cards = grid.querySelectorAll(".game-card");
+
+		switch (action) {
+			case ACTION_ACTIVATE: {
+				const idx = focusedCardIndex(cards);
+				if (idx >= 0) cards[idx].click();
+				return;
+			}
+
+			case ACTION_PREV_FILTER:
+			case ACTION_NEXT_FILTER: {
+				const btns = filtersBar.querySelectorAll(".filter-btn");
+				if (btns.length === 0) return;
+				const activeBtn = filtersBar.querySelector(".filter-btn.active");
+				const sibling =
+					action === ACTION_PREV_FILTER
+						? activeBtn?.previousElementSibling
+						: activeBtn?.nextElementSibling;
+				if (!sibling) return;
+				focusedKey = null;
+				sibling.click();
+				// renderAll() was called synchronously by the click handler.
+				const newCards = grid.querySelectorAll(".game-card");
+				if (newCards.length > 0) {
+					newCards[0].focus();
+					focusedKey = newCards[0].dataset.key ?? null;
+				}
+				return;
+			}
+
+			default: {
+				if (cards.length === 0) return;
+
+				const current = focusedCardIndex(cards);
+				// If nothing is focused yet, focus the first card on any directional input.
+				if (current < 0) {
+					focusCard(cards, 0);
+					return;
+				}
+
+				const cols = gridColumns(cards);
+
+				switch (action) {
+					case ACTION_LEFT:
+						// Clamp: do nothing if already at start of row.
+						if (current % cols !== 0) focusCard(cards, current - 1);
+						break;
+					case ACTION_RIGHT:
+						// Clamp: do nothing if already at end of row.
+						if ((current + 1) % cols !== 0 && current + 1 < cards.length) {
+							focusCard(cards, current + 1);
+						}
+						break;
+					case ACTION_UP:
+						if (current >= cols) focusCard(cards, current - cols);
+						break;
+					case ACTION_DOWN:
+						if (current + cols < cards.length) focusCard(cards, current + cols);
+						break;
+				}
+			}
+		}
+	}
+
 	// Keyboard shortcut: [ / ] cycle through filter buttons.
 	document.addEventListener("keydown", (e) => {
 		if (e.key !== "[" && e.key !== "]") return;
@@ -223,10 +347,25 @@
 		}
 	});
 
-	// Input mode: suppress hover effects during gamepad navigation,
-	// and clear gamepad focus when the mouse takes over.
+	// Arrow-key navigation across game cards.
+	document.addEventListener("keydown", (e) => {
+		if (document.activeElement === searchInput) return;
+		const actionMap = {
+			ArrowLeft: ACTION_LEFT,
+			ArrowRight: ACTION_RIGHT,
+			ArrowUp: ACTION_UP,
+			ArrowDown: ACTION_DOWN,
+		};
+		const action = actionMap[e.key];
+		if (!action) return;
+		e.preventDefault();
+		handleAction(action);
+	});
+
+	// Input mode: suppress hover effects during directional navigation,
+	// and clear focus when the mouse takes over.
 	grid.addEventListener("mousemove", () => {
-		if (grid.dataset.input === "gamepad") {
+		if (grid.dataset.input === "directional") {
 			grid.dataset.input = "pointer";
 			if (document.activeElement?.classList.contains("game-card")) {
 				document.activeElement.blur();
@@ -303,128 +442,8 @@
 	// Debounce intervals (ms).
 	const REPEAT_DELAY = 180;
 
-	// Logical actions produced by the gamepad.
-	const ACTION_LEFT = "left";
-	const ACTION_RIGHT = "right";
-	const ACTION_UP = "up";
-	const ACTION_DOWN = "down";
-	const ACTION_ACTIVATE = "activate";
-	const ACTION_PREV_FILTER = "prevFilter";
-	const ACTION_NEXT_FILTER = "nextFilter";
-
 	// Axis threshold for treating an analog stick / D-pad axis as pressed.
 	const AXIS_THRESHOLD = 0.5;
-
-	/**
-	 * Returns the number of columns in the game grid by counting cards that
-	 * share the same offsetTop as the first card.
-	 * @param {NodeList} cards
-	 * @returns {number}
-	 */
-	function gridColumns(cards) {
-		if (cards.length === 0) return 1;
-		const firstTop = cards[0].offsetTop;
-		let cols = 0;
-		for (const card of cards) {
-			if (card.offsetTop !== firstTop) break;
-			cols++;
-		}
-		return cols;
-	}
-
-	/**
-	 * Returns the index of the focused game card, or -1 if none is focused.
-	 * @param {NodeList} cards
-	 * @returns {number}
-	 */
-	function focusedCardIndex(cards) {
-		for (let i = 0; i < cards.length; i++) {
-			if (cards[i] === document.activeElement) return i;
-		}
-		return -1;
-	}
-
-	/**
-	 * Moves focus to the card at the given index, clamped to valid range.
-	 * @param {NodeList} cards
-	 * @param {number} index
-	 */
-	function focusCard(cards, index) {
-		if (cards.length === 0) return;
-		const clamped = Math.max(0, Math.min(index, cards.length - 1));
-		cards[clamped].focus();
-		focusedKey = cards[clamped].dataset.key ?? null;
-	}
-
-	/**
-	 * Handles a single logical gamepad action.
-	 * @param {string} action
-	 */
-	function handleAction(action) {
-		grid.dataset.input = "gamepad";
-		const cards = grid.querySelectorAll(".game-card");
-
-		switch (action) {
-			case ACTION_ACTIVATE: {
-				const idx = focusedCardIndex(cards);
-				if (idx >= 0) cards[idx].click();
-				return;
-			}
-
-			case ACTION_PREV_FILTER:
-			case ACTION_NEXT_FILTER: {
-				const btns = filtersBar.querySelectorAll(".filter-btn");
-				if (btns.length === 0) return;
-				const activeBtn = filtersBar.querySelector(".filter-btn.active");
-				const sibling =
-					action === ACTION_PREV_FILTER
-						? activeBtn?.previousElementSibling
-						: activeBtn?.nextElementSibling;
-				if (!sibling) return;
-				focusedKey = null;
-				sibling.click();
-				// renderAll() was called synchronously by the click handler.
-				const newCards = grid.querySelectorAll(".game-card");
-				if (newCards.length > 0) {
-					newCards[0].focus();
-					focusedKey = newCards[0].dataset.key ?? null;
-				}
-				return;
-			}
-
-			default: {
-				if (cards.length === 0) return;
-
-				const current = focusedCardIndex(cards);
-				// If nothing is focused yet, focus the first card on any directional input.
-				if (current < 0) {
-					focusCard(cards, 0);
-					return;
-				}
-
-				const cols = gridColumns(cards);
-
-				switch (action) {
-					case ACTION_LEFT:
-						// Clamp: do nothing if already at start of row.
-						if (current % cols !== 0) focusCard(cards, current - 1);
-						break;
-					case ACTION_RIGHT:
-						// Clamp: do nothing if already at end of row.
-						if ((current + 1) % cols !== 0 && current + 1 < cards.length) {
-							focusCard(cards, current + 1);
-						}
-						break;
-					case ACTION_UP:
-						if (current >= cols) focusCard(cards, current - cols);
-						break;
-					case ACTION_DOWN:
-						if (current + cols < cards.length) focusCard(cards, current + cols);
-						break;
-				}
-			}
-		}
-	}
 
 	/**
 	 * Reads the current logical action (if any) from a gamepad snapshot.
