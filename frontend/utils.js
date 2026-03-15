@@ -35,4 +35,26 @@
 
 	exports.biosUrl = (consoleName) =>
 		`/bios/${encodeURIComponent(consoleName)}/`;
+
+	exports.initThemeToggle = () => {
+		const btn = document.getElementById("theme-toggle");
+		if (!btn) return;
+
+		const update = () => {
+			btn.textContent =
+				document.documentElement.dataset.theme === "light"
+					? "\u263D"
+					: "\u2600";
+		};
+
+		btn.addEventListener("click", () => {
+			const next =
+				document.documentElement.dataset.theme === "light" ? "dark" : "light";
+			document.documentElement.dataset.theme = next;
+			localStorage.setItem("freeplay-theme", next);
+			update();
+		});
+
+		update();
+	};
 })(typeof module !== "undefined" ? module.exports : (window.Freeplay = {}));

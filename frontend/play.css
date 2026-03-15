@@ -15,7 +15,7 @@ header {
 }
 
 header a {
-    color: #8888ff;
+    color: var(--color-link);
     text-decoration: none;
     font-size: 0.875rem;
 }
@@ -25,7 +25,7 @@ header a:hover {
 }
 
 header a:focus-visible {
-    outline: 2px solid #8888ff;
+    outline: 2px solid var(--color-link);
     outline-offset: 2px;
 }
 
@@ -33,8 +33,12 @@ header .game-name {
     font-family: inherit;
     font-size: 1rem;
     font-weight: 500;
-    color: #fff;
+    color: var(--color-text-bright);
     margin: 0;
+}
+
+#theme-toggle {
+    margin-left: auto;
 }
 
 #game {
@@ -50,6 +54,6 @@ header .game-name {
 .error-msg {
     text-align: center;
     padding: 60px 24px;
-    color: #ff6666;
+    color: var(--color-error);
     font-size: 1rem;
 }

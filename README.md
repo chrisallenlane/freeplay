@@ -14,6 +14,7 @@ a TOML file, and you're done.
 - Persists save states and battery saves server-side
 - Optionally fetches cover art from [IGDB][]
 - Runs as a single binary or a single Docker container with one volume mount
+- Light and dark themes (auto-detects system preference, with manual toggle)
 - Responsive layout that works on mobile, tablet, and desktop
 - Supports gamepad navigation in the library UI (D-pad to browse, shoulder
   buttons to switch filters, A/Start to launch)
