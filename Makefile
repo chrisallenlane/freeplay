@@ -10,7 +10,8 @@ LINT := revive
 MKDIR := mkdir -p
 
 # build flags
-BUILD_FLAGS := -ldflags="-s -w" -mod vendor -trimpath
+VERSION     := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+BUILD_FLAGS := -ldflags="-s -w -X github.com/chrisallenlane/freeplay.Version=$(VERSION)" -mod vendor -trimpath
 
 ## build: build the freeplay binary
 .PHONY: build
