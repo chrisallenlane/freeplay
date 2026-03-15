@@ -17,6 +17,10 @@
 	// Key of the currently focused game card, used to restore focus after re-renders.
 	let focusedKey = null;
 
+	// Key of the last mouse-hovered game card, used as the starting position
+	// for directional navigation when no card has focus.
+	let hoveredKey = null;
+
 	function saveFavorites() {
 		localStorage.setItem(
 			"freeplay-favorites",
@@ -34,6 +38,11 @@
 	}
 
 	function renderAll() {
+		focusedKey = null;
+		hoveredKey = null;
+		if (document.activeElement?.classList.contains("game-card")) {
+			document.activeElement.blur();
+		}
 		renderFilters();
 		renderGrid();
 	}
@@ -243,6 +252,17 @@
 	}
 
 	/**
+	 * Sets the `.highlighted` class on the given card, removing it from any
+	 * previously highlighted card.
+	 * @param {Element|null} card
+	 */
+	function highlightCard(card) {
+		const prev = grid.querySelector(".game-card.highlighted");
+		if (prev) prev.classList.remove("highlighted");
+		if (card) card.classList.add("highlighted");
+	}
+
+	/**
 	 * Moves focus to the card at the given index, clamped to valid range.
 	 * @param {NodeList} cards
 	 * @param {number} index
@@ -250,8 +270,10 @@
 	function focusCard(cards, index) {
 		if (cards.length === 0) return;
 		const clamped = Math.max(0, Math.min(index, cards.length - 1));
-		cards[clamped].focus();
-		focusedKey = cards[clamped].dataset.key ?? null;
+		const card = cards[clamped];
+		card.focus();
+		highlightCard(card);
+		focusedKey = card.dataset.key ?? null;
 	}
 
 	/**
@@ -259,13 +281,12 @@
 	 * @param {string} action
 	 */
 	function handleAction(action) {
-		grid.dataset.input = "directional";
 		const cards = grid.querySelectorAll(".game-card");
 
 		switch (action) {
 			case ACTION_ACTIVATE: {
-				const idx = focusedCardIndex(cards);
-				if (idx >= 0) cards[idx].click();
+				const card = grid.querySelector(".game-card.highlighted");
+				if (card) card.click();
 				return;
 			}
 
@@ -279,22 +300,23 @@
 						? activeBtn?.previousElementSibling
 						: activeBtn?.nextElementSibling;
 				if (!sibling) return;
-				focusedKey = null;
 				sibling.click();
-				// renderAll() was called synchronously by the click handler.
-				const newCards = grid.querySelectorAll(".game-card");
-				if (newCards.length > 0) {
-					newCards[0].focus();
-					focusedKey = newCards[0].dataset.key ?? null;
-				}
 				return;
 			}
 
 			default: {
 				if (cards.length === 0) return;
 
-				const current = focusedCardIndex(cards);
-				// If nothing is focused yet, focus the first card on any directional input.
+				let current = focusedCardIndex(cards);
+				// Fall back to the last mouse-hovered card when no card has focus.
+				if (current < 0 && hoveredKey !== null) {
+					for (let i = 0; i < cards.length; i++) {
+						if (cards[i].dataset.key === hoveredKey) {
+							current = i;
+							break;
+						}
+					}
+				}
 				if (current < 0) {
 					focusCard(cards, 0);
 					return;
@@ -338,13 +360,7 @@
 				? activeBtn?.previousElementSibling
 				: activeBtn?.nextElementSibling;
 		if (!sibling) return;
-		focusedKey = null;
 		sibling.click();
-		const cards = grid.querySelectorAll(".game-card");
-		if (cards.length > 0) {
-			cards[0].focus();
-			focusedKey = cards[0].dataset.key ?? null;
-		}
 	});
 
 	// Arrow-key navigation across game cards.
@@ -362,14 +378,24 @@
 		handleAction(action);
 	});
 
-	// Input mode: suppress hover effects during directional navigation,
-	// and clear focus when the mouse takes over.
+	// Track and highlight mouse-hovered card.
+	grid.addEventListener("mouseover", (e) => {
+		const card = e.target.closest(".game-card");
+		if (!card) return;
+		hoveredKey = card.dataset.key ?? null;
+		highlightCard(card);
+	});
+
+	// Highlight cards reached via Tab navigation.
+	grid.addEventListener("focusin", (e) => {
+		const card = e.target.closest(".game-card");
+		if (card) highlightCard(card);
+	});
+
+	// Clear directional focus when the mouse takes over.
 	grid.addEventListener("mousemove", () => {
-		if (grid.dataset.input === "directional") {
-			grid.dataset.input = "pointer";
-			if (document.activeElement?.classList.contains("game-card")) {
-				document.activeElement.blur();
-			}
+		if (document.activeElement?.classList.contains("game-card")) {
+			document.activeElement.blur();
 		}
 	});
 
