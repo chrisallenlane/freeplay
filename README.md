@@ -20,24 +20,25 @@ a TOML file, and you're done.
 - Persists save states and battery saves server-side
 - Optionally fetches cover art from [IGDB][]
 - Runs as a single binary or a single Docker container with one volume mount
-- Light and dark themes (auto-detects system preference, with manual toggle)
-- Responsive layout that works on mobile, tablet, and desktop
+- Switches between light and dark themes (auto-detects system preference,
+  with manual toggle)
+- Adapts to mobile, tablet, and desktop screens
 - Supports gamepad navigation in the library UI (D-pad to browse, shoulder
   buttons to switch filters, A/Start to launch)
-- Keyboard-accessible — semantic HTML, visible focus indicators, skip
-  navigation
+- Supports keyboard navigation — semantic HTML, visible focus indicators,
+  skip links
 
 ## What it doesn't do
 
-Freeplay is deliberately minimal. It has no:
+Freeplay is deliberately minimal. It does not:
 
-- Database (no MariaDB, PostgreSQL, or Redis)
-- User accounts, authentication, or role-based access
-- Collections or wishlists
-- ROM upload or metadata-editing UI
-- Background job scheduler or cron tasks
-- Multi-user support or sharing features
-- OIDC, OAuth, or SSO integration
+- Require a database (no MariaDB, PostgreSQL, or Redis)
+- Manage user accounts, authentication, or roles
+- Offer collections or wishlists
+- Provide a ROM upload or metadata-editing UI
+- Run background jobs or cron tasks
+- Support multiple users or sharing features
+- Integrate with OIDC, OAuth, or SSO
 
 Your ROMs live on the filesystem. Freeplay reads them and gets out of your
 way.
