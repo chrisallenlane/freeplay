@@ -212,16 +212,18 @@ header h1 {
     outline-offset: 2px;
 }
 
-.game-card .cover {
+.game-card .cover,
+.game-card .placeholder-cover {
     width: 100%;
     aspect-ratio: 3 / 4;
+}
+
+.game-card .cover {
     object-fit: cover;
     display: block;
 }
 
 .game-card .placeholder-cover {
-    width: 100%;
-    aspect-ratio: 3 / 4;
     background: linear-gradient(135deg, var(--color-placeholder-start), var(--color-placeholder-end));
     display: flex;
     flex-direction: column;
