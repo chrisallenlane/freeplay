@@ -47,7 +47,7 @@
 
 	function addFilterBtn(label, isActive, onClick) {
 		const btn = document.createElement("button");
-		btn.className = `filter-btn${isActive ? " active" : ""}`;
+		btn.className = `btn filter-btn${isActive ? " active" : ""}`;
 		btn.textContent = label;
 		btn.addEventListener("click", onClick);
 		filtersBar.appendChild(btn);
