@@ -24,6 +24,7 @@ a TOML file, and you're done.
 - Switches between light and dark themes (auto-detects system preference,
   with manual toggle)
 - Adapts to mobile, tablet, and desktop screens
+- Supports lightgun peripherals (SNES Super Scope, Justifier, and others)
 - Supports gamepad navigation in the library UI (D-pad to browse, shoulder
   buttons to switch filters, A/Start to launch)
 - Supports keyboard navigation — arrow keys to browse, `[`/`]` to cycle
