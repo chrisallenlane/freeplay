@@ -50,6 +50,10 @@
 				: "#1a1a2e";
 		window.EJS_gameName = nameEl.textContent;
 		window.EJS_startOnLoaded = true;
+		// Load unminified EmulatorJS sources. The vendored emulator.min.js
+		// does not include our controller port device patches (lightgun
+		// support), so we must load the individual source files instead.
+		window.EJS_DEBUG_XX = true;
 
 		if (game.hasBios) {
 			window.EJS_biosUrl = FP.biosUrl(consoleName);
