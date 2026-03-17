@@ -27,11 +27,12 @@ func testServer(t *testing.T) (*Server, string) {
 		t.Fatal(err)
 	}
 
-	biosDir := filepath.Join(dir, "bios", "PSX")
+	biosDir := filepath.Join(dir, "bios")
 	if err := os.MkdirAll(biosDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(biosDir, "scph1001.bin"), []byte("biosdata"), 0o644); err != nil {
+	biosFile := filepath.Join(biosDir, "scph1001.bin")
+	if err := os.WriteFile(biosFile, []byte("biosdata"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -41,7 +42,7 @@ func testServer(t *testing.T) (*Server, string) {
 			"NES": {Path: romDir, Core: "fceumm"},
 		},
 		BIOS: map[string]string{
-			"PSX": biosDir,
+			"PSX": biosFile,
 		},
 	}
 
@@ -136,7 +137,7 @@ func TestROMServingUnknownConsole(t *testing.T) {
 func TestBIOSServing(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/bios/PSX/scph1001.bin", nil)
+	req := httptest.NewRequest("GET", "/bios/PSX", nil)
 	w := httptest.NewRecorder()
 	srv.handler.ServeHTTP(w, req)
 
@@ -151,7 +152,7 @@ func TestBIOSServing(t *testing.T) {
 func TestBIOSServingNoConfig(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/bios/NES/bios.bin", nil)
+	req := httptest.NewRequest("GET", "/bios/NES", nil)
 	w := httptest.NewRecorder()
 	srv.handler.ServeHTTP(w, req)
 

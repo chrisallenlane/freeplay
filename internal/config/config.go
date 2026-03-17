@@ -116,7 +116,7 @@ func (c *Config) checkDirectories() {
 
 	for name, path := range c.BIOS {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			slog.Warn("BIOS directory does not exist", "console", name, "path", path)
+			slog.Warn("BIOS file does not exist", "console", name, "path", path)
 		}
 	}
 }

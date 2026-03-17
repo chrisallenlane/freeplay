@@ -93,7 +93,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /roms/{console}/{file}", s.handleROM)
 
 	// BIOS serving
-	s.mux.HandleFunc("GET /bios/{console}/{file}", s.handleBIOS)
+	s.mux.HandleFunc("GET /bios/{console}", s.handleBIOS)
 
 	// Cover art serving
 	s.mux.HandleFunc("GET /covers/{rest...}", s.handleCovers)
@@ -144,10 +144,19 @@ func (s *Server) handleROM(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
-	s.serveConsoleFile(w, r, func(name string) (string, bool) {
-		dir, ok := s.cfg.BIOS[name]
-		return dir, ok
-	})
+	path, ok := s.cfg.BIOS[r.PathValue("console")]
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+
+	http.ServeFile(w, r, path)
 }
 
 func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
