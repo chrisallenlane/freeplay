@@ -29,8 +29,7 @@ files:
     snes/
       Chrono Trigger.zip
   bios/           # only needed for consoles that require BIOS files
-    ps1/
-      scph1001.bin
+    SCPH1001.BIN
 ```
 
 ### 2. Create your configuration file
@@ -151,12 +150,14 @@ Paths may be absolute or relative to the data directory. Common cores:
 
 ### BIOS files
 
-Some consoles (e.g. PlayStation) require BIOS files. Map console names to
-directories containing the appropriate files:
+Some consoles (e.g. PlayStation) require BIOS files. Specify the path to the
+BIOS file directly on the ROM entry:
 
 ```toml
-[bios]
-PlayStation = "bios/ps1"
+[roms.PlayStation]
+path = "roms/ps1"
+core = "pcsx_rearmed"
+bios = "bios/SCPH1001.BIN"
 ```
 
 Paths are relative to the data directory unless absolute.

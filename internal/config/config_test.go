@@ -143,15 +143,17 @@ func TestLoadBIOSResolution(t *testing.T) {
 path = "/roms/nes"
 core = "fceumm"
 
-[bios]
-PlayStation = "bios/ps1"
+[roms.PlayStation]
+path = "/roms/ps1"
+core = "pcsx_rearmed"
+bios = "bios/SCPH1001.BIN"
 `)
 	cfg, err := Load(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.BIOS["PlayStation"] != filepath.Join(dir, "bios", "ps1") {
-		t.Errorf("bios path = %q, want resolved path", cfg.BIOS["PlayStation"])
+	if cfg.ROMs["PlayStation"].Bios != filepath.Join(dir, "bios", "SCPH1001.BIN") {
+		t.Errorf("bios path = %q, want resolved path", cfg.ROMs["PlayStation"].Bios)
 	}
 }
 

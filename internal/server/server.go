@@ -144,19 +144,19 @@ func (s *Server) handleROM(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
-	path, ok := s.cfg.BIOS[r.PathValue("console")]
-	if !ok {
+	rom, ok := s.cfg.ROMs[r.PathValue("console")]
+	if !ok || rom.Bios == "" {
 		http.NotFound(w, r)
 		return
 	}
 
-	info, err := os.Stat(path)
+	info, err := os.Stat(rom.Bios)
 	if err != nil || info.IsDir() {
 		http.NotFound(w, r)
 		return
 	}
 
-	http.ServeFile(w, r, path)
+	http.ServeFile(w, r, rom.Bios)
 }
 
 func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {

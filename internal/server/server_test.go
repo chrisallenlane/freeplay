@@ -39,10 +39,7 @@ func testServer(t *testing.T) (*Server, string) {
 	cfg := &config.Config{
 		Port: 8080,
 		ROMs: map[string]config.ROM{
-			"NES": {Path: romDir, Core: "fceumm"},
-		},
-		BIOS: map[string]string{
-			"PSX": biosFile,
+			"NES": {Path: romDir, Core: "fceumm", Bios: biosFile},
 		},
 	}
 
@@ -137,7 +134,7 @@ func TestROMServingUnknownConsole(t *testing.T) {
 func TestBIOSServing(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/bios/PSX", nil)
+	req := httptest.NewRequest("GET", "/bios/NES", nil)
 	w := httptest.NewRecorder()
 	srv.handler.ServeHTTP(w, req)
 
@@ -152,7 +149,7 @@ func TestBIOSServing(t *testing.T) {
 func TestBIOSServingNoConfig(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/bios/NES", nil)
+	req := httptest.NewRequest("GET", "/bios/SNES", nil)
 	w := httptest.NewRecorder()
 	srv.handler.ServeHTTP(w, req)
 
@@ -478,7 +475,6 @@ func TestStatusEndpointFetching(t *testing.T) {
 		ROMs: map[string]config.ROM{
 			"NES": {Path: romDir, Core: "fceumm"},
 		},
-		BIOS: map[string]string{},
 	}
 
 	frontendFS := fstest.MapFS{

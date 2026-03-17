@@ -50,6 +50,7 @@ port = 8080
 # [roms."Nintendo DS"]
 # path = "roms/nds"
 # core = "melonds"                   # alt: desmume, desmume2015
+# bios = "bios/bios7.bin"
 # igdb_platform_ids = [20]
 
 # [roms."Virtual Boy"]
@@ -87,6 +88,7 @@ port = 8080
 # [roms."Sega Saturn"]
 # path = "roms/saturn"
 # core = "yabause"
+# bios = "bios/sega_101.bin"
 # igdb_platform_ids = [32]
 
 # --- Sony ---
@@ -94,6 +96,7 @@ port = 8080
 # [roms.PlayStation]
 # path = "roms/ps1"
 # core = "pcsx_rearmed"              # alt: mednafen_psx_hw
+# bios = "bios/SCPH1001.BIN"
 # igdb_platform_ids = [7]
 
 # [roms.PSP]
@@ -133,11 +136,13 @@ port = 8080
 # [roms."TurboGrafx-16"]
 # path = "roms/tg16"
 # core = "mednafen_pce"
+# bios = "bios/syscard3.pce"
 # igdb_platform_ids = [86]
 
 # [roms."PC-FX"]
 # path = "roms/pcfx"
 # core = "mednafen_pcfx"
+# bios = "bios/pcfx.rom"
 # igdb_platform_ids = [274]
 
 # --- SNK ---
@@ -169,6 +174,7 @@ port = 8080
 # [roms."3DO"]
 # path = "roms/3do"
 # core = "opera"
+# bios = "bios/panafz10.bin"
 # igdb_platform_ids = [50]
 
 # [roms.ColecoVision]
@@ -242,11 +248,3 @@ port = 8080
 # path = "roms/doom"
 # core = "prboom"
 
-# BIOS directories (optional, needed for some consoles)
-# [bios]
-# PlayStation = "bios/ps1"
-# "Sega Saturn" = "bios/saturn"
-# "3DO" = "bios/3do"
-# "Nintendo DS" = "bios/nds"
-# "TurboGrafx-16" = "bios/tg16"
-# "PC-FX" = "bios/pcfx"

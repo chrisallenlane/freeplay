@@ -47,7 +47,6 @@ func setupTestDir(t *testing.T) (string, *config.Config) {
 			"NES":     {Path: nesDir, Core: "fceumm"},
 			"Genesis": {Path: genDir, Core: "genesis_plus_gx"},
 		},
-		BIOS: map[string]string{},
 	}
 
 	return dir, cfg
@@ -153,7 +152,6 @@ func TestScanMissingDirectory(t *testing.T) {
 		ROMs: map[string]config.ROM{
 			"NES": {Path: "/nonexistent/path", Core: "fceumm"},
 		},
-		BIOS: map[string]string{},
 	}
 	s := New(cfg, "")
 	s.ScanBlocking()
@@ -226,7 +224,9 @@ func TestCatalogJSONEmpty(t *testing.T) {
 
 func TestScanBIOSDetection(t *testing.T) {
 	dir, cfg := setupTestDir(t)
-	cfg.BIOS["NES"] = "/some/bios/dir"
+	nes := cfg.ROMs["NES"]
+	nes.Bios = "/some/bios/SCPH1001.BIN"
+	cfg.ROMs["NES"] = nes
 
 	s := New(cfg, dir)
 	s.ScanBlocking()
