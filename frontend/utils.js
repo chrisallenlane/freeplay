@@ -33,8 +33,7 @@
 	exports.saveBasePath = (consoleName, gameSlug) =>
 		`/api/saves/${encodeURIComponent(consoleName)}/${encodeURIComponent(gameSlug)}`;
 
-	exports.biosUrl = (consoleName) =>
-		`/bios/${encodeURIComponent(consoleName)}/`;
+	exports.biosUrl = (consoleName) => `/bios/${encodeURIComponent(consoleName)}`;
 
 	// Logical actions for directional navigation (shared by keyboard and gamepad).
 	exports.ACTION_LEFT = "left";

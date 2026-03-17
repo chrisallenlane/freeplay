@@ -190,11 +190,11 @@ describe("saveBasePath", () => {
 
 describe("biosUrl", () => {
 	it("builds a BIOS URL", () => {
-		assert.equal(FP.biosUrl("SNES"), "/bios/SNES/");
+		assert.equal(FP.biosUrl("SNES"), "/bios/SNES");
 	});
 
 	it("encodes special characters", () => {
-		assert.equal(FP.biosUrl("Game Boy"), "/bios/Game%20Boy/");
+		assert.equal(FP.biosUrl("Game Boy"), "/bios/Game%20Boy");
 	});
 });
 
