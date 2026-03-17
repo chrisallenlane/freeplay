@@ -41,6 +41,12 @@ compile time via Go's `embed` package (see `embed.go`). This means the
 compiled binary is fully self-contained -- no runtime file dependencies
 beyond the data directory.
 
+The player page sets `EJS_DEBUG_XX = true`, which tells EmulatorJS to load
+its unminified source files instead of `emulator.min.js`. This is required
+because the vendored `emulator.min.js` does not include the controller port
+device patches (lightgun support). The individual source files in
+`emulatorjs/data/src/` do contain these patches.
+
 ## API
 
 All API routes are internal to the frontend. They are not versioned and may
