@@ -91,7 +91,7 @@ func (s *Scanner) scan() {
 		}
 
 		consoleSet[consoleName] = true
-		_, hasBios := s.cfg.BIOS[consoleName]
+		hasBios := rom.Bios != ""
 
 		for _, entry := range entries {
 			if entry.IsDir() {

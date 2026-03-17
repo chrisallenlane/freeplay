@@ -13,17 +13,17 @@ import (
 
 // Config holds the application configuration.
 type Config struct {
-	Port        int               `toml:"port"`
-	CoverArtAPI string            `toml:"cover_art_api"`
-	CoverArtKey string            `toml:"cover_art_api_key"`
-	ROMs        map[string]ROM    `toml:"roms"`
-	BIOS        map[string]string `toml:"bios"`
+	Port        int            `toml:"port"`
+	CoverArtAPI string         `toml:"cover_art_api"`
+	CoverArtKey string         `toml:"cover_art_api_key"`
+	ROMs        map[string]ROM `toml:"roms"`
 }
 
 // ROM describes a single console's ROM directory and emulator core.
 type ROM struct {
 	Path            string `toml:"path"`
 	Core            string `toml:"core"`
+	Bios            string `toml:"bios"`
 	IGDBPlatformIDs []int  `toml:"igdb_platform_ids"`
 }
 
@@ -85,9 +85,6 @@ func (c *Config) validate() error {
 	if c.ROMs == nil {
 		c.ROMs = make(map[string]ROM)
 	}
-	if c.BIOS == nil {
-		c.BIOS = make(map[string]string)
-	}
 
 	return nil
 }
@@ -97,13 +94,10 @@ func (c *Config) resolvePaths(dataDir string) {
 		if !filepath.IsAbs(rom.Path) {
 			rom.Path = filepath.Join(dataDir, rom.Path)
 		}
-		c.ROMs[name] = rom
-	}
-
-	for name, path := range c.BIOS {
-		if !filepath.IsAbs(path) {
-			c.BIOS[name] = filepath.Join(dataDir, path)
+		if rom.Bios != "" && !filepath.IsAbs(rom.Bios) {
+			rom.Bios = filepath.Join(dataDir, rom.Bios)
 		}
+		c.ROMs[name] = rom
 	}
 }
 
@@ -112,11 +106,10 @@ func (c *Config) checkDirectories() {
 		if _, err := os.Stat(rom.Path); os.IsNotExist(err) {
 			slog.Warn("ROM directory does not exist", "console", name, "path", rom.Path)
 		}
-	}
-
-	for name, path := range c.BIOS {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			slog.Warn("BIOS file does not exist", "console", name, "path", path)
+		if rom.Bios != "" {
+			if _, err := os.Stat(rom.Bios); os.IsNotExist(err) {
+				slog.Warn("BIOS file does not exist", "console", name, "path", rom.Bios)
+			}
 		}
 	}
 }

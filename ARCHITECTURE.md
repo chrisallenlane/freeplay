@@ -25,7 +25,7 @@ Browser ──► HTTP Server ──► Embedded frontend (HTML/JS/CSS)
                 ├──► /api/saves/...   ──► Filesystem: <data>/saves/
                 ├──► /api/rescan      ──► Triggers scanner
                 ├──► /roms/...        ──► Filesystem: configured ROM directories
-                ├──► /bios/...        ──► Filesystem: configured BIOS directories
+                ├──► /bios/...        ──► Filesystem: configured BIOS files
                 ├──► /covers/...      ──► Filesystem: <data>/covers/
                 └──► /emulatorjs/...  ──► Embedded EmulatorJS assets
 ```
@@ -60,7 +60,7 @@ change without notice.
 | Path                     | Source                        |
 |--------------------------|-------------------------------|
 | `/roms/{console}/{file}` | Configured ROM directory      |
-| `/bios/{console}/{file}` | Configured BIOS directory     |
+| `/bios/{console}`        | Configured BIOS file          |
 | `/covers/{rest...}`      | `<data>/covers/`              |
 | `/emulatorjs/...`        | Embedded EmulatorJS assets    |
 | `/play`                  | Embedded player page          |
