@@ -15,6 +15,8 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
+const longCacheValue = "public, max-age=31536000, immutable"
+
 // CoverStatus reports whether cover art is being fetched.
 type CoverStatus interface {
 	Fetching() bool
@@ -156,7 +158,7 @@ func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("Cache-Control", longCacheValue)
 	http.ServeFile(w, r, rom.Bios)
 }
 
@@ -178,7 +180,7 @@ func noCache(next http.Handler) http.Handler {
 
 func longCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		w.Header().Set("Cache-Control", longCacheValue)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -266,6 +268,6 @@ func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir
 		return
 	}
 
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("Cache-Control", longCacheValue)
 	http.ServeFile(w, r, fullPath)
 }
