@@ -69,6 +69,35 @@ func newTestFetcher(t *testing.T, games []map[string]any) (*IGDBFetcher, *[]stri
 	return f, &queries, ts
 }
 
+// newTestFetcherWithHandler creates an IGDBFetcher wired to a test server
+// running the given handler. Use this when you need a custom server handler.
+func newTestFetcherWithHandler(t *testing.T, handler http.Handler) *IGDBFetcher {
+	t.Helper()
+	ts := httptest.NewServer(handler)
+	t.Cleanup(ts.Close)
+	f := NewIGDBFetcher("test-id:test-secret")
+	f.client = &http.Client{
+		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
+	}
+	return f
+}
+
+// interceptCoverQueries wraps a test server's handler to log /v4/covers
+// query bodies. Returns a pointer to the accumulated queries.
+func interceptCoverQueries(ts *httptest.Server) *[]string {
+	var queries []string
+	orig := ts.Config.Handler
+	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/v4/covers") {
+			body := make([]byte, r.ContentLength)
+			_, _ = r.Body.Read(body)
+			queries = append(queries, string(body))
+		}
+		orig.ServeHTTP(w, r)
+	})
+	return &queries
+}
+
 func FuzzNewIGDBFetcher(f *testing.F) {
 	f.Add("client_id:client_secret")
 	f.Add("a:b")
@@ -145,17 +174,7 @@ func TestFetchNameMatching(t *testing.T) {
 		{"name": "Mega Man 2", "cover": 30},
 	})
 
-	// Track which cover ID is requested
-	var coverQueries []string
-	origHandler := ts.Config.Handler
-	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/v4/covers") {
-			body := make([]byte, r.ContentLength)
-			_, _ = r.Body.Read(body)
-			coverQueries = append(coverQueries, string(body))
-		}
-		origHandler.ServeHTTP(w, r)
-	})
+	coverQueries := interceptCoverQueries(ts)
 
 	_, err := f.Fetch("Mega Man", "NES", nil)
 	if err != nil {
@@ -163,11 +182,11 @@ func TestFetchNameMatching(t *testing.T) {
 	}
 
 	// Should have requested cover ID 20 (the exact name match), not 10 (first result)
-	if len(coverQueries) == 0 {
+	if len(*coverQueries) == 0 {
 		t.Fatal("no cover queries recorded")
 	}
-	if !strings.Contains(coverQueries[0], "where id = 20") {
-		t.Errorf("should pick exact name match (cover 20), got query: %s", coverQueries[0])
+	if !strings.Contains((*coverQueries)[0], "where id = 20") {
+		t.Errorf("should pick exact name match (cover 20), got query: %s", (*coverQueries)[0])
 	}
 }
 
@@ -177,16 +196,7 @@ func TestFetchFirstCoverFallback(t *testing.T) {
 		{"name": "Mega Man 2", "cover": 20},
 	})
 
-	var coverQueries []string
-	origHandler := ts.Config.Handler
-	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/v4/covers") {
-			body := make([]byte, r.ContentLength)
-			_, _ = r.Body.Read(body)
-			coverQueries = append(coverQueries, string(body))
-		}
-		origHandler.ServeHTTP(w, r)
-	})
+	coverQueries := interceptCoverQueries(ts)
 
 	// Search for a name that doesn't exactly match any result
 	img, err := f.Fetch("Mega Man", "NES", nil)
@@ -197,11 +207,11 @@ func TestFetchFirstCoverFallback(t *testing.T) {
 		t.Fatal("expected non-nil image when results with covers exist")
 	}
 	// Should pick the first result with a cover (cover ID 10)
-	if len(coverQueries) == 0 {
+	if len(*coverQueries) == 0 {
 		t.Fatal("no cover queries recorded")
 	}
-	if !strings.Contains(coverQueries[0], "where id = 10") {
-		t.Errorf("should fall back to first result with cover (10), got query: %s", coverQueries[0])
+	if !strings.Contains((*coverQueries)[0], "where id = 10") {
+		t.Errorf("should fall back to first result with cover (10), got query: %s", (*coverQueries)[0])
 	}
 }
 
@@ -213,16 +223,7 @@ func TestFetchCaseInsensitiveMatch(t *testing.T) {
 		{"name": "mega man", "cover": 20},
 	})
 
-	var coverQueries []string
-	origHandler := ts.Config.Handler
-	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/v4/covers") {
-			body := make([]byte, r.ContentLength)
-			_, _ = r.Body.Read(body)
-			coverQueries = append(coverQueries, string(body))
-		}
-		origHandler.ServeHTTP(w, r)
-	})
+	coverQueries := interceptCoverQueries(ts)
 
 	// Search with different casing — should match case-insensitively
 	img, err := f.Fetch("Mega Man", "NES", nil)
@@ -233,11 +234,11 @@ func TestFetchCaseInsensitiveMatch(t *testing.T) {
 		t.Fatal("expected non-nil image for case-insensitive match")
 	}
 	// Should pick the case-insensitive match (cover ID 20), not first result (10)
-	if len(coverQueries) == 0 {
+	if len(*coverQueries) == 0 {
 		t.Fatal("no cover queries recorded")
 	}
-	if !strings.Contains(coverQueries[0], "where id = 20") {
-		t.Errorf("should pick case-insensitive match (20), got query: %s", coverQueries[0])
+	if !strings.Contains((*coverQueries)[0], "where id = 20") {
+		t.Errorf("should pick case-insensitive match (20), got query: %s", (*coverQueries)[0])
 	}
 }
 
@@ -282,19 +283,13 @@ func (t *rewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 func TestGetTokenNon200(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/oauth2/token") {
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = w.Write([]byte("forbidden"))
 			return
 		}
 	}))
-	t.Cleanup(ts.Close)
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
 
 	_, err := f.Fetch("Test", "NES", nil)
 	if err == nil {
@@ -306,18 +301,12 @@ func TestGetTokenNon200(t *testing.T) {
 }
 
 func TestGetTokenDecodeError(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/oauth2/token") {
 			_, _ = w.Write([]byte("not json"))
 			return
 		}
 	}))
-	t.Cleanup(ts.Close)
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
 
 	_, err := f.Fetch("Test", "NES", nil)
 	if err == nil {
@@ -329,7 +318,7 @@ func TestGetTokenDecodeError(t *testing.T) {
 }
 
 func TestFetchAPIErrorNon200(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -341,12 +330,6 @@ func TestFetchAPIErrorNon200(t *testing.T) {
 			_, _ = w.Write([]byte("server error"))
 		}
 	}))
-	t.Cleanup(ts.Close)
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
 
 	_, err := f.Fetch("Test", "NES", nil)
 	if err == nil {
@@ -358,7 +341,7 @@ func TestFetchAPIErrorNon200(t *testing.T) {
 }
 
 func TestFetchEmptyCoverURL(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -375,12 +358,6 @@ func TestFetchEmptyCoverURL(t *testing.T) {
 			})
 		}
 	}))
-	t.Cleanup(ts.Close)
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
 
 	img, err := f.Fetch("Test Game", "NES", nil)
 	if err != nil {
@@ -392,7 +369,7 @@ func TestFetchEmptyCoverURL(t *testing.T) {
 }
 
 func TestFetchCoverImageNon200(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -411,12 +388,6 @@ func TestFetchCoverImageNon200(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
-	t.Cleanup(ts.Close)
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
 
 	_, err := f.Fetch("Test Game", "NES", nil)
 	if err == nil {
@@ -439,42 +410,34 @@ func TestFetchTokenRetryOn401(t *testing.T) {
 		{"name": "Test Game", "cover": 1},
 	})
 
-	ts := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch {
-			case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-				_ = json.NewEncoder(w).Encode(map[string]any{
-					"access_token": "fresh-token",
-					"expires_in":   3600,
-				})
+	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "fresh-token",
+				"expires_in":   3600,
+			})
 
-			case strings.HasSuffix(r.URL.Path, "/v4/games"):
-				n := gamesCallCount.Add(1)
-				if n == 1 {
-					// Simulate an expired token on the first request.
-					w.WriteHeader(http.StatusUnauthorized)
-					return
-				}
-				_, _ = w.Write(gamesResp)
-
-			case strings.HasSuffix(r.URL.Path, "/v4/covers"):
-				_ = json.NewEncoder(w).Encode([]map[string]string{
-					{"url": "//images.igdb.com/t_thumb/cover.jpg"},
-				})
-
-			default:
-				// Serve a cover image for all other paths (image download).
-				w.Header().Set("Content-Type", "image/png")
-				_ = png.Encode(w, img)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			n := gamesCallCount.Add(1)
+			if n == 1 {
+				// Simulate an expired token on the first request.
+				w.WriteHeader(http.StatusUnauthorized)
+				return
 			}
-		}),
-	)
-	t.Cleanup(ts.Close)
+			_, _ = w.Write(gamesResp)
 
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
+		case strings.HasSuffix(r.URL.Path, "/v4/covers"):
+			_ = json.NewEncoder(w).Encode([]map[string]string{
+				{"url": "//images.igdb.com/t_thumb/cover.jpg"},
+			})
+
+		default:
+			// Serve a cover image for all other paths (image download).
+			w.Header().Set("Content-Type", "image/png")
+			_ = png.Encode(w, img)
+		}
+	}))
 
 	// Pre-set a stale token so the first request uses it without calling the
 	// token endpoint, triggering the 401 path.
