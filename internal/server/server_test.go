@@ -15,7 +15,7 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
-func testServer(t *testing.T) (*Server, string) {
+func testServer(t *testing.T, coverStatus ...CoverStatus) (*Server, string) {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -51,7 +51,12 @@ func testServer(t *testing.T) (*Server, string) {
 		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
 	}
 
-	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, nil)
+	var cs CoverStatus
+	if len(coverStatus) > 0 {
+		cs = coverStatus[0]
+	}
+
+	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, cs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,6 +122,9 @@ func TestROMServing(t *testing.T) {
 	if w.Body.String() != "romdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "romdata")
 	}
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	}
 }
 
 func TestROMServingUnknownConsole(t *testing.T) {
@@ -143,6 +151,9 @@ func TestBIOSServing(t *testing.T) {
 	}
 	if w.Body.String() != "biosdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "biosdata")
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
 	}
 }
 
@@ -294,6 +305,9 @@ func TestCoversServing(t *testing.T) {
 	if w.Body.String() != "pngdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "pngdata")
 	}
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	}
 }
 
 func TestCoversNotFound(t *testing.T) {
@@ -305,6 +319,21 @@ func TestCoversNotFound(t *testing.T) {
 
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
+	}
+}
+
+func TestEmulatorJSCacheHeaders(t *testing.T) {
+	srv, _ := testServer(t)
+
+	req := httptest.NewRequest("GET", "/emulatorjs/data/loader.js", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
 	}
 }
 
@@ -463,32 +492,7 @@ func TestStatusEndpointNilCover(t *testing.T) {
 }
 
 func TestStatusEndpointFetching(t *testing.T) {
-	dir := t.TempDir()
-
-	romDir := filepath.Join(dir, "roms", "NES")
-	if err := os.MkdirAll(romDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg := &config.Config{
-		Port: 8080,
-		ROMs: map[string]config.ROM{
-			"NES": {Path: romDir, Core: "fceumm"},
-		},
-	}
-
-	frontendFS := fstest.MapFS{
-		"frontend/index.html": &fstest.MapFile{Data: []byte("<html>index</html>")},
-		"frontend/play.html":  &fstest.MapFile{Data: []byte("<html>play</html>")},
-	}
-	emulatorjsFS := fstest.MapFS{
-		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
-	}
-
-	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, &mockCoverStatus{fetching: true})
-	if err != nil {
-		t.Fatal(err)
-	}
+	srv, _ := testServer(t, &mockCoverStatus{fetching: true})
 
 	req := httptest.NewRequest("GET", "/api/status", nil)
 	w := httptest.NewRecorder()
