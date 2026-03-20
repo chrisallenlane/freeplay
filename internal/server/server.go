@@ -15,6 +15,8 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
+const longCacheValue = "public, max-age=31536000, immutable"
+
 // CoverStatus reports whether cover art is being fetched.
 type CoverStatus interface {
 	Fetching() bool
@@ -98,8 +100,8 @@ func (s *Server) routes() {
 	// Cover art serving
 	s.mux.HandleFunc("GET /covers/{rest...}", s.handleCovers)
 
-	// Embedded EmulatorJS
-	s.mux.Handle("/emulatorjs/", http.StripPrefix("/emulatorjs/", http.FileServerFS(s.emulatorjsSub)))
+	// Embedded EmulatorJS — immutable cache; assets are embedded at build time
+	s.mux.Handle("/emulatorjs/", longCache(http.StripPrefix("/emulatorjs/", http.FileServerFS(s.emulatorjsSub))))
 
 	// Player page (explicit route before catch-all)
 	s.mux.HandleFunc("GET /play", s.handlePlay)
@@ -127,20 +129,13 @@ func (s *Server) handleGames(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(data)
 }
 
-func (s *Server) serveConsoleFile(w http.ResponseWriter, r *http.Request, resolve func(string) (string, bool)) {
-	dir, ok := resolve(r.PathValue("console"))
+func (s *Server) handleROM(w http.ResponseWriter, r *http.Request) {
+	rom, ok := s.cfg.ROMs[r.PathValue("console")]
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	s.serveSecureFile(w, r, dir, r.PathValue("file"))
-}
-
-func (s *Server) handleROM(w http.ResponseWriter, r *http.Request) {
-	s.serveConsoleFile(w, r, func(name string) (string, bool) {
-		rom, ok := s.cfg.ROMs[name]
-		return rom.Path, ok
-	})
+	s.serveSecureFile(w, r, rom.Path, r.PathValue("file"))
 }
 
 func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
@@ -149,14 +144,7 @@ func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-
-	info, err := os.Stat(rom.Bios)
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-
-	http.ServeFile(w, r, rom.Bios)
+	serveFile(w, r, rom.Bios)
 }
 
 func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +159,13 @@ func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
 func noCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func longCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", longCacheValue)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -237,6 +232,16 @@ func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {
 	writeJSONOK(w)
 }
 
+func serveFile(w http.ResponseWriter, r *http.Request, path string) {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", longCacheValue)
+	http.ServeFile(w, r, path)
+}
+
 func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir, file string) {
 	clean := filepath.Clean(file)
 	if strings.Contains(clean, "..") {
@@ -252,11 +257,5 @@ func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir
 		return
 	}
 
-	info, err := os.Stat(fullPath)
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-
-	http.ServeFile(w, r, fullPath)
+	serveFile(w, r, fullPath)
 }

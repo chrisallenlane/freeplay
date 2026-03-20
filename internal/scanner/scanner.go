@@ -50,11 +50,6 @@ func New(cfg *config.Config, dataDir string) *Scanner {
 	return s
 }
 
-// getCatalog returns the current catalog.
-func (s *Scanner) getCatalog() *Catalog {
-	return s.catalog.Load()
-}
-
 // CatalogJSON returns the catalog as JSON bytes.
 func (s *Scanner) CatalogJSON() ([]byte, error) {
 	return json.Marshal(s.catalog.Load())
@@ -93,6 +88,16 @@ func (s *Scanner) scan() {
 		consoleSet[consoleName] = true
 		hasBios := rom.Bios != ""
 
+		// Build a set of existing cover filenames for O(1) lookup,
+		// replacing a per-ROM os.Stat call.
+		covers := make(map[string]bool)
+		coverDir := filepath.Join(s.dataDir, "covers", consoleName)
+		if coverEntries, err := os.ReadDir(coverDir); err == nil {
+			for _, ce := range coverEntries {
+				covers[ce.Name()] = true
+			}
+		}
+
 		for _, entry := range entries {
 			if entry.IsDir() {
 				continue
@@ -100,14 +105,12 @@ func (s *Scanner) scan() {
 
 			filename := entry.Name()
 			nameNoExt := strings.TrimSuffix(filename, filepath.Ext(filename))
-			coverPath := filepath.Join(s.dataDir, "covers", consoleName, nameNoExt+".png")
-			_, coverErr := os.Stat(coverPath)
 
 			games = append(games, Game{
 				Filename:        filename,
 				Console:         consoleName,
 				Core:            rom.Core,
-				HasCover:        coverErr == nil,
+				HasCover:        covers[nameNoExt+".png"],
 				HasBios:         hasBios,
 				IGDBPlatformIDs: rom.IGDBPlatformIDs,
 			})
