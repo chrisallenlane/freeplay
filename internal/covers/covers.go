@@ -86,7 +86,7 @@ func nameVariants(cleanName string) []string {
 	return variants
 }
 
-// Path returns the expected filesystem path for a game's cover art.
+// coverPath returns the expected filesystem path for a game's cover art.
 func coverPath(dataDir, console, filenameWithoutExt string) string {
 	return filepath.Join(dataDir, "covers", console, filenameWithoutExt+".png")
 }
