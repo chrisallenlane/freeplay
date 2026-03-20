@@ -25,7 +25,11 @@ Initial release.
 - Responsive layout for mobile, tablet, and desktop
 - Single-binary deployment or Docker container with one volume mount
 - Rescan endpoint with cover art download progress indicator
-- Cache-Control headers on frontend assets for immediate deploy pickup
+- Cache-Control headers: `no-cache` on frontend for immediate deploy pickup,
+  immutable long-cache on EmulatorJS, ROMs, BIOS, and cover art
+- Performance: `defer` script loading, Silkscreen font preload, explicit
+  `width`/`height` on cover art images, O(1) cover-detection via directory
+  map lookup
 
 ### Changed
 - BIOS configuration is now an optional `bios` field on each `[roms.*]`
