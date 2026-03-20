@@ -15,7 +15,7 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
-func testServer(t *testing.T) (*Server, string) {
+func testServer(t *testing.T, coverStatus ...CoverStatus) (*Server, string) {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -51,7 +51,12 @@ func testServer(t *testing.T) (*Server, string) {
 		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
 	}
 
-	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, nil)
+	var cs CoverStatus
+	if len(coverStatus) > 0 {
+		cs = coverStatus[0]
+	}
+
+	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, cs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -463,32 +468,7 @@ func TestStatusEndpointNilCover(t *testing.T) {
 }
 
 func TestStatusEndpointFetching(t *testing.T) {
-	dir := t.TempDir()
-
-	romDir := filepath.Join(dir, "roms", "NES")
-	if err := os.MkdirAll(romDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg := &config.Config{
-		Port: 8080,
-		ROMs: map[string]config.ROM{
-			"NES": {Path: romDir, Core: "fceumm"},
-		},
-	}
-
-	frontendFS := fstest.MapFS{
-		"frontend/index.html": &fstest.MapFile{Data: []byte("<html>index</html>")},
-		"frontend/play.html":  &fstest.MapFile{Data: []byte("<html>play</html>")},
-	}
-	emulatorjsFS := fstest.MapFS{
-		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
-	}
-
-	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, &mockCoverStatus{fetching: true})
-	if err != nil {
-		t.Fatal(err)
-	}
+	srv, _ := testServer(t, &mockCoverStatus{fetching: true})
 
 	req := httptest.NewRequest("GET", "/api/status", nil)
 	w := httptest.NewRecorder()

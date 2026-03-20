@@ -129,20 +129,13 @@ func (s *Server) handleGames(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(data)
 }
 
-func (s *Server) serveConsoleFile(w http.ResponseWriter, r *http.Request, resolve func(string) (string, bool)) {
-	dir, ok := resolve(r.PathValue("console"))
+func (s *Server) handleROM(w http.ResponseWriter, r *http.Request) {
+	rom, ok := s.cfg.ROMs[r.PathValue("console")]
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	s.serveSecureFile(w, r, dir, r.PathValue("file"))
-}
-
-func (s *Server) handleROM(w http.ResponseWriter, r *http.Request) {
-	s.serveConsoleFile(w, r, func(name string) (string, bool) {
-		rom, ok := s.cfg.ROMs[name]
-		return rom.Path, ok
-	})
+	s.serveSecureFile(w, r, rom.Path, r.PathValue("file"))
 }
 
 func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
@@ -151,15 +144,7 @@ func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-
-	info, err := os.Stat(rom.Bios)
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-
-	w.Header().Set("Cache-Control", longCacheValue)
-	http.ServeFile(w, r, rom.Bios)
+	serveFile(w, r, rom.Bios)
 }
 
 func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
@@ -247,6 +232,16 @@ func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {
 	writeJSONOK(w)
 }
 
+func serveFile(w http.ResponseWriter, r *http.Request, path string) {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", longCacheValue)
+	http.ServeFile(w, r, path)
+}
+
 func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir, file string) {
 	clean := filepath.Clean(file)
 	if strings.Contains(clean, "..") {
@@ -262,12 +257,5 @@ func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir
 		return
 	}
 
-	info, err := os.Stat(fullPath)
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-
-	w.Header().Set("Cache-Control", longCacheValue)
-	http.ServeFile(w, r, fullPath)
+	serveFile(w, r, fullPath)
 }
