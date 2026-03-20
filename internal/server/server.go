@@ -98,8 +98,8 @@ func (s *Server) routes() {
 	// Cover art serving
 	s.mux.HandleFunc("GET /covers/{rest...}", s.handleCovers)
 
-	// Embedded EmulatorJS
-	s.mux.Handle("/emulatorjs/", http.StripPrefix("/emulatorjs/", http.FileServerFS(s.emulatorjsSub)))
+	// Embedded EmulatorJS — immutable cache; assets are embedded at build time
+	s.mux.Handle("/emulatorjs/", longCache(http.StripPrefix("/emulatorjs/", http.FileServerFS(s.emulatorjsSub))))
 
 	// Player page (explicit route before catch-all)
 	s.mux.HandleFunc("GET /play", s.handlePlay)
@@ -156,6 +156,7 @@ func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	http.ServeFile(w, r, rom.Bios)
 }
 
@@ -171,6 +172,13 @@ func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
 func noCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func longCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -258,5 +266,6 @@ func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir
 		return
 	}
 
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	http.ServeFile(w, r, fullPath)
 }
