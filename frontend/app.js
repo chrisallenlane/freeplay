@@ -125,6 +125,8 @@
 			coverEl.src = FP.coverUrl(game);
 			coverEl.alt = displayName;
 			coverEl.loading = "lazy";
+			coverEl.width = 180;
+			coverEl.height = 240;
 		} else {
 			coverEl = el("div", "placeholder-cover");
 			coverEl.append(
