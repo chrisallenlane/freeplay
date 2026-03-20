@@ -63,11 +63,15 @@ change without notice.
 
 ## Static file routes
 
-| Path                     | Source                        |
-|--------------------------|-------------------------------|
-| `/roms/{console}/{file}` | Configured ROM directory      |
-| `/bios/{console}`        | Configured BIOS file          |
-| `/covers/{rest...}`      | `<data>/covers/`              |
-| `/emulatorjs/...`        | Embedded EmulatorJS assets    |
-| `/play`                  | Embedded player page          |
-| `/`                      | Embedded frontend (catch-all) |
+| Path                     | Source                        | Cache-Control                              |
+|--------------------------|-------------------------------|--------------------------------------------|
+| `/roms/{console}/{file}` | Configured ROM directory      | `public, max-age=31536000, immutable`      |
+| `/bios/{console}`        | Configured BIOS file          | `public, max-age=31536000, immutable`      |
+| `/covers/{rest...}`      | `<data>/covers/`              | `public, max-age=31536000, immutable`      |
+| `/emulatorjs/...`        | Embedded EmulatorJS assets    | `public, max-age=31536000, immutable`      |
+| `/play`                  | Embedded player page          | `no-cache`                                 |
+| `/`                      | Embedded frontend (catch-all) | `no-cache`                                 |
+
+ROMs, BIOS files, covers, and EmulatorJS assets are immutable or change
+infrequently, so they use aggressive long-cache headers. The frontend and
+player page use `no-cache` so that redeployments are picked up immediately.
