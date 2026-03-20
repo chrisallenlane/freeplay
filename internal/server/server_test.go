@@ -122,6 +122,9 @@ func TestROMServing(t *testing.T) {
 	if w.Body.String() != "romdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "romdata")
 	}
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	}
 }
 
 func TestROMServingUnknownConsole(t *testing.T) {
@@ -148,6 +151,9 @@ func TestBIOSServing(t *testing.T) {
 	}
 	if w.Body.String() != "biosdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "biosdata")
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
 	}
 }
 
@@ -299,6 +305,9 @@ func TestCoversServing(t *testing.T) {
 	if w.Body.String() != "pngdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "pngdata")
 	}
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	}
 }
 
 func TestCoversNotFound(t *testing.T) {
@@ -310,6 +319,21 @@ func TestCoversNotFound(t *testing.T) {
 
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
+	}
+}
+
+func TestEmulatorJSCacheHeaders(t *testing.T) {
+	srv, _ := testServer(t)
+
+	req := httptest.NewRequest("GET", "/emulatorjs/data/loader.js", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
 	}
 }
 
