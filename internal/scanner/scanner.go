@@ -50,11 +50,6 @@ func New(cfg *config.Config, dataDir string) *Scanner {
 	return s
 }
 
-// getCatalog returns the current catalog.
-func (s *Scanner) getCatalog() *Catalog {
-	return s.catalog.Load()
-}
-
 // CatalogJSON returns the catalog as JSON bytes.
 func (s *Scanner) CatalogJSON() ([]byte, error) {
 	return json.Marshal(s.catalog.Load())

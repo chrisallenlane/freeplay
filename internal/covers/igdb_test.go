@@ -26,10 +26,7 @@ func newTestServer(t *testing.T, queryLog *[]string, gamesResp []byte) *httptest
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"access_token": "test-token",
-				"expires_in":   3600,
-			})
+			writeTokenResponse(w)
 
 		case strings.HasSuffix(r.URL.Path, "/v4/games"):
 			body := make([]byte, r.ContentLength)
@@ -96,6 +93,14 @@ func interceptCoverQueries(ts *httptest.Server) *[]string {
 		orig.ServeHTTP(w, r)
 	})
 	return &queries
+}
+
+// writeTokenResponse writes the standard test OAuth2 token response.
+func writeTokenResponse(w http.ResponseWriter) {
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"access_token": "test-token",
+		"expires_in":   3600,
+	})
 }
 
 func FuzzNewIGDBFetcher(f *testing.F) {
@@ -321,10 +326,7 @@ func TestFetchAPIErrorNon200(t *testing.T) {
 	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"access_token": "test-token",
-				"expires_in":   3600,
-			})
+			writeTokenResponse(w)
 		case strings.HasSuffix(r.URL.Path, "/v4/games"):
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte("server error"))
@@ -344,10 +346,7 @@ func TestFetchEmptyCoverURL(t *testing.T) {
 	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"access_token": "test-token",
-				"expires_in":   3600,
-			})
+			writeTokenResponse(w)
 		case strings.HasSuffix(r.URL.Path, "/v4/games"):
 			_ = json.NewEncoder(w).Encode([]map[string]any{
 				{"name": "Test Game", "cover": 1},
@@ -372,10 +371,7 @@ func TestFetchCoverImageNon200(t *testing.T) {
 	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"access_token": "test-token",
-				"expires_in":   3600,
-			})
+			writeTokenResponse(w)
 		case strings.HasSuffix(r.URL.Path, "/v4/games"):
 			_ = json.NewEncoder(w).Encode([]map[string]any{
 				{"name": "Test Game", "cover": 1},

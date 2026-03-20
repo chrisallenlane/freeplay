@@ -9,6 +9,11 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/config"
 )
 
+// getCatalog is a test helper that returns the current catalog.
+func getCatalog(s *Scanner) *Catalog {
+	return s.catalog.Load()
+}
+
 func setupTestDir(t *testing.T) (string, *config.Config) {
 	t.Helper()
 	dir := t.TempDir()
@@ -57,7 +62,7 @@ func TestScanFindsGames(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := s.getCatalog()
+	cat := getCatalog(s)
 	if len(cat.Games) != 3 {
 		t.Fatalf("got %d games, want 3", len(cat.Games))
 	}
@@ -71,7 +76,7 @@ func TestScanSortOrder(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := s.getCatalog()
+	cat := getCatalog(s)
 	// Consoles should be alphabetical
 	if cat.Consoles[0] != "Genesis" || cat.Consoles[1] != "NES" {
 		t.Errorf("consoles not sorted: %v", cat.Consoles)
@@ -96,7 +101,7 @@ func TestScanSkipsSubdirectories(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := s.getCatalog()
+	cat := getCatalog(s)
 	for _, g := range cat.Games {
 		if g.Filename == "subdir" {
 			t.Error("subdirectory should be skipped")
@@ -109,7 +114,7 @@ func TestScanCoverDetection(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := s.getCatalog()
+	cat := getCatalog(s)
 	foundSonic := false
 	foundNES := false
 	for _, g := range cat.Games {
@@ -138,7 +143,7 @@ func TestScanEmptyBeforeFirstScan(t *testing.T) {
 	_, cfg := setupTestDir(t)
 	s := New(cfg, "")
 
-	cat := s.getCatalog()
+	cat := getCatalog(s)
 	if len(cat.Games) != 0 {
 		t.Errorf("expected empty games before scan, got %d", len(cat.Games))
 	}
@@ -156,7 +161,7 @@ func TestScanMissingDirectory(t *testing.T) {
 	s := New(cfg, "")
 	s.ScanBlocking()
 
-	cat := s.getCatalog()
+	cat := getCatalog(s)
 	if len(cat.Games) != 0 {
 		t.Errorf("expected no games for missing dir, got %d", len(cat.Games))
 	}
@@ -231,7 +236,7 @@ func TestScanBIOSDetection(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := s.getCatalog()
+	cat := getCatalog(s)
 	for _, g := range cat.Games {
 		if g.Console == "NES" && !g.HasBios {
 			t.Errorf("NES game %s should have HasBios=true", g.Filename)
@@ -266,7 +271,7 @@ func TestScanReturnsTrue(t *testing.T) {
 		t.Error("Scan should return true when no scan is in progress")
 	}
 
-	cat := s.getCatalog()
+	cat := getCatalog(s)
 	if len(cat.Games) != 3 {
 		t.Errorf("got %d games, want 3", len(cat.Games))
 	}
