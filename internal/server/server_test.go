@@ -17,7 +17,28 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
-func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
+// testFrontendFS and testEmulatorjsFS are shared across all test helpers that
+// need embedded filesystem stubs.
+var testFrontendFS = fstest.MapFS{
+	"frontend/index.html":   &fstest.MapFile{Data: []byte("<html>index</html>")},
+	"frontend/play.html":    &fstest.MapFile{Data: []byte("<html>play</html>")},
+	"frontend/details.html": &fstest.MapFile{Data: []byte("<html>details</html>")},
+}
+
+var testEmulatorjsFS = fstest.MapFS{
+	"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
+}
+
+// testServerOpts holds optional dependencies for newTestServer.
+type testServerOpts struct {
+	cache   DetailsCache
+	fetcher DetailsFetcher
+}
+
+// newTestServer creates a Server wired with a temp ROM dir, a BIOS file, and
+// optional cache/fetcher dependencies. It is the single server-construction
+// helper for all tests in this package.
+func newTestServer(t *testing.T, opts testServerOpts) (*Server, string) {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -43,29 +64,38 @@ func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
 	cfg := &config.Config{
 		Port: 8080,
 		ROMs: map[string]config.ROM{
-			"NES": {Path: romDir, Core: "fceumm", Bios: biosFile},
+			"NES": {
+				Path:            romDir,
+				Core:            "fceumm",
+				Bios:            biosFile,
+				IGDBPlatformIDs: []int{18},
+			},
 		},
 	}
 
-	frontendFS := fstest.MapFS{
-		"frontend/index.html":   &fstest.MapFile{Data: []byte("<html>index</html>")},
-		"frontend/play.html":    &fstest.MapFile{Data: []byte("<html>play</html>")},
-		"frontend/details.html": &fstest.MapFile{Data: []byte("<html>details</html>")},
-	}
-	emulatorjsFS := fstest.MapFS{
-		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
-	}
-
-	var cache DetailsCache
-	if len(dc) > 0 {
-		cache = dc[0]
-	}
-
-	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, cache, nil)
+	srv, err := New(cfg, dir, testFrontendFS, testEmulatorjsFS, opts.cache, opts.fetcher)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return srv, dir
+}
+
+// testServer is a convenience wrapper around newTestServer for tests that only
+// need an optional DetailsCache and no DetailsFetcher.
+func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
+	t.Helper()
+	var opts testServerOpts
+	if len(dc) > 0 {
+		opts.cache = dc[0]
+	}
+	return newTestServer(t, opts)
+}
+
+// testServerWithDetails is a convenience wrapper around newTestServer for
+// tests that exercise the DetailsFetcher path.
+func testServerWithDetails(t *testing.T, df DetailsFetcher) (*Server, string) {
+	t.Helper()
+	return newTestServer(t, testServerOpts{fetcher: df})
 }
 
 func TestHealthEndpoint(t *testing.T) {
@@ -396,43 +426,6 @@ type mockDetailsFetcher struct {
 
 func (m *mockDetailsFetcher) FetchDetails(_ string, _ []int) (*covers.GameDetails, error) {
 	return m.details, m.err
-}
-
-func testServerWithDetails(t *testing.T, df DetailsFetcher) (*Server, string) {
-	t.Helper()
-	dir := t.TempDir()
-
-	romDir := filepath.Join(dir, "roms", "NES")
-	if err := os.MkdirAll(romDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg := &config.Config{
-		Port: 8080,
-		ROMs: map[string]config.ROM{
-			"NES": {Path: romDir, Core: "fceumm", IGDBPlatformIDs: []int{18}},
-		},
-	}
-
-	frontendFS := fstest.MapFS{
-		"frontend/index.html":   &fstest.MapFile{Data: []byte("<html>index</html>")},
-		"frontend/play.html":    &fstest.MapFile{Data: []byte("<html>play</html>")},
-		"frontend/details.html": &fstest.MapFile{Data: []byte("<html>details</html>")},
-	}
-	emulatorjsFS := fstest.MapFS{
-		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
-	}
-
-	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, nil, df)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return srv, dir
 }
 
 func TestGameDetailsSuccess(t *testing.T) {
@@ -768,37 +761,7 @@ func TestGameDetailsCacheMissFallsBackToFetcher(t *testing.T) {
 			Summary: "Live summary.",
 		},
 	}
-	dir := t.TempDir()
-
-	romDir := filepath.Join(dir, "roms", "NES")
-	if err := os.MkdirAll(romDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg := &config.Config{
-		Port: 8080,
-		ROMs: map[string]config.ROM{
-			"NES": {Path: romDir, Core: "fceumm"},
-		},
-	}
-	frontendFS := fstest.MapFS{
-		"frontend/index.html":   &fstest.MapFile{Data: []byte("<html>")},
-		"frontend/play.html":    &fstest.MapFile{Data: []byte("<html>")},
-		"frontend/details.html": &fstest.MapFile{Data: []byte("<html>")},
-	}
-	emulatorjsFS := fstest.MapFS{
-		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
-	}
-
-	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, cache, fetcher)
-	if err != nil {
-		t.Fatal(err)
-	}
+	srv, _ := newTestServer(t, testServerOpts{cache: cache, fetcher: fetcher})
 
 	req := httptest.NewRequest(
 		"GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil,
