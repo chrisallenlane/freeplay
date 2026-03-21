@@ -318,6 +318,8 @@ func serveFile(w http.ResponseWriter, r *http.Request, path string) {
 }
 
 func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir, file string) {
+	baseDir = filepath.Clean(baseDir)
+
 	clean := filepath.Clean(file)
 	if strings.Contains(clean, "..") {
 		http.NotFound(w, r)

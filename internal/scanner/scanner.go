@@ -158,5 +158,7 @@ func (s *Scanner) scan() {
 
 // SetOnScanComplete sets a callback that fires after each scan.
 func (s *Scanner) SetOnScanComplete(cb ScanCallback) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.onScanComplete = cb
 }

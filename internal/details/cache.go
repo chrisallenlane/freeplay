@@ -29,7 +29,7 @@ type Cache struct {
 	dataDir  string
 	fetcher  igdbFetcher
 	client   *http.Client
-	fetching atomic.Bool
+	fetching atomic.Int32
 }
 
 // New creates a Cache. fetcher may be nil if IGDB is not configured.
@@ -43,7 +43,7 @@ func New(dataDir string, fetcher igdbFetcher) *Cache {
 
 // Fetching reports whether cache population is in progress.
 func (c *Cache) Fetching() bool {
-	return c.fetching.Load()
+	return c.fetching.Load() > 0
 }
 
 // cacheDir returns the filesystem directory for a game's cached IGDB data.
@@ -79,8 +79,8 @@ func (c *Cache) FetchAll(games []covers.GameEntry) int {
 		return 0
 	}
 
-	c.fetching.Store(true)
-	defer c.fetching.Store(false)
+	c.fetching.Add(1)
+	defer c.fetching.Add(-1)
 
 	ticker := time.NewTicker(334 * time.Millisecond) // ~3 req/s
 	defer ticker.Stop()
@@ -269,6 +269,13 @@ func (c *Cache) downloadImage(
 	if resp.StatusCode != http.StatusOK {
 		return "", "", fmt.Errorf(
 			"downloading %s: status %d", filename, resp.StatusCode,
+		)
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(ct, "image/") {
+		return "", "", fmt.Errorf(
+			"downloading %s: unexpected content-type %q", filename, ct,
 		)
 	}
 
