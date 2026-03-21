@@ -24,6 +24,10 @@ header a:hover {
     text-decoration: underline;
 }
 
+header a.btn:hover {
+    text-decoration: none;
+}
+
 header a:focus-visible {
     outline: 2px solid var(--color-link);
     outline-offset: 2px;

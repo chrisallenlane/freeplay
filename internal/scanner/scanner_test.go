@@ -139,6 +139,41 @@ func TestScanCoverDetection(t *testing.T) {
 	}
 }
 
+func TestScanManualDetection(t *testing.T) {
+	dir, cfg := setupTestDir(t)
+
+	// Create a manual for Mega Man
+	manualDir := filepath.Join(dir, "manuals", "NES")
+	if err := os.MkdirAll(manualDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(manualDir, "Mega Man.pdf"), []byte("%PDF"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := New(cfg, dir)
+	s.ScanBlocking()
+
+	cat := getCatalog(s)
+	for _, g := range cat.Games {
+		if g.Console == "NES" && g.Filename == "Mega Man.zip" {
+			if !g.HasManual {
+				t.Error("Mega Man should have manual")
+			}
+		}
+		if g.Console == "NES" && g.Filename == "Zelda.zip" {
+			if g.HasManual {
+				t.Error("Zelda should not have manual")
+			}
+		}
+		if g.Console == "Genesis" && g.Filename == "Sonic.gen" {
+			if g.HasManual {
+				t.Error("Sonic should not have manual")
+			}
+		}
+	}
+}
+
 func TestScanEmptyBeforeFirstScan(t *testing.T) {
 	_, cfg := setupTestDir(t)
 	s := New(cfg, "")

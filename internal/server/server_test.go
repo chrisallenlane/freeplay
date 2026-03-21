@@ -310,6 +310,44 @@ func TestCoversServing(t *testing.T) {
 	}
 }
 
+func TestManualsServing(t *testing.T) {
+	srv, dir := testServer(t)
+
+	manualDir := filepath.Join(dir, "manuals", "NES")
+	if err := os.MkdirAll(manualDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(manualDir, "Mega Man.pdf"), []byte("pdfdata"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/manuals/NES/Mega%20Man.pdf", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+	if w.Body.String() != "pdfdata" {
+		t.Errorf("body = %q, want %q", w.Body.String(), "pdfdata")
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	}
+}
+
+func TestManualsNotFound(t *testing.T) {
+	srv, _ := testServer(t)
+
+	req := httptest.NewRequest("GET", "/manuals/NES/noexist.pdf", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 404 {
+		t.Errorf("got status %d, want 404", w.Code)
+	}
+}
+
 func TestCoversNotFound(t *testing.T) {
 	srv, _ := testServer(t)
 

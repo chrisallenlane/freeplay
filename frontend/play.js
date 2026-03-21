@@ -24,6 +24,15 @@
 				showError("Game not found. It may have been removed from the library.");
 				return;
 			}
+			if (game.hasManual) {
+				const link = document.createElement("a");
+				link.href = FP.manualUrl(game);
+				link.className = "btn header-btn";
+				link.title = "View the manual";
+				link.textContent = "Manual";
+				const toggle = document.getElementById("theme-toggle");
+				toggle.parentNode.insertBefore(link, toggle);
+			}
 			startEmulator(game);
 		})
 		.catch(() => {
