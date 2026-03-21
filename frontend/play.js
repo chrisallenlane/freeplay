@@ -1,20 +1,12 @@
 (() => {
 	const FP = window.Freeplay;
 
-	const params = new URLSearchParams(window.location.search);
-	const consoleName = params.get("console");
-	const rom = params.get("rom");
-
-	if (!consoleName || !rom) {
+	const subpage = FP.initSubpage();
+	if (!subpage) {
 		showError("Missing console or rom parameter.");
 		return;
 	}
-
-	const nameEl = document.getElementById("game-name");
-	nameEl.textContent = FP.stripExt(rom);
-	document.title = `Freeplay - ${nameEl.textContent}`;
-
-	FP.initThemeToggle();
+	const { consoleName, rom, gameName } = subpage;
 
 	fetch("/api/games")
 		.then((res) => res.json())
@@ -59,7 +51,7 @@
 	}
 
 	function startEmulator(game) {
-		const saveBase = FP.saveBasePath(consoleName, nameEl.textContent);
+		const saveBase = FP.saveBasePath(consoleName, gameName);
 
 		window.EJS_player = "#game";
 		window.EJS_core = game.core;
@@ -69,7 +61,7 @@
 			document.documentElement.dataset.theme === "light"
 				? "#f0f0f5"
 				: "#1a1a2e";
-		window.EJS_gameName = nameEl.textContent;
+		window.EJS_gameName = gameName;
 		window.EJS_startOnLoaded = true;
 		// Load unminified EmulatorJS sources. The vendored emulator.min.js
 		// does not include our controller port device patches (lightgun

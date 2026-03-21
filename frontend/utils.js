@@ -102,6 +102,19 @@
 			.catch(() => false);
 	};
 
+	exports.initSubpage = () => {
+		const params = new URLSearchParams(window.location.search);
+		const consoleName = params.get("console");
+		const rom = params.get("rom");
+		if (!consoleName || !rom) return null;
+		const gameName = exports.stripExt(rom);
+		const nameEl = document.getElementById("game-name");
+		if (nameEl) nameEl.textContent = gameName;
+		document.title = `Freeplay - ${gameName}`;
+		exports.initThemeToggle();
+		return { consoleName, rom, gameName };
+	};
+
 	exports.initThemeToggle = () => {
 		const btn = document.getElementById("theme-toggle");
 		if (!btn) return;
