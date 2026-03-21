@@ -2,6 +2,7 @@ package details
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,12 +21,42 @@ type mockIGDBFetcher struct {
 	detailsResults map[int]*covers.GameDetails
 	searchCalls    int
 	detailsCalls   int
+
+	// searchErr, if non-nil, is returned by every SearchGame call.
+	searchErr error
+	// detailsErr, if non-nil, is returned by every FetchDetailsByID call.
+	detailsErr error
+	// searchPlatformArgs records the platformIDs slice from each SearchGame
+	// call, in call order.
+	searchPlatformArgs [][]int
+
+	// blockSearch, if non-nil, is used to synchronise the fetching-flag
+	// test. SearchGame signals entered by closing (or sending on) the
+	// channel, then blocks until release is closed.
+	entered chan struct{}
+	release chan struct{}
 }
 
 func (m *mockIGDBFetcher) SearchGame(
-	gameName string, _ []int,
+	gameName string, platformIDs []int,
 ) (int, error) {
 	m.searchCalls++
+	// Record a copy of platformIDs for later inspection.
+	var ids []int
+	if platformIDs != nil {
+		ids = append([]int(nil), platformIDs...)
+	}
+	m.searchPlatformArgs = append(m.searchPlatformArgs, ids)
+
+	// If blocking channels are set, signal entry and wait for release.
+	if m.entered != nil {
+		close(m.entered)
+		<-m.release
+	}
+
+	if m.searchErr != nil {
+		return 0, m.searchErr
+	}
 	if m.searchResults == nil {
 		return 0, nil
 	}
@@ -36,10 +67,88 @@ func (m *mockIGDBFetcher) FetchDetailsByID(
 	gameID int,
 ) (*covers.GameDetails, error) {
 	m.detailsCalls++
+	if m.detailsErr != nil {
+		return nil, m.detailsErr
+	}
 	if m.detailsResults == nil {
 		return nil, nil
 	}
 	return m.detailsResults[gameID], nil
+}
+
+func FuzzCacheGet(f *testing.F) {
+	f.Add("NES", "Mega Man.nes")
+	f.Add("", "")
+	f.Add("NES", "(tag only).nes")
+	f.Add("../evil", "game.nes")
+
+	f.Fuzz(func(t *testing.T, console, romFilename string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf(
+					"Cache.Get panicked on (%q, %q): %v",
+					console, romFilename, r,
+				)
+			}
+		}()
+
+		dir := t.TempDir()
+		c := New(dir, nil)
+
+		result := c.Get(console, romFilename)
+
+		// Result must be nil or have a non-empty Name.
+		if result != nil && result.Name == "" {
+			t.Errorf(
+				"Cache.Get(%q, %q) returned details with empty Name",
+				console, romFilename,
+			)
+		}
+	})
+}
+
+func FuzzCacheGetMalformedJSON(f *testing.F) {
+	f.Add("NES", "Mega Man.nes", []byte(`{invalid json`))
+	f.Add("NES", "Game.nes", []byte(`null`))
+	f.Add("NES", "Game.nes", []byte(`[]`))
+	f.Add("NES", "Game.nes", []byte(``))
+	f.Add("NES", "Game.nes", []byte(`{"name":""}`))
+
+	f.Fuzz(func(t *testing.T, console, romFilename string, jsonData []byte) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf(
+					"Cache.Get panicked on (%q, %q) with JSON %q: %v",
+					console, romFilename, jsonData, r,
+				)
+			}
+		}()
+
+		dir := t.TempDir()
+		c := New(dir, nil)
+
+		// Derive the cache path the same way the implementation does, so
+		// the written file is actually found by Get.
+		_, cleanName := covers.CleanFilename(romFilename)
+		if cleanName != "" && console != "" {
+			cacheDir := filepath.Join(
+				dir, "cache", "igdb", console, cleanName,
+			)
+			if err := os.MkdirAll(cacheDir, 0o755); err == nil {
+				// Ignore write errors — the fuzz input may produce a path
+				// that is unwritable on this OS; Get must still not panic.
+				_ = os.WriteFile(
+					filepath.Join(cacheDir, "details.json"),
+					jsonData, 0o644,
+				)
+			}
+		}
+
+		// The only invariant here is no panic; arbitrary JSON bytes may
+		// produce a non-nil result with an empty Name field, and that is
+		// acceptable behaviour for the malformed-input path.
+		_ = c.Get(console, romFilename)
+	})
 }
 
 func TestGet_CacheHit(t *testing.T) {
@@ -273,22 +382,40 @@ func TestFetchAll_RegionalVariantsShareCache(t *testing.T) {
 }
 
 func TestFetchAll_FetchingFlag(t *testing.T) {
-	// A fetcher that checks the Fetching() flag while running
-	fetcher := &mockIGDBFetcher{} // returns 0 for all searches
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	fetcher := &mockIGDBFetcher{
+		entered: entered,
+		release: release,
+	}
 
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	// Not fetching before start
+	// Not fetching before start.
 	if c.Fetching() {
 		t.Error("expected Fetching()=false before FetchAll")
 	}
 
-	c.FetchAll([]covers.GameEntry{
-		{Console: "NES", Filename: "Game.nes"},
-	})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.FetchAll([]covers.GameEntry{
+			{Console: "NES", Filename: "Game.nes"},
+		})
+	}()
 
-	// Not fetching after completion
+	// Wait until SearchGame is entered — FetchAll must have set the flag.
+	<-entered
+	if !c.Fetching() {
+		t.Error("expected Fetching()=true while FetchAll is running")
+	}
+
+	// Unblock SearchGame and wait for FetchAll to return.
+	close(release)
+	<-done
+
+	// Not fetching after completion.
 	if c.Fetching() {
 		t.Error("expected Fetching()=false after FetchAll completes")
 	}
@@ -330,8 +457,256 @@ func TestFetchAll_URLsRewrittenToLocalPaths(t *testing.T) {
 	if !strings.HasPrefix(got.CoverURL, "/cache/igdb/") {
 		t.Errorf("CoverURL not rewritten: %q", got.CoverURL)
 	}
-	if len(got.Screenshots) > 0 &&
-		!strings.HasPrefix(got.Screenshots[0], "/cache/igdb/") {
+	if len(got.Screenshots) != 1 {
+		t.Fatalf("Screenshots len = %d, want 1", len(got.Screenshots))
+	}
+	if !strings.HasPrefix(got.Screenshots[0], "/cache/igdb/") {
 		t.Errorf("Screenshot URL not rewritten: %q", got.Screenshots[0])
+	}
+	if len(got.Artworks) != 1 {
+		t.Fatalf("Artworks len = %d, want 1", len(got.Artworks))
+	}
+	if !strings.HasPrefix(got.Artworks[0], "/cache/igdb/") {
+		t.Errorf("Artwork URL not rewritten: %q", got.Artworks[0])
+	}
+}
+
+// TestFetchAll_NameVariantFallback verifies that when the primary search name
+// returns no result but a colon-substituted variant does, FetchAll still
+// caches the game. This exercises the covers.NameVariants fallback path where
+// No-Intro " - " subtitle separators are tried as IGDB ": " separators.
+func TestFetchAll_NameVariantFallback(t *testing.T) {
+	imgServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte("fakeimage"))
+		}),
+	)
+	defer imgServer.Close()
+
+	coverURL := imgServer.URL + "/cover.jpg"
+
+	// "Game - Subtitle" returns 0; "Game: Subtitle" (the colon variant
+	// generated by NameVariants) returns 42.
+	fetcher := &mockIGDBFetcher{
+		searchResults: map[string]int{
+			"Game: Subtitle": 42,
+		},
+		detailsResults: map[int]*covers.GameDetails{
+			42: {Name: "Game: Subtitle", CoverURL: coverURL},
+		},
+	}
+
+	dir := t.TempDir()
+	c := New(dir, fetcher)
+
+	count := c.FetchAll([]covers.GameEntry{
+		{Console: "NES", Filename: "Game - Subtitle.nes"},
+	})
+
+	if count != 1 {
+		t.Errorf("FetchAll() = %d, want 1 (name variant fallback)", count)
+	}
+}
+
+// TestFetchAll_DetailsError verifies that when FetchDetailsByID returns an
+// error, FetchAll returns 0 and no details.json is written.
+func TestFetchAll_DetailsError(t *testing.T) {
+	fetcher := &mockIGDBFetcher{
+		searchResults: map[string]int{"Mega Man": 17},
+		detailsErr:    errors.New("IGDB API unavailable"),
+	}
+
+	dir := t.TempDir()
+	c := New(dir, fetcher)
+
+	count := c.FetchAll([]covers.GameEntry{
+		{Console: "NES", Filename: "Mega Man (USA).nes"},
+	})
+
+	if count != 0 {
+		t.Errorf("FetchAll() = %d, want 0 on details error", count)
+	}
+
+	jsonPath := filepath.Join(
+		dir, "cache", "igdb", "NES", "Mega Man", "details.json",
+	)
+	if _, err := os.Stat(jsonPath); err == nil {
+		t.Errorf(
+			"expected no details.json after details fetch error, but found one",
+		)
+	}
+}
+
+// TestFetchAll_DetailsNil verifies that when FetchDetailsByID returns
+// (nil, nil), FetchAll writes a .notfound marker and returns 0.
+func TestFetchAll_DetailsNil(t *testing.T) {
+	fetcher := &mockIGDBFetcher{
+		searchResults: map[string]int{"Mega Man": 17},
+		// detailsResults is nil so FetchDetailsByID returns (nil, nil).
+	}
+
+	dir := t.TempDir()
+	c := New(dir, fetcher)
+
+	count := c.FetchAll([]covers.GameEntry{
+		{Console: "NES", Filename: "Mega Man (USA).nes"},
+	})
+
+	if count != 0 {
+		t.Errorf("FetchAll() = %d, want 0 when details are nil", count)
+	}
+
+	notFoundPath := filepath.Join(
+		dir, "cache", "igdb", "NES", "Mega Man", ".notfound",
+	)
+	if _, err := os.Stat(notFoundPath); err != nil {
+		t.Errorf(
+			"expected .notfound marker at %q, got: %v",
+			notFoundPath, err,
+		)
+	}
+}
+
+// TestFetchAll_PlatformConstrainedSearch verifies that when a game entry
+// carries IGDBPlatformIDs, the first SearchGame call is made with those IDs
+// (platform-constrained) before falling back to an unconstrained search.
+func TestFetchAll_PlatformConstrainedSearch(t *testing.T) {
+	// searchResults is empty so all searches return 0. We only care that the
+	// constrained call was made first.
+	fetcher := &mockIGDBFetcher{}
+
+	dir := t.TempDir()
+	c := New(dir, fetcher)
+
+	c.FetchAll([]covers.GameEntry{
+		{
+			Console:         "NES",
+			Filename:        "Mega Man (USA).nes",
+			IGDBPlatformIDs: []int{18},
+		},
+	})
+
+	if len(fetcher.searchPlatformArgs) == 0 {
+		t.Fatal("SearchGame was never called")
+	}
+
+	// The very first call must be platform-constrained.
+	first := fetcher.searchPlatformArgs[0]
+	if len(first) == 0 {
+		t.Errorf("first SearchGame call had no platformIDs, want [18]")
+	} else if first[0] != 18 {
+		t.Errorf(
+			"first SearchGame platformIDs = %v, want [18]",
+			first,
+		)
+	}
+
+	// A subsequent call must be unconstrained (nil platformIDs).
+	foundUnconstrained := false
+	for _, ids := range fetcher.searchPlatformArgs[1:] {
+		if ids == nil {
+			foundUnconstrained = true
+			break
+		}
+	}
+	if !foundUnconstrained {
+		t.Errorf(
+			"no unconstrained SearchGame call found; all calls: %v",
+			fetcher.searchPlatformArgs,
+		)
+	}
+}
+
+// TestFetchAll_SearchError verifies that when SearchGame returns an error,
+// FetchAll returns 0, no details.json is written, and no .notfound marker is
+// written (errors are transient and must not permanently suppress retries).
+func TestFetchAll_SearchError(t *testing.T) {
+	fetcher := &mockIGDBFetcher{
+		searchErr: errors.New("network timeout"),
+	}
+
+	dir := t.TempDir()
+	c := New(dir, fetcher)
+
+	count := c.FetchAll([]covers.GameEntry{
+		{Console: "NES", Filename: "Mega Man (USA).nes"},
+	})
+
+	if count != 0 {
+		t.Errorf("FetchAll() = %d, want 0 on search error", count)
+	}
+
+	base := filepath.Join(dir, "cache", "igdb", "NES", "Mega Man")
+
+	if _, err := os.Stat(filepath.Join(base, "details.json")); err == nil {
+		t.Errorf("expected no details.json after search error, but found one")
+	}
+
+	if _, err := os.Stat(filepath.Join(base, ".notfound")); err == nil {
+		t.Errorf(
+			"expected no .notfound marker after transient search error, " +
+				"but found one",
+		)
+	}
+}
+
+// TestFetchAll_ImageDownloadFailure verifies that when the image server
+// returns 404, FetchAll still succeeds (count=1, details.json written) but
+// the CoverURL in the cached JSON is not rewritten to a local path.
+func TestFetchAll_ImageDownloadFailure(t *testing.T) {
+	imgServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "not found", http.StatusNotFound)
+		}),
+	)
+	defer imgServer.Close()
+
+	coverURL := imgServer.URL + "/cover.jpg"
+
+	fetcher := &mockIGDBFetcher{
+		searchResults: map[string]int{"Mega Man": 17},
+		detailsResults: map[int]*covers.GameDetails{
+			17: {
+				Name:     "Mega Man",
+				Summary:  "A platformer.",
+				CoverURL: coverURL,
+			},
+		},
+	}
+
+	dir := t.TempDir()
+	c := New(dir, fetcher)
+
+	count := c.FetchAll([]covers.GameEntry{
+		{Console: "NES", Filename: "Mega Man (USA).nes"},
+	})
+
+	// A missing image is not fatal — the overall fetch must still succeed.
+	if count != 1 {
+		t.Errorf(
+			"FetchAll() = %d, want 1 even when image download fails",
+			count,
+		)
+	}
+
+	// details.json should still be written.
+	jsonPath := filepath.Join(
+		dir, "cache", "igdb", "NES", "Mega Man", "details.json",
+	)
+	if _, err := os.Stat(jsonPath); err != nil {
+		t.Errorf("expected details.json at %q, got: %v", jsonPath, err)
+	}
+
+	// The CoverURL must NOT have been rewritten to a local /cache/igdb/ path
+	// because the download failed.
+	got := c.Get("NES", "Mega Man (USA).nes")
+	if got == nil {
+		t.Fatal("expected cached details after image-download failure")
+	}
+	if strings.HasPrefix(got.CoverURL, "/cache/igdb/") {
+		t.Errorf(
+			"CoverURL was rewritten despite download failure: %q",
+			got.CoverURL,
+		)
 	}
 }
