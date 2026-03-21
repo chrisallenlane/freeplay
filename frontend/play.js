@@ -24,14 +24,26 @@
 				showError("Game not found. It may have been removed from the library.");
 				return;
 			}
+			const toggle = document.getElementById("theme-toggle");
+
+			FP.isIGDBConfigured().then((configured) => {
+				if (configured) {
+					const detailsLink = document.createElement("a");
+					detailsLink.href = FP.detailsUrl(game);
+					detailsLink.className = "btn header-btn";
+					detailsLink.title = "View game details";
+					detailsLink.textContent = "Details";
+					toggle.parentNode.insertBefore(detailsLink, toggle);
+				}
+			});
+
 			if (game.hasManual) {
-				const link = document.createElement("a");
-				link.href = FP.manualUrl(game);
-				link.className = "btn header-btn";
-				link.title = "View the manual";
-				link.textContent = "Manual";
-				const toggle = document.getElementById("theme-toggle");
-				toggle.parentNode.insertBefore(link, toggle);
+				const manualLink = document.createElement("a");
+				manualLink.href = FP.manualUrl(game);
+				manualLink.className = "btn header-btn";
+				manualLink.title = "View the manual";
+				manualLink.textContent = "Manual";
+				toggle.parentNode.insertBefore(manualLink, toggle);
 			}
 			startEmulator(game);
 		})

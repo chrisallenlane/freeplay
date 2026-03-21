@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freeplay - Details</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/details.css">
+    <link rel="preload" href="/Silkscreen-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <script src="/theme-init.js"></script>
+    <script src="/utils.js" defer></script>
+    <script src="/details.js" defer></script>
+</head>
+<body>
+    <header>
+        <a href="/">&larr; Back to Library</a>
+        <!-- [html-validate-disable-next empty-heading -- populated by details.js] -->
+        <h1 class="game-name" id="game-name"></h1>
+        <div class="header-actions" id="header-actions"></div>
+        <button type="button" id="theme-toggle" class="btn header-btn" title="Toggle light/dark mode" aria-label="Toggle light/dark mode"></button>
+    </header>
+    <main id="content">
+        <div id="loading" class="message">Loading game details...</div>
+    </main>
+    <div id="error" class="error-msg" style="display:none;"></div>
+</body>
+</html>

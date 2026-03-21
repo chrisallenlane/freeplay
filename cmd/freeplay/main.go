@@ -34,14 +34,24 @@ func main() {
 		fatal(err)
 	}
 
-	// Set up cover art fetcher if configured
-	var fetcher covers.Fetcher
+	// Set up IGDB fetcher if configured
+	var igdbFetcher *covers.IGDBFetcher
 	if cfg.CoverArtAPI == "igdb" {
-		fetcher = covers.NewIGDBFetcher(cfg.CoverArtKey)
+		igdbFetcher = covers.NewIGDBFetcher(cfg.CoverArtKey)
 	}
-	coverMgr := covers.New(*dataDir, fetcher)
 
-	srv, err := server.New(cfg, *dataDir, freeplay.FrontendFS, freeplay.EmulatorjsFS, coverMgr)
+	var coverFetcher covers.Fetcher
+	if igdbFetcher != nil {
+		coverFetcher = igdbFetcher
+	}
+	coverMgr := covers.New(*dataDir, coverFetcher)
+
+	var detailsFetcher server.DetailsFetcher
+	if igdbFetcher != nil {
+		detailsFetcher = igdbFetcher
+	}
+
+	srv, err := server.New(cfg, *dataDir, freeplay.FrontendFS, freeplay.EmulatorjsFS, coverMgr, detailsFetcher)
 	if err != nil {
 		fatal(err)
 	}

@@ -30,6 +30,9 @@
 	exports.playUrl = (game) =>
 		`/play?console=${encodeURIComponent(game.console)}&rom=${encodeURIComponent(game.filename)}`;
 
+	exports.detailsUrl = (game) =>
+		`/details?console=${encodeURIComponent(game.console)}&rom=${encodeURIComponent(game.filename)}`;
+
 	exports.romUrl = (consoleName, rom) =>
 		`/roms/${encodeURIComponent(consoleName)}/${encodeURIComponent(rom)}`;
 
@@ -84,6 +87,19 @@
 		}
 
 		return null;
+	};
+
+	exports.isIGDBConfigured = () => {
+		const cached = sessionStorage.getItem("freeplay-igdb-configured");
+		if (cached !== null) return Promise.resolve(cached === "true");
+		return fetch("/api/status")
+			.then((res) => res.json())
+			.then((status) => {
+				const val = !!status.igdbConfigured;
+				sessionStorage.setItem("freeplay-igdb-configured", String(val));
+				return val;
+			})
+			.catch(() => false);
 	};
 
 	exports.initThemeToggle = () => {
