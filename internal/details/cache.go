@@ -46,12 +46,15 @@ func (c *Cache) Fetching() bool {
 	return c.fetching.Load()
 }
 
+// cacheDir returns the filesystem directory for a game's cached IGDB data.
+func (c *Cache) cacheDir(console, cleanName string) string {
+	return filepath.Join(c.dataDir, "cache", "igdb", console, cleanName)
+}
+
 // Get returns cached GameDetails for the given console and ROM filename,
 // or nil if not cached.
 func (c *Cache) Get(console, romFilename string) *covers.GameDetails {
-	ext := filepath.Ext(romFilename)
-	nameNoExt := strings.TrimSuffix(romFilename, ext)
-	cleanName := covers.CleanName(nameNoExt)
+	_, cleanName := covers.CleanFilename(romFilename)
 	if cleanName == "" {
 		return nil
 	}
@@ -94,9 +97,7 @@ func (c *Cache) FetchAll(games []covers.GameEntry) int {
 // fetchOne handles cache population for a single game entry.
 // Returns true if new details were cached.
 func (c *Cache) fetchOne(g covers.GameEntry, ticker *time.Ticker) bool {
-	ext := filepath.Ext(g.Filename)
-	nameNoExt := strings.TrimSuffix(g.Filename, ext)
-	cleanName := covers.CleanName(nameNoExt)
+	nameNoExt, cleanName := covers.CleanFilename(g.Filename)
 	if cleanName == "" {
 		return false
 	}
@@ -186,7 +187,7 @@ func (c *Cache) saveDetails(
 	console, cleanName string,
 	details *covers.GameDetails,
 ) error {
-	cacheDir := filepath.Join(c.dataDir, "cache", "igdb", console, cleanName)
+	cacheDir := c.cacheDir(console, cleanName)
 	urlBase := "/cache/igdb/" +
 		url.PathEscape(console) + "/" +
 		url.PathEscape(cleanName)
@@ -248,12 +249,7 @@ func (c *Cache) saveDetails(
 func (c *Cache) downloadImage(
 	rawURL, cacheDir, urlBase, filename string,
 ) (string, string, error) {
-	imgURL := rawURL
-	if strings.HasPrefix(imgURL, "//") {
-		imgURL = "https:" + imgURL
-	}
-
-	resp, err := c.client.Get(imgURL)
+	resp, err := c.client.Get(rawURL)
 	if err != nil {
 		return "", "", fmt.Errorf("downloading %s: %w", filename, err)
 	}
@@ -284,9 +280,7 @@ func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
 		return // already exists
 	}
 
-	srcPath := filepath.Join(
-		c.dataDir, "cache", "igdb", console, cleanName, "cover_thumb.jpg",
-	)
+	srcPath := filepath.Join(c.cacheDir(console, cleanName), "cover_thumb.jpg")
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
 		return // no cached cover yet
@@ -300,7 +294,7 @@ func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
 
 // isCached reports whether details.json or .notfound exists for the game.
 func (c *Cache) isCached(console, cleanName string) bool {
-	base := filepath.Join(c.dataDir, "cache", "igdb", console, cleanName)
+	base := c.cacheDir(console, cleanName)
 	for _, name := range []string{"details.json", ".notfound"} {
 		if _, err := os.Stat(filepath.Join(base, name)); err == nil {
 			return true
@@ -311,9 +305,7 @@ func (c *Cache) isCached(console, cleanName string) bool {
 
 // writeNotFound writes a .notfound marker so the game is not retried.
 func (c *Cache) writeNotFound(console, cleanName string) {
-	path := filepath.Join(
-		c.dataDir, "cache", "igdb", console, cleanName, ".notfound",
-	)
+	path := filepath.Join(c.cacheDir(console, cleanName), ".notfound")
 	_ = atomicfile.Write(path, func(w io.Writer) error {
 		_, err := w.Write([]byte(""))
 		return err
@@ -322,7 +314,5 @@ func (c *Cache) writeNotFound(console, cleanName string) {
 
 // detailsPath returns the filesystem path for the game's details.json.
 func (c *Cache) detailsPath(console, cleanName string) string {
-	return filepath.Join(
-		c.dataDir, "cache", "igdb", console, cleanName, "details.json",
-	)
+	return filepath.Join(c.cacheDir(console, cleanName), "details.json")
 }
