@@ -29,6 +29,24 @@ func writeTokenResponse(w http.ResponseWriter) {
 	})
 }
 
+// newTestFetcher creates an IGDBFetcher whose HTTP client is wired to call
+// handler instead of the real IGDB API. The test server is closed via
+// t.Cleanup when the test completes.
+func newTestFetcher(t *testing.T, handler http.HandlerFunc) *IGDBFetcher {
+	t.Helper()
+	ts := httptest.NewServer(handler)
+	t.Cleanup(ts.Close)
+
+	f := NewIGDBFetcher("test-id:test-secret")
+	f.client = &http.Client{
+		Transport: &rewriteTransport{
+			base:   http.DefaultTransport,
+			target: ts.URL,
+		},
+	}
+	return f
+}
+
 func FuzzNewIGDBFetcher(f *testing.F) {
 	f.Add("client_id:client_secret")
 	f.Add("a:b")
@@ -84,25 +102,14 @@ func TestSearchGameExactMatch(t *testing.T) {
 		{"id": 17, "name": "Mega Man"},
 		{"id": 99, "name": "Mega Man 2"},
 	})
-	ts := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch {
-			case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-				writeTokenResponse(w)
-			case strings.HasSuffix(r.URL.Path, "/v4/games"):
-				_, _ = w.Write(searchResp)
-			}
-		}),
-	)
-	t.Cleanup(ts.Close)
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{
-			base:   http.DefaultTransport,
-			target: ts.URL,
-		},
-	}
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write(searchResp)
+		}
+	})
 
 	id, err := f.SearchGame("Mega Man", nil)
 	if err != nil {
@@ -117,25 +124,14 @@ func TestSearchGameNoMatch(t *testing.T) {
 	searchResp, _ := json.Marshal([]map[string]any{
 		{"id": 42, "name": "Mega Man X"},
 	})
-	ts := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch {
-			case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-				writeTokenResponse(w)
-			case strings.HasSuffix(r.URL.Path, "/v4/games"):
-				_, _ = w.Write(searchResp)
-			}
-		}),
-	)
-	t.Cleanup(ts.Close)
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{
-			base:   http.DefaultTransport,
-			target: ts.URL,
-		},
-	}
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write(searchResp)
+		}
+	})
 
 	id, err := f.SearchGame("Mega Man", nil)
 	if err != nil {
@@ -148,31 +144,20 @@ func TestSearchGameNoMatch(t *testing.T) {
 
 func TestSearchGameWithPlatformFilter(t *testing.T) {
 	var capturedQuery string
-	ts := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch {
-			case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-				writeTokenResponse(w)
-			case strings.HasSuffix(r.URL.Path, "/v4/games"):
-				body := make([]byte, r.ContentLength)
-				_, _ = r.Body.Read(body)
-				capturedQuery = string(body)
-				resp, _ := json.Marshal([]map[string]any{
-					{"id": 18, "name": "Metroid"},
-				})
-				_, _ = w.Write(resp)
-			}
-		}),
-	)
-	t.Cleanup(ts.Close)
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{
-			base:   http.DefaultTransport,
-			target: ts.URL,
-		},
-	}
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			body := make([]byte, r.ContentLength)
+			_, _ = r.Body.Read(body)
+			capturedQuery = string(body)
+			resp, _ := json.Marshal([]map[string]any{
+				{"id": 18, "name": "Metroid"},
+			})
+			_, _ = w.Write(resp)
+		}
+	})
 
 	_, err := f.SearchGame("Metroid", []int{18, 99})
 	if err != nil {
@@ -202,26 +187,14 @@ func TestFetchDetailsByID(t *testing.T) {
 			},
 		},
 	})
-
-	ts := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch {
-			case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-				writeTokenResponse(w)
-			case strings.HasSuffix(r.URL.Path, "/v4/games"):
-				_, _ = w.Write(detailsResp)
-			}
-		}),
-	)
-	t.Cleanup(ts.Close)
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{
-			base:   http.DefaultTransport,
-			target: ts.URL,
-		},
-	}
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write(detailsResp)
+		}
+	})
 
 	details, err := f.FetchDetailsByID(17)
 	if err != nil {
@@ -248,25 +221,14 @@ func TestFetchDetailsByID(t *testing.T) {
 }
 
 func TestFetchDetailsByIDNotFound(t *testing.T) {
-	ts := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch {
-			case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-				writeTokenResponse(w)
-			case strings.HasSuffix(r.URL.Path, "/v4/games"):
-				_, _ = w.Write([]byte("[]"))
-			}
-		}),
-	)
-	t.Cleanup(ts.Close)
-
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{
-			base:   http.DefaultTransport,
-			target: ts.URL,
-		},
-	}
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write([]byte("[]"))
+		}
+	})
 
 	details, err := f.FetchDetailsByID(999)
 	if err != nil {
