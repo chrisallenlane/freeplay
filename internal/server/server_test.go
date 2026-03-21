@@ -234,6 +234,7 @@ func TestSaveRoundtrip(t *testing.T) {
 
 	// POST save
 	postReq := httptest.NewRequest("POST", "/api/saves/NES/game1/state", bytes.NewReader(saveData))
+	postReq.Header.Set("X-Requested-With", "freeplay")
 	postW := httptest.NewRecorder()
 	srv.handler.ServeHTTP(postW, postReq)
 
@@ -285,6 +286,7 @@ func TestRescanEndpoint(t *testing.T) {
 	srv, _ := testServer(t)
 
 	req := httptest.NewRequest("POST", "/api/rescan", nil)
+	req.Header.Set("X-Requested-With", "freeplay")
 	w := httptest.NewRecorder()
 	srv.handler.ServeHTTP(w, req)
 
@@ -627,6 +629,7 @@ func TestRescanConflict(t *testing.T) {
 	<-started
 
 	req := httptest.NewRequest("POST", "/api/rescan", nil)
+	req.Header.Set("X-Requested-With", "freeplay")
 	w := httptest.NewRecorder()
 	srv.handler.ServeHTTP(w, req)
 
@@ -634,6 +637,24 @@ func TestRescanConflict(t *testing.T) {
 
 	if w.Code != http.StatusConflict {
 		t.Errorf("got status %d, want 409", w.Code)
+	}
+}
+
+func TestPostWithoutCSRFHeaderRejected(t *testing.T) {
+	srv, _ := testServer(t)
+
+	endpoints := []string{
+		"/api/saves/NES/game1/state",
+		"/api/rescan",
+	}
+	for _, ep := range endpoints {
+		req := httptest.NewRequest("POST", ep, nil)
+		w := httptest.NewRecorder()
+		srv.handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusForbidden {
+			t.Errorf("POST %s without X-Requested-With: got %d, want 403", ep, w.Code)
+		}
 	}
 }
 
@@ -810,6 +831,7 @@ func TestPostSavePutError(t *testing.T) {
 		"/api/saves/NES/game1/state",
 		bytes.NewReader([]byte("data")),
 	)
+	req.Header.Set("X-Requested-With", "freeplay")
 	w := httptest.NewRecorder()
 	srv.handler.ServeHTTP(w, req)
 

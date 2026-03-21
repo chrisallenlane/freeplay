@@ -651,8 +651,8 @@ func TestFetchAll_SearchError(t *testing.T) {
 }
 
 // TestFetchAll_ImageDownloadFailure verifies that when the image server
-// returns 404, FetchAll still succeeds (count=1, details.json written) but
-// the CoverURL in the cached JSON is not rewritten to a local path.
+// returns 404, FetchAll still succeeds (count=1, details.json written) and
+// the CoverURL is cleared rather than left as a remote URL.
 func TestFetchAll_ImageDownloadFailure(t *testing.T) {
 	imgServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -667,9 +667,11 @@ func TestFetchAll_ImageDownloadFailure(t *testing.T) {
 		searchResults: map[string]int{"Mega Man": 17},
 		detailsResults: map[int]*covers.GameDetails{
 			17: {
-				Name:     "Mega Man",
-				Summary:  "A platformer.",
-				CoverURL: coverURL,
+				Name:        "Mega Man",
+				Summary:     "A platformer.",
+				CoverURL:    coverURL,
+				Screenshots: []string{imgServer.URL + "/ss0.jpg"},
+				Artworks:    []string{imgServer.URL + "/art0.jpg"},
 			},
 		},
 	}
@@ -697,16 +699,19 @@ func TestFetchAll_ImageDownloadFailure(t *testing.T) {
 		t.Errorf("expected details.json at %q, got: %v", jsonPath, err)
 	}
 
-	// The CoverURL must NOT have been rewritten to a local /cache/igdb/ path
-	// because the download failed.
+	// Failed downloads must clear the URL rather than leave a remote URL
+	// that the frontend would try to load directly.
 	got := c.Get("NES", "Mega Man (USA).nes")
 	if got == nil {
 		t.Fatal("expected cached details after image-download failure")
 	}
-	if strings.HasPrefix(got.CoverURL, "/cache/igdb/") {
-		t.Errorf(
-			"CoverURL was rewritten despite download failure: %q",
-			got.CoverURL,
-		)
+	if got.CoverURL != "" {
+		t.Errorf("CoverURL should be empty after download failure, got %q", got.CoverURL)
+	}
+	if len(got.Screenshots) != 0 {
+		t.Errorf("Screenshots should be empty after download failure, got %v", got.Screenshots)
+	}
+	if len(got.Artworks) != 0 {
+		t.Errorf("Artworks should be empty after download failure, got %v", got.Artworks)
 	}
 }

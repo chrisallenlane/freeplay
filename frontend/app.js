@@ -383,7 +383,10 @@
 	rescanBtn.addEventListener("click", () => {
 		rescanBtn.disabled = true;
 		rescanBtn.textContent = "Scanning\u2026";
-		fetch("/api/rescan", { method: "POST" })
+		fetch("/api/rescan", {
+			method: "POST",
+			headers: { "X-Requested-With": "freeplay" },
+		})
 			.then((res) => {
 				if (res.status === 409) {
 					alert("Scan already in progress.");

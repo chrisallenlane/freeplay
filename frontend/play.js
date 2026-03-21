@@ -76,8 +76,9 @@
 			if (data)
 				fetch(`${saveBase}/${type}`, {
 					method: "POST",
+					headers: { "X-Requested-With": "freeplay" },
 					body: new Blob([data]),
-				});
+				}).catch((err) => console.error(`Save failed (${type}):`, err));
 		}
 
 		window.EJS_onSaveState = (data) => {

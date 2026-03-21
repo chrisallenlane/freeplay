@@ -205,6 +205,7 @@ func (c *Cache) saveDetails(
 		)
 		if err != nil {
 			slog.Warn("downloading cover failed", "game", cleanName, "error", err)
+			details.CoverURL = ""
 		} else {
 			// Also download t_cover_big for library grid thumbnails
 			thumbURL := strings.Replace(
@@ -216,6 +217,7 @@ func (c *Cache) saveDetails(
 	}
 
 	// Screenshots
+	var screenshots []string
 	for i, u := range details.Screenshots {
 		filename := fmt.Sprintf("screenshot_%d.jpg", i)
 		_, localURL, err := c.downloadImage(u, cacheDir, urlBase, filename)
@@ -226,10 +228,12 @@ func (c *Cache) saveDetails(
 			)
 			continue
 		}
-		details.Screenshots[i] = localURL
+		screenshots = append(screenshots, localURL)
 	}
+	details.Screenshots = screenshots
 
 	// Artworks
+	var artworks []string
 	for i, u := range details.Artworks {
 		filename := fmt.Sprintf("artwork_%d.jpg", i)
 		_, localURL, err := c.downloadImage(u, cacheDir, urlBase, filename)
@@ -240,8 +244,9 @@ func (c *Cache) saveDetails(
 			)
 			continue
 		}
-		details.Artworks[i] = localURL
+		artworks = append(artworks, localURL)
 	}
+	details.Artworks = artworks
 
 	// Write details.json
 	jsonPath := filepath.Join(cacheDir, "details.json")
