@@ -19,6 +19,9 @@ a TOML file, and you're done.
 - Serves your ROM library through a browser-based emulator
 - Persists save states and battery saves server-side
 - Optionally fetches cover art from [IGDB][]
+- Shows a game details page with metadata, screenshots, and artwork from
+  [IGDB][] (when configured)
+- Serves per-game PDF manuals when placed alongside ROMs
 - Filters games by console, search query, or favorites
 - Runs as a single binary or a single Docker container with one volume mount
 - Switches between light and dark themes (auto-detects system preference,
