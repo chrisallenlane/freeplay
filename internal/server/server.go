@@ -238,8 +238,7 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Strip extension from ROM filename for IGDB search
-	ext := filepath.Ext(rom)
-	gameName := covers.CleanName(strings.TrimSuffix(rom, ext))
+	_, gameName := covers.CleanFilename(rom)
 	if gameName == "" {
 		http.Error(w, `{"error":"invalid rom name"}`, http.StatusBadRequest)
 		return

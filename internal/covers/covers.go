@@ -55,6 +55,15 @@ func NameVariants(cleanName string) []string {
 	return variants
 }
 
+// CleanFilename splits a ROM filename into its base name (without extension)
+// and the cleaned name suitable for IGDB searches.
+func CleanFilename(filename string) (nameNoExt, cleanName string) {
+	ext := filepath.Ext(filename)
+	nameNoExt = strings.TrimSuffix(filename, ext)
+	cleanName = CleanName(nameNoExt)
+	return
+}
+
 // CoverPath returns the expected filesystem path for a game's cover art.
 func CoverPath(dataDir, console, filenameWithoutExt string) string {
 	return filepath.Join(dataDir, "covers", console, filenameWithoutExt+".png")
