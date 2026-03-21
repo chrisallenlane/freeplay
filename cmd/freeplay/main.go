@@ -43,15 +43,10 @@ func main() {
 
 	detailsCache := details.New(*dataDir, igdbFetcher)
 
-	var detailsFetcher server.DetailsFetcher
-	if igdbFetcher != nil {
-		detailsFetcher = igdbFetcher
-	}
-
 	srv, err := server.New(
 		cfg, *dataDir,
 		freeplay.FrontendFS, freeplay.EmulatorjsFS,
-		detailsCache, detailsFetcher,
+		detailsCache,
 	)
 	if err != nil {
 		fatal(err)

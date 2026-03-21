@@ -18,11 +18,6 @@ import (
 
 const longCacheValue = "public, max-age=31536000, immutable"
 
-// DetailsFetcher retrieves game metadata from IGDB.
-type DetailsFetcher interface {
-	FetchDetails(gameName string, platformIDs []int) (*covers.GameDetails, error)
-}
-
 // DetailsCache serves locally-cached game metadata.
 type DetailsCache interface {
 	Get(console, romFilename string) *covers.GameDetails
@@ -31,26 +26,24 @@ type DetailsCache interface {
 
 // Server is the Freeplay HTTP server.
 type Server struct {
-	cfg            *config.Config
-	dataDir        string
-	scanner        *scanner.Scanner
-	saves          *saves.Manager
-	detailsCache   DetailsCache
-	detailsFetcher DetailsFetcher
-	frontendSub    fs.FS
-	emulatorjsSub  fs.FS
-	mux            *http.ServeMux
-	handler        http.Handler
+	cfg           *config.Config
+	dataDir       string
+	scanner       *scanner.Scanner
+	saves         *saves.Manager
+	detailsCache  DetailsCache
+	frontendSub   fs.FS
+	emulatorjsSub fs.FS
+	mux           *http.ServeMux
+	handler       http.Handler
 }
 
 // New creates a configured Server ready to listen.
-// detailsCache and detailsFetcher may be nil if IGDB is not configured.
+// detailsCache may be nil if IGDB is not configured.
 func New(
 	cfg *config.Config,
 	dataDir string,
 	frontendFS, emulatorjsFS fs.FS,
 	detailsCache DetailsCache,
-	detailsFetcher DetailsFetcher,
 ) (*Server, error) {
 	frontendSub, err := fs.Sub(frontendFS, "frontend")
 	if err != nil {
@@ -62,15 +55,14 @@ func New(
 	}
 
 	s := &Server{
-		cfg:            cfg,
-		dataDir:        dataDir,
-		scanner:        scanner.New(cfg, dataDir),
-		saves:          saves.New(dataDir),
-		detailsCache:   detailsCache,
-		detailsFetcher: detailsFetcher,
-		frontendSub:    frontendSub,
-		emulatorjsSub:  emulatorjsSub,
-		mux:            http.NewServeMux(),
+		cfg:           cfg,
+		dataDir:       dataDir,
+		scanner:       scanner.New(cfg, dataDir),
+		saves:         saves.New(dataDir),
+		detailsCache:  detailsCache,
+		frontendSub:   frontendSub,
+		emulatorjsSub: emulatorjsSub,
+		mux:           http.NewServeMux(),
 	}
 	s.routes()
 	s.handler = securityHeaders(s.mux)
@@ -200,7 +192,7 @@ func (s *Server) handleDetailsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
-	if s.detailsCache == nil && s.detailsFetcher == nil {
+	if s.detailsCache == nil {
 		http.Error(w, `{"error":"IGDB not configured"}`, http.StatusNotFound)
 		return
 	}
@@ -216,50 +208,14 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check local cache first
-	if s.detailsCache != nil {
-		if d := s.detailsCache.Get(consoleName, rom); d != nil {
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(d)
-			return
-		}
-	}
-
-	// Fall back to live IGDB fetch
-	if s.detailsFetcher == nil {
-		http.Error(w, `{"error":"game not found"}`, http.StatusNotFound)
-		return
-	}
-
-	// Look up platform IDs from config
-	var platformIDs []int
-	if romCfg, ok := s.cfg.ROMs[consoleName]; ok {
-		platformIDs = romCfg.IGDBPlatformIDs
-	}
-
-	// Strip extension from ROM filename for IGDB search
-	_, gameName := covers.CleanFilename(rom)
-	if gameName == "" {
-		http.Error(w, `{"error":"invalid rom name"}`, http.StatusBadRequest)
-		return
-	}
-
-	details, err := s.detailsFetcher.FetchDetails(gameName, platformIDs)
-	if err != nil {
-		http.Error(
-			w,
-			`{"error":"IGDB request failed"}`,
-			http.StatusServiceUnavailable,
-		)
-		return
-	}
-	if details == nil {
+	d := s.detailsCache.Get(consoleName, rom)
+	if d == nil {
 		http.Error(w, `{"error":"game not found"}`, http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(details)
+	_ = json.NewEncoder(w).Encode(d)
 }
 
 func noCache(next http.Handler) http.Handler {
@@ -326,7 +282,7 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	fetching := s.detailsCache != nil && s.detailsCache.Fetching()
-	igdbConfigured := s.detailsCache != nil || s.detailsFetcher != nil
+	igdbConfigured := s.detailsCache != nil
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"fetchingCovers": fetching,
