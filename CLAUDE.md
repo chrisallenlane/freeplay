@@ -5,10 +5,12 @@ Retro-gaming server that serves ROMs via EmulatorJS in the browser.
 ## Build & Test
 
 ```
-make check    # fmt + lint + vet + test
-make build    # build binary to dist/
-make run      # build and run with testdata
-make setup    # install dev tools (gofumpt, golangci-lint)
+make check      # fmt + lint + vet + test
+make build      # build binary to dist/
+make run        # build and run with testdata
+make fuzz       # run fuzz tests (15s each)
+make fuzz-long  # run fuzz tests (10m each)
+make setup      # install dev tools (gofumpt, golangci-lint)
 ```
 
 `make fmt`, `make lint`, and `make test` cover both Go and frontend (JS/HTML)

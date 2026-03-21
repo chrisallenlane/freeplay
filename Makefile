@@ -68,6 +68,16 @@ coverage-text: .tmp
 	$(GO) test ./... -coverprofile=.tmp/coverage.out && \
 	$(GO) tool cover -func=.tmp/coverage.out | sort -k3 -n
 
+## fuzz: run quick fuzz tests (15s each)
+.PHONY: fuzz
+fuzz:
+	@./test/fuzz.sh 15s
+
+## fuzz-long: run extended fuzz tests (10m each)
+.PHONY: fuzz-long
+fuzz-long:
+	@./test/fuzz.sh 10m
+
 ## check: format, lint, vet, and run unit tests
 .PHONY: check
 check: fmt lint vet test
