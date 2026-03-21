@@ -2,97 +2,24 @@ package covers
 
 import (
 	"encoding/json"
-	"image"
-	"image/color"
-	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
-// newTestServer creates an httptest.Server that mimics the IGDB API.
-// queryLog receives the Apicalypse query body for each /v4/games request.
-// gamesResp is the JSON response to return for /v4/games.
-func newTestServer(t *testing.T, queryLog *[]string, gamesResp []byte) *httptest.Server {
-	t.Helper()
-
-	// Create a 1x1 PNG for cover image responses
-	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
-	img.Set(0, 0, color.RGBA{R: 255, A: 255})
-
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			body := make([]byte, r.ContentLength)
-			_, _ = r.Body.Read(body)
-			*queryLog = append(*queryLog, string(body))
-			_, _ = w.Write(gamesResp)
-
-		case strings.HasSuffix(r.URL.Path, "/v4/covers"):
-			_ = json.NewEncoder(w).Encode([]map[string]string{
-				{"url": "//images.igdb.com/t_thumb/cover.jpg"},
-			})
-
-		case strings.Contains(r.URL.Path, "t_cover_big"):
-			w.Header().Set("Content-Type", "image/png")
-			_ = png.Encode(w, img)
-
-		default:
-			// Serve the cover image for any other path (covers URL rewrite)
-			w.Header().Set("Content-Type", "image/png")
-			_ = png.Encode(w, img)
-		}
-	}))
+// rewriteTransport redirects all HTTP requests to a test server URL.
+type rewriteTransport struct {
+	base   http.RoundTripper
+	target string
 }
 
-// newTestFetcher creates an IGDBFetcher wired to a test server.
-// Returns the fetcher, a log of Apicalypse queries, and the test server.
-func newTestFetcher(t *testing.T, games []map[string]any) (*IGDBFetcher, *[]string, *httptest.Server) {
-	t.Helper()
-	var queries []string
-	gamesResp, _ := json.Marshal(games)
-	ts := newTestServer(t, &queries, gamesResp)
-	t.Cleanup(ts.Close)
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
-	return f, &queries, ts
-}
-
-// newTestFetcherWithHandler creates an IGDBFetcher wired to a test server
-// running the given handler. Use this when you need a custom server handler.
-func newTestFetcherWithHandler(t *testing.T, handler http.Handler) *IGDBFetcher {
-	t.Helper()
-	ts := httptest.NewServer(handler)
-	t.Cleanup(ts.Close)
-	f := NewIGDBFetcher("test-id:test-secret")
-	f.client = &http.Client{
-		Transport: &rewriteTransport{base: http.DefaultTransport, target: ts.URL},
-	}
-	return f
-}
-
-// interceptCoverQueries wraps a test server's handler to log /v4/covers
-// query bodies. Returns a pointer to the accumulated queries.
-func interceptCoverQueries(ts *httptest.Server) *[]string {
-	var queries []string
-	orig := ts.Config.Handler
-	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/v4/covers") {
-			body := make([]byte, r.ContentLength)
-			_, _ = r.Body.Read(body)
-			queries = append(queries, string(body))
-		}
-		orig.ServeHTTP(w, r)
-	})
-	return &queries
+func (t *rewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.URL.Scheme = "http"
+	// Extract just the host:port from target
+	req.URL.Host = strings.TrimPrefix(t.target, "http://")
+	return t.base.RoundTrip(req)
 }
 
 // writeTokenResponse writes the standard test OAuth2 token response.
@@ -100,6 +27,65 @@ func writeTokenResponse(w http.ResponseWriter) {
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"access_token": "test-token",
 		"expires_in":   3600,
+	})
+}
+
+// newTestFetcher creates an IGDBFetcher whose HTTP client is wired to call
+// handler instead of the real IGDB API. The test server is closed via
+// t.Cleanup when the test completes.
+func newTestFetcher(t *testing.T, handler http.HandlerFunc) *IGDBFetcher {
+	t.Helper()
+	ts := httptest.NewServer(handler)
+	t.Cleanup(ts.Close)
+
+	f := NewIGDBFetcher("test-id:test-secret")
+	f.client = &http.Client{
+		Transport: &rewriteTransport{
+			base:   http.DefaultTransport,
+			target: ts.URL,
+		},
+	}
+	return f
+}
+
+func FuzzTransformImageURL(f *testing.F) {
+	f.Add("//images.igdb.com/igdb/image/upload/t_thumb/abc.jpg", "t_original")
+	f.Add("https://images.igdb.com/igdb/image/upload/t_thumb/abc.jpg", "t_cover_big")
+	f.Add("", "")
+	f.Add("//", "t_thumb")
+
+	f.Fuzz(func(t *testing.T, rawURL, size string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf(
+					"transformImageURL panicked on (%q, %q): %v",
+					rawURL, size, r,
+				)
+			}
+		}()
+
+		result := transformImageURL(rawURL, size)
+
+		// If the input starts with "//", output must start with "https:".
+		if strings.HasPrefix(rawURL, "//") &&
+			!strings.HasPrefix(result, "https:") {
+			t.Errorf(
+				"transformImageURL(%q, %q) = %q: want https: prefix",
+				rawURL, size, result,
+			)
+		}
+
+		// Output length is bounded: it can only grow by prepending "https:"
+		// (6 bytes) and replacing "t_thumb" with size (net change =
+		// len(size) - len("t_thumb")).  A generous bound of
+		// len(rawURL) + len(size) + 10 covers all cases.
+		maxLen := len(rawURL) + len(size) + 10
+		if len(result) > maxLen {
+			t.Errorf(
+				"transformImageURL(%q, %q) result length %d exceeds bound %d",
+				rawURL, size, len(result), maxLen,
+			)
+		}
 	})
 }
 
@@ -123,332 +109,401 @@ func FuzzNewIGDBFetcher(f *testing.F) {
 	})
 }
 
-func TestFetchWithPlatformFilter(t *testing.T) {
-	f, queries, _ := newTestFetcher(t, []map[string]any{
-		{"name": "Mega Man", "cover": 1},
-	})
-
-	_, err := f.Fetch("Mega Man", "NES", []int{18, 99})
-	if err != nil {
-		t.Fatalf("Fetch returned error: %v", err)
+func TestIntsToStrings(t *testing.T) {
+	tests := []struct {
+		input []int
+		want  []string
+	}{
+		{[]int{18}, []string{"18"}},
+		{[]int{18, 99}, []string{"18", "99"}},
+		{[]int{}, []string{}},
 	}
-
-	if len(*queries) == 0 {
-		t.Fatal("no queries recorded")
-	}
-
-	query := (*queries)[0]
-	if !strings.Contains(query, "where platforms = (18,99)") {
-		t.Errorf("query missing platform filter: %s", query)
-	}
-	if !strings.Contains(query, "limit 5") {
-		t.Errorf("query should use limit 5: %s", query)
-	}
-	if !strings.Contains(query, "fields name, cover") {
-		t.Errorf("query should request name field: %s", query)
-	}
-}
-
-func TestFetchWithoutPlatformFilter(t *testing.T) {
-	f, queries, _ := newTestFetcher(t, []map[string]any{
-		{"name": "Mega Man", "cover": 1},
-	})
-
-	_, err := f.Fetch("Mega Man", "NES", nil)
-	if err != nil {
-		t.Fatalf("Fetch returned error: %v", err)
-	}
-
-	if len(*queries) == 0 {
-		t.Fatal("no queries recorded")
-	}
-
-	query := (*queries)[0]
-	if strings.Contains(query, "where platforms") {
-		t.Errorf("query should NOT have platform filter when IDs are nil: %s", query)
-	}
-	if !strings.Contains(query, "limit 5") {
-		t.Errorf("query should use limit 5: %s", query)
-	}
-}
-
-func TestFetchNameMatching(t *testing.T) {
-	f, _, ts := newTestFetcher(t, []map[string]any{
-		{"name": "Mega Man X", "cover": 10},
-		{"name": "Mega Man", "cover": 20},
-		{"name": "Mega Man 2", "cover": 30},
-	})
-
-	coverQueries := interceptCoverQueries(ts)
-
-	_, err := f.Fetch("Mega Man", "NES", nil)
-	if err != nil {
-		t.Fatalf("Fetch returned error: %v", err)
-	}
-
-	// Should have requested cover ID 20 (the exact name match), not 10 (first result)
-	if len(*coverQueries) == 0 {
-		t.Fatal("no cover queries recorded")
-	}
-	if !strings.Contains((*coverQueries)[0], "where id = 20") {
-		t.Errorf("should pick exact name match (cover 20), got query: %s", (*coverQueries)[0])
-	}
-}
-
-func TestFetchFirstCoverFallback(t *testing.T) {
-	f, _, ts := newTestFetcher(t, []map[string]any{
-		{"name": "Mega Man X", "cover": 10},
-		{"name": "Mega Man 2", "cover": 20},
-	})
-
-	coverQueries := interceptCoverQueries(ts)
-
-	// Search for a name that doesn't exactly match any result
-	img, err := f.Fetch("Mega Man", "NES", nil)
-	if err != nil {
-		t.Fatalf("Fetch returned error: %v", err)
-	}
-	if img == nil {
-		t.Fatal("expected non-nil image when results with covers exist")
-	}
-	// Should pick the first result with a cover (cover ID 10)
-	if len(*coverQueries) == 0 {
-		t.Fatal("no cover queries recorded")
-	}
-	if !strings.Contains((*coverQueries)[0], "where id = 10") {
-		t.Errorf("should fall back to first result with cover (10), got query: %s", (*coverQueries)[0])
-	}
-}
-
-func TestFetchCaseInsensitiveMatch(t *testing.T) {
-	// First result is a different game; second is a case-insensitive match.
-	// EqualFold should prefer the case-insensitive match over the first result.
-	f, _, ts := newTestFetcher(t, []map[string]any{
-		{"name": "Mega Man X", "cover": 10},
-		{"name": "mega man", "cover": 20},
-	})
-
-	coverQueries := interceptCoverQueries(ts)
-
-	// Search with different casing — should match case-insensitively
-	img, err := f.Fetch("Mega Man", "NES", nil)
-	if err != nil {
-		t.Fatalf("Fetch returned error: %v", err)
-	}
-	if img == nil {
-		t.Fatal("expected non-nil image for case-insensitive match")
-	}
-	// Should pick the case-insensitive match (cover ID 20), not first result (10)
-	if len(*coverQueries) == 0 {
-		t.Fatal("no cover queries recorded")
-	}
-	if !strings.Contains((*coverQueries)[0], "where id = 20") {
-		t.Errorf("should pick case-insensitive match (20), got query: %s", (*coverQueries)[0])
-	}
-}
-
-func TestFetchNoResults(t *testing.T) {
-	f, _, _ := newTestFetcher(t, []map[string]any{})
-
-	img, err := f.Fetch("Nonexistent Game", "NES", []int{18})
-	if err != nil {
-		t.Fatalf("Fetch returned error: %v", err)
-	}
-	if img != nil {
-		t.Error("expected nil image for no results")
-	}
-}
-
-func TestFetchAllResultsNoCover(t *testing.T) {
-	f, _, _ := newTestFetcher(t, []map[string]any{
-		{"name": "Game A", "cover": 0},
-		{"name": "Game B", "cover": 0},
-	})
-
-	img, err := f.Fetch("Game A", "NES", nil)
-	if err != nil {
-		t.Fatalf("Fetch returned error: %v", err)
-	}
-	if img != nil {
-		t.Error("expected nil image when no results have cover art")
-	}
-}
-
-// rewriteTransport redirects all HTTP requests to a test server URL.
-type rewriteTransport struct {
-	base   http.RoundTripper
-	target string
-}
-
-func (t *rewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.URL.Scheme = "http"
-	// Extract just the host:port from target
-	req.URL.Host = strings.TrimPrefix(t.target, "http://")
-	return t.base.RoundTrip(req)
-}
-
-func TestGetTokenNon200(t *testing.T) {
-	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/oauth2/token") {
-			w.WriteHeader(http.StatusForbidden)
-			_, _ = w.Write([]byte("forbidden"))
-			return
+	for _, tt := range tests {
+		got := intsToStrings(tt.input)
+		if len(got) != len(tt.want) {
+			t.Errorf(
+				"intsToStrings(%v) = %v, want %v",
+				tt.input, got, tt.want,
+			)
+			continue
 		}
-	}))
-
-	_, err := f.Fetch("Test", "NES", nil)
-	if err == nil {
-		t.Fatal("expected error for non-200 token response")
-	}
-	if !strings.Contains(err.Error(), "403") {
-		t.Errorf("error should mention status code: %v", err)
-	}
-}
-
-func TestGetTokenDecodeError(t *testing.T) {
-	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/oauth2/token") {
-			_, _ = w.Write([]byte("not json"))
-			return
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Errorf(
+					"intsToStrings(%v)[%d] = %q, want %q",
+					tt.input, i, got[i], tt.want[i],
+				)
+			}
 		}
-	}))
-
-	_, err := f.Fetch("Test", "NES", nil)
-	if err == nil {
-		t.Fatal("expected error for invalid token JSON")
-	}
-	if !strings.Contains(err.Error(), "parsing token response") {
-		t.Errorf("unexpected error message: %v", err)
 	}
 }
 
-func TestFetchAPIErrorNon200(t *testing.T) {
-	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestSearchGameExactMatch(t *testing.T) {
+	searchResp, _ := json.Marshal([]map[string]any{
+		{"id": 42, "name": "Mega Man X"},
+		{"id": 17, "name": "Mega Man"},
+		{"id": 99, "name": "Mega Man 2"},
+	})
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write(searchResp)
+		}
+	})
+
+	id, err := f.SearchGame("Mega Man", nil)
+	if err != nil {
+		t.Fatalf("SearchGame returned error: %v", err)
+	}
+	if id != 17 {
+		t.Errorf("SearchGame() = %d, want 17 (exact match)", id)
+	}
+}
+
+func TestSearchGameNoMatch(t *testing.T) {
+	searchResp, _ := json.Marshal([]map[string]any{
+		{"id": 42, "name": "Mega Man X"},
+	})
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write(searchResp)
+		}
+	})
+
+	id, err := f.SearchGame("Mega Man", nil)
+	if err != nil {
+		t.Fatalf("SearchGame returned error: %v", err)
+	}
+	if id != 0 {
+		t.Errorf("SearchGame() = %d, want 0 (no exact match)", id)
+	}
+}
+
+func TestSearchGameWithPlatformFilter(t *testing.T) {
+	var capturedQuery string
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			body := make([]byte, r.ContentLength)
+			_, _ = r.Body.Read(body)
+			capturedQuery = string(body)
+			resp, _ := json.Marshal([]map[string]any{
+				{"id": 18, "name": "Metroid"},
+			})
+			_, _ = w.Write(resp)
+		}
+	})
+
+	_, err := f.SearchGame("Metroid", []int{18, 99})
+	if err != nil {
+		t.Fatalf("SearchGame returned error: %v", err)
+	}
+	if !strings.Contains(capturedQuery, "where platforms = (18,99)") {
+		t.Errorf("query missing platform filter: %s", capturedQuery)
+	}
+}
+
+func TestFetchDetailsByID(t *testing.T) {
+	detailsResp, _ := json.Marshal([]map[string]any{
+		{
+			"id":                 17,
+			"name":               "Mega Man",
+			"url":                "https://www.igdb.com/games/mega-man",
+			"summary":            "A platformer.",
+			"storyline":          "A robot fights evil.",
+			"first_release_date": int64(565_920_000),
+			"cover":              map[string]any{"url": "//images.igdb.com/t_thumb/abc.jpg"},
+			"platforms":          []map[string]any{{"name": "NES"}},
+			"involved_companies": []map[string]any{
+				{
+					"company":   map[string]any{"name": "Capcom"},
+					"developer": true,
+					"publisher": true,
+				},
+			},
+			"collection":  map[string]any{"name": "Mega Man"},
+			"screenshots": []map[string]any{{"url": "//images.igdb.com/t_thumb/ss1.jpg"}},
+			"artworks":    []map[string]any{{"url": "//images.igdb.com/t_thumb/art1.jpg"}},
+		},
+	})
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write(detailsResp)
+		}
+	})
+
+	details, err := f.FetchDetailsByID(17)
+	if err != nil {
+		t.Fatalf("FetchDetailsByID returned error: %v", err)
+	}
+	if details == nil {
+		t.Fatal("expected non-nil details")
+	}
+	if details.Name != "Mega Man" {
+		t.Errorf("Name = %q, want %q", details.Name, "Mega Man")
+	}
+	if details.Summary != "A platformer." {
+		t.Errorf("Summary = %q, want %q", details.Summary, "A platformer.")
+	}
+	if details.Storyline != "A robot fights evil." {
+		t.Errorf("Storyline = %q, want %q", details.Storyline, "A robot fights evil.")
+	}
+	if details.FirstReleaseDate != "1987-12-08" {
+		t.Errorf(
+			"FirstReleaseDate = %q, want %q",
+			details.FirstReleaseDate, "1987-12-08",
+		)
+	}
+	if len(details.Platforms) != 1 || details.Platforms[0] != "NES" {
+		t.Errorf("Platforms = %v, want [NES]", details.Platforms)
+	}
+	if len(details.Developers) != 1 || details.Developers[0] != "Capcom" {
+		t.Errorf("Developers = %v, want [Capcom]", details.Developers)
+	}
+	if len(details.Publishers) != 1 || details.Publishers[0] != "Capcom" {
+		t.Errorf("Publishers = %v, want [Capcom]", details.Publishers)
+	}
+	if details.IGDBURL != "https://www.igdb.com/games/mega-man" {
+		t.Errorf(
+			"IGDBURL = %q, want %q",
+			details.IGDBURL, "https://www.igdb.com/games/mega-man",
+		)
+	}
+	if details.Collection != "Mega Man" {
+		t.Errorf("Collection = %q, want %q", details.Collection, "Mega Man")
+	}
+	if !strings.Contains(details.CoverURL, "t_original") {
+		t.Errorf("CoverURL should use t_original, got %q", details.CoverURL)
+	}
+	if len(details.Screenshots) != 1 {
+		t.Fatalf("Screenshots len = %d, want 1", len(details.Screenshots))
+	}
+	if !strings.Contains(details.Screenshots[0], "t_original") {
+		t.Errorf("Screenshot URL should use t_original, got %q", details.Screenshots[0])
+	}
+	if len(details.Artworks) != 1 {
+		t.Fatalf("Artworks len = %d, want 1", len(details.Artworks))
+	}
+	if !strings.Contains(details.Artworks[0], "t_original") {
+		t.Errorf("Artwork URL should use t_original, got %q", details.Artworks[0])
+	}
+}
+
+func TestFetchDetailsByIDNotFound(t *testing.T) {
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write([]byte("[]"))
+		}
+	})
+
+	details, err := f.FetchDetailsByID(999)
+	if err != nil {
+		t.Fatalf("FetchDetailsByID returned error: %v", err)
+	}
+	if details != nil {
+		t.Errorf("expected nil details for empty response, got %+v", details)
+	}
+}
+
+// TestAPIRequestRetryOn401 verifies that apiRequest clears the cached token
+// and retries once when the games endpoint returns HTTP 401.
+func TestAPIRequestRetryOn401(t *testing.T) {
+	var gamesHits atomic.Int32
+
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			n := gamesHits.Add(1)
+			if n == 1 {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			resp, _ := json.Marshal([]map[string]any{
+				{"id": 7, "name": "Contra"},
+			})
+			_, _ = w.Write(resp)
+		}
+	})
+
+	id, err := f.SearchGame("Contra", nil)
+	if err != nil {
+		t.Fatalf("SearchGame returned error: %v", err)
+	}
+	if id != 7 {
+		t.Errorf("SearchGame() = %d, want 7", id)
+	}
+	if gamesHits.Load() != 2 {
+		t.Errorf("expected 2 games endpoint hits, got %d", gamesHits.Load())
+	}
+}
+
+// TestAPIRequestNon200Error verifies that a non-200, non-401 response from
+// the games endpoint is surfaced as an error containing the status code.
+func TestAPIRequestNon200Error(t *testing.T) {
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
 			writeTokenResponse(w)
 		case strings.HasSuffix(r.URL.Path, "/v4/games"):
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte("server error"))
 		}
-	}))
-
-	_, err := f.Fetch("Test", "NES", nil)
-	if err == nil {
-		t.Fatal("expected error for 500 API response")
-	}
-	if !strings.Contains(err.Error(), "500") {
-		t.Errorf("error should mention status code: %v", err)
-	}
-}
-
-func TestFetchEmptyCoverURL(t *testing.T) {
-	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_ = json.NewEncoder(w).Encode([]map[string]any{
-				{"name": "Test Game", "cover": 1},
-			})
-		case strings.HasSuffix(r.URL.Path, "/v4/covers"):
-			_ = json.NewEncoder(w).Encode([]map[string]string{
-				{"url": ""},
-			})
-		}
-	}))
-
-	img, err := f.Fetch("Test Game", "NES", nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if img != nil {
-		t.Error("expected nil image for empty cover URL")
-	}
-}
-
-func TestFetchCoverImageNon200(t *testing.T) {
-	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_ = json.NewEncoder(w).Encode([]map[string]any{
-				{"name": "Test Game", "cover": 1},
-			})
-		case strings.HasSuffix(r.URL.Path, "/v4/covers"):
-			_ = json.NewEncoder(w).Encode([]map[string]string{
-				{"url": "//images.igdb.com/t_thumb/cover.jpg"},
-			})
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-
-	_, err := f.Fetch("Test Game", "NES", nil)
-	if err == nil {
-		t.Fatal("expected error for non-200 image response")
-	}
-	if !strings.Contains(err.Error(), "cover image returned") {
-		t.Errorf("unexpected error message: %v", err)
-	}
-}
-
-// TestFetchTokenRetryOn401 verifies that apiRequestRetry clears the stale
-// token and retries the request when the server responds with 401.
-func TestFetchTokenRetryOn401(t *testing.T) {
-	var gamesCallCount atomic.Int32
-
-	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
-	img.Set(0, 0, color.RGBA{R: 255, A: 255})
-
-	gamesResp, _ := json.Marshal([]map[string]any{
-		{"name": "Test Game", "cover": 1},
 	})
 
-	f := newTestFetcherWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	_, err := f.SearchGame("Contra", nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "IGDB returned 500") {
+		t.Errorf("error should mention \"IGDB returned 500\", got: %v", err)
+	}
+}
+
+// TestGetTokenCaching verifies that a valid cached token is reused across
+// multiple calls so that only one OAuth request is made.
+func TestGetTokenCaching(t *testing.T) {
+	var tokenHits atomic.Int32
+
+	searchResp, _ := json.Marshal([]map[string]any{
+		{"id": 1, "name": "Tetris"},
+	})
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"access_token": "fresh-token",
-				"expires_in":   3600,
-			})
-
+			tokenHits.Add(1)
+			writeTokenResponse(w)
 		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			n := gamesCallCount.Add(1)
-			if n == 1 {
-				// Simulate an expired token on the first request.
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-			_, _ = w.Write(gamesResp)
-
-		case strings.HasSuffix(r.URL.Path, "/v4/covers"):
-			_ = json.NewEncoder(w).Encode([]map[string]string{
-				{"url": "//images.igdb.com/t_thumb/cover.jpg"},
-			})
-
-		default:
-			// Serve a cover image for all other paths (image download).
-			w.Header().Set("Content-Type", "image/png")
-			_ = png.Encode(w, img)
+			_, _ = w.Write(searchResp)
 		}
-	}))
+	})
 
-	// Pre-set a stale token so the first request uses it without calling the
-	// token endpoint, triggering the 401 path.
-	f.token = "stale-token"
-	f.tokenExpiry = time.Now().Add(time.Hour)
-
-	result, err := f.Fetch("Test Game", "NES", nil)
-	if err != nil {
-		t.Fatalf("Fetch returned unexpected error: %v", err)
+	if _, err := f.SearchGame("Tetris", nil); err != nil {
+		t.Fatalf("first SearchGame error: %v", err)
 	}
-	if result == nil {
-		t.Fatal("expected non-nil image, got nil")
+	if _, err := f.SearchGame("Tetris", nil); err != nil {
+		t.Fatalf("second SearchGame error: %v", err)
 	}
+	if tokenHits.Load() != 1 {
+		t.Errorf("expected 1 token request, got %d", tokenHits.Load())
+	}
+}
 
-	if n := gamesCallCount.Load(); n < 2 {
-		t.Errorf("expected at least 2 /v4/games requests (initial + retry), got %d", n)
+// TestGetTokenOAuthError verifies that an HTTP 400 from the token endpoint
+// propagates as an error from SearchGame.
+func TestGetTokenOAuthError(t *testing.T) {
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/oauth2/token") {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"message":"invalid credentials"}`))
+		}
+	})
+
+	_, err := f.SearchGame("Tetris", nil)
+	if err == nil {
+		t.Fatal("expected error from OAuth failure, got nil")
+	}
+	if !strings.Contains(err.Error(), "token request returned 400") {
+		t.Errorf("error should mention \"token request returned 400\", got: %v", err)
+	}
+}
+
+// TestGetTokenMalformedJSON verifies that malformed JSON from the token
+// endpoint propagates as a parse error from SearchGame.
+func TestGetTokenMalformedJSON(t *testing.T) {
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/oauth2/token") {
+			_, _ = w.Write([]byte(`{invalid`))
+		}
+	})
+
+	_, err := f.SearchGame("Tetris", nil)
+	if err == nil {
+		t.Fatal("expected parse error, got nil")
+	}
+}
+
+// TestSearchGameAPIError verifies that a 500 from the games endpoint
+// propagates as an error from SearchGame.
+func TestSearchGameAPIError(t *testing.T) {
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+
+	_, err := f.SearchGame("Tetris", nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestSearchGameMalformedJSON verifies that malformed JSON from the games
+// endpoint propagates as a parse error from SearchGame.
+func TestSearchGameMalformedJSON(t *testing.T) {
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write([]byte(`{invalid`))
+		}
+	})
+
+	_, err := f.SearchGame("Tetris", nil)
+	if err == nil {
+		t.Fatal("expected parse error, got nil")
+	}
+}
+
+// TestFetchDetailsByIDAPIError verifies that a 500 from the games endpoint
+// propagates as an error from FetchDetailsByID.
+func TestFetchDetailsByIDAPIError(t *testing.T) {
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+
+	_, err := f.FetchDetailsByID(17)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestFetchDetailsByIDMalformedJSON verifies that malformed JSON from the
+// games endpoint propagates as a parse error from FetchDetailsByID.
+func TestFetchDetailsByIDMalformedJSON(t *testing.T) {
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write([]byte(`{invalid`))
+		}
+	})
+
+	_, err := f.FetchDetailsByID(17)
+	if err == nil {
+		t.Fatal("expected parse error, got nil")
 	}
 }
