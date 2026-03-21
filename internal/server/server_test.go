@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -29,16 +28,10 @@ var testEmulatorjsFS = fstest.MapFS{
 	"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
 }
 
-// testServerOpts holds optional dependencies for newTestServer.
-type testServerOpts struct {
-	cache   DetailsCache
-	fetcher DetailsFetcher
-}
-
 // newTestServer creates a Server wired with a temp ROM dir, a BIOS file, and
-// optional cache/fetcher dependencies. It is the single server-construction
-// helper for all tests in this package.
-func newTestServer(t *testing.T, opts testServerOpts) (*Server, string) {
+// an optional DetailsCache. It is the single server-construction helper for
+// all tests in this package.
+func newTestServer(t *testing.T, dc DetailsCache) (*Server, string) {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -73,29 +66,22 @@ func newTestServer(t *testing.T, opts testServerOpts) (*Server, string) {
 		},
 	}
 
-	srv, err := New(cfg, dir, testFrontendFS, testEmulatorjsFS, opts.cache, opts.fetcher)
+	srv, err := New(cfg, dir, testFrontendFS, testEmulatorjsFS, dc)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return srv, dir
 }
 
-// testServer is a convenience wrapper around newTestServer for tests that only
-// need an optional DetailsCache and no DetailsFetcher.
+// testServer is a convenience wrapper around newTestServer for tests that do
+// not need a DetailsCache.
 func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
 	t.Helper()
-	var opts testServerOpts
+	var cache DetailsCache
 	if len(dc) > 0 {
-		opts.cache = dc[0]
+		cache = dc[0]
 	}
-	return newTestServer(t, opts)
-}
-
-// testServerWithDetails is a convenience wrapper around newTestServer for
-// tests that exercise the DetailsFetcher path.
-func testServerWithDetails(t *testing.T, df DetailsFetcher) (*Server, string) {
-	t.Helper()
-	return newTestServer(t, testServerOpts{fetcher: df})
+	return newTestServer(t, cache)
 }
 
 func TestHealthEndpoint(t *testing.T) {
@@ -395,8 +381,8 @@ func TestDetailsPage(t *testing.T) {
 	}
 }
 
-func TestGameDetailsNoFetcher(t *testing.T) {
-	srv, _ := testServer(t) // detailsFetcher is nil
+func TestGameDetailsNoCache(t *testing.T) {
+	srv, _ := testServer(t) // detailsCache is nil
 
 	req := httptest.NewRequest("GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil)
 	w := httptest.NewRecorder()
@@ -408,7 +394,7 @@ func TestGameDetailsNoFetcher(t *testing.T) {
 }
 
 func TestGameDetailsMissingParams(t *testing.T) {
-	srv, _ := testServerWithDetails(t, &mockDetailsFetcher{})
+	srv, _ := testServer(t, &mockDetailsCache{})
 
 	req := httptest.NewRequest("GET", "/api/game-details", nil)
 	w := httptest.NewRecorder()
@@ -419,53 +405,8 @@ func TestGameDetailsMissingParams(t *testing.T) {
 	}
 }
 
-type mockDetailsFetcher struct {
-	details *covers.GameDetails
-	err     error
-}
-
-func (m *mockDetailsFetcher) FetchDetails(_ string, _ []int) (*covers.GameDetails, error) {
-	return m.details, m.err
-}
-
-func TestGameDetailsSuccess(t *testing.T) {
-	details := &covers.GameDetails{
-		Name:             "Mega Man",
-		Summary:          "A platformer.",
-		FirstReleaseDate: "1987-12-17",
-		Developers:       []string{"Capcom"},
-		Publishers:       []string{"Capcom"},
-		Platforms:        []string{"NES"},
-	}
-	srv, _ := testServerWithDetails(t, &mockDetailsFetcher{details: details})
-
-	req := httptest.NewRequest("GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Fatalf("got status %d, want 200", w.Code)
-	}
-
-	ct := w.Header().Get("Content-Type")
-	if ct != "application/json" {
-		t.Errorf("Content-Type = %q, want application/json", ct)
-	}
-
-	var got covers.GameDetails
-	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
-		t.Fatalf("invalid JSON: %v", err)
-	}
-	if got.Name != "Mega Man" {
-		t.Errorf("name = %q, want %q", got.Name, "Mega Man")
-	}
-	if got.Summary != "A platformer." {
-		t.Errorf("summary = %q, want %q", got.Summary, "A platformer.")
-	}
-}
-
-func TestGameDetailsNotFound(t *testing.T) {
-	srv, _ := testServerWithDetails(t, &mockDetailsFetcher{details: nil})
+func TestGameDetailsCacheMiss404(t *testing.T) {
+	srv, _ := testServer(t, &mockDetailsCache{}) // cache returns nil for all Gets
 
 	req := httptest.NewRequest("GET", "/api/game-details?console=NES&rom=Unknown.nes", nil)
 	w := httptest.NewRecorder()
@@ -473,18 +414,6 @@ func TestGameDetailsNotFound(t *testing.T) {
 
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
-	}
-}
-
-func TestGameDetailsFetchError(t *testing.T) {
-	srv, _ := testServerWithDetails(t, &mockDetailsFetcher{err: fmt.Errorf("network error")})
-
-	req := httptest.NewRequest("GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
-	if w.Code != 503 {
-		t.Errorf("got status %d, want 503", w.Code)
 	}
 }
 
@@ -657,7 +586,7 @@ func (m *mockDetailsCache) Get(console, rom string) *covers.GameDetails {
 }
 
 func TestStatusEndpointNilCover(t *testing.T) {
-	srv, _ := testServer(t) // detailsCache is nil, detailsFetcher is nil
+	srv, _ := testServer(t) // detailsCache is nil
 
 	req := httptest.NewRequest("GET", "/api/status", nil)
 	w := httptest.NewRecorder()
@@ -750,35 +679,6 @@ func TestGameDetailsFromCache(t *testing.T) {
 	}
 	if got.Summary != "Cached summary." {
 		t.Errorf("Summary = %q, want %q", got.Summary, "Cached summary.")
-	}
-}
-
-func TestGameDetailsCacheMissFallsBackToFetcher(t *testing.T) {
-	cache := &mockDetailsCache{} // returns nil for all Gets
-	fetcher := &mockDetailsFetcher{
-		details: &covers.GameDetails{
-			Name:    "Mega Man",
-			Summary: "Live summary.",
-		},
-	}
-	srv, _ := newTestServer(t, testServerOpts{cache: cache, fetcher: fetcher})
-
-	req := httptest.NewRequest(
-		"GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil,
-	)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Fatalf("got status %d, want 200", w.Code)
-	}
-
-	var got covers.GameDetails
-	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
-		t.Fatalf("invalid JSON: %v", err)
-	}
-	if got.Summary != "Live summary." {
-		t.Errorf("Summary = %q, want live summary", got.Summary)
 	}
 }
 

@@ -197,26 +197,6 @@ func (f *IGDBFetcher) FetchDetailsByID(gameID int) (*GameDetails, error) {
 	return gameDetailsFromIGDB(games[0]), nil
 }
 
-// FetchDetails retrieves game metadata from IGDB by searching for gameName.
-// Returns nil if the game is not found.
-func (f *IGDBFetcher) FetchDetails(gameName string, platformIDs []int) (*GameDetails, error) {
-	gameID, err := f.SearchGame(gameName, platformIDs)
-	if err != nil {
-		return nil, err
-	}
-	if gameID == 0 && len(platformIDs) > 0 {
-		// Retry without platform constraint
-		gameID, err = f.SearchGame(gameName, nil)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if gameID == 0 {
-		return nil, nil
-	}
-	return f.FetchDetailsByID(gameID)
-}
-
 // igdbGame is the raw IGDB API response shape for a game record.
 type igdbGame struct {
 	Name             string `json:"name"`
