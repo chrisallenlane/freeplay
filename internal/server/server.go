@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
+	"github.com/chrisallenlane/freeplay/internal/covers"
 	"github.com/chrisallenlane/freeplay/internal/saves"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
@@ -22,22 +23,28 @@ type CoverStatus interface {
 	Fetching() bool
 }
 
+// DetailsFetcher retrieves game metadata from IGDB.
+type DetailsFetcher interface {
+	FetchDetails(gameName string, platformIDs []int) (*covers.GameDetails, error)
+}
+
 // Server is the Freeplay HTTP server.
 type Server struct {
-	cfg           *config.Config
-	dataDir       string
-	scanner       *scanner.Scanner
-	saves         *saves.Manager
-	coverStatus   CoverStatus
-	frontendSub   fs.FS
-	emulatorjsSub fs.FS
-	mux           *http.ServeMux
-	handler       http.Handler
+	cfg            *config.Config
+	dataDir        string
+	scanner        *scanner.Scanner
+	saves          *saves.Manager
+	coverStatus    CoverStatus
+	detailsFetcher DetailsFetcher
+	frontendSub    fs.FS
+	emulatorjsSub  fs.FS
+	mux            *http.ServeMux
+	handler        http.Handler
 }
 
 // New creates a configured Server ready to listen.
-// coverStatus may be nil if cover art fetching is not configured.
-func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS, coverStatus CoverStatus) (*Server, error) {
+// coverStatus and detailsFetcher may be nil if IGDB is not configured.
+func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS, coverStatus CoverStatus, detailsFetcher DetailsFetcher) (*Server, error) {
 	frontendSub, err := fs.Sub(frontendFS, "frontend")
 	if err != nil {
 		return nil, fmt.Errorf("frontend fs: %w", err)
@@ -48,14 +55,15 @@ func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS, cov
 	}
 
 	s := &Server{
-		cfg:           cfg,
-		dataDir:       dataDir,
-		scanner:       scanner.New(cfg, dataDir),
-		saves:         saves.New(dataDir),
-		coverStatus:   coverStatus,
-		frontendSub:   frontendSub,
-		emulatorjsSub: emulatorjsSub,
-		mux:           http.NewServeMux(),
+		cfg:            cfg,
+		dataDir:        dataDir,
+		scanner:        scanner.New(cfg, dataDir),
+		saves:          saves.New(dataDir),
+		coverStatus:    coverStatus,
+		detailsFetcher: detailsFetcher,
+		frontendSub:    frontendSub,
+		emulatorjsSub:  emulatorjsSub,
+		mux:            http.NewServeMux(),
 	}
 	s.routes()
 	s.handler = securityHeaders(s.mux)
@@ -105,6 +113,10 @@ func (s *Server) routes() {
 
 	// Embedded EmulatorJS — immutable cache; assets are embedded at build time
 	s.mux.Handle("/emulatorjs/", longCache(http.StripPrefix("/emulatorjs/", http.FileServerFS(s.emulatorjsSub))))
+
+	// Game details
+	s.mux.HandleFunc("GET /api/game-details", s.handleGameDetails)
+	s.mux.HandleFunc("GET /details", s.handleDetailsPage)
 
 	// Player page (explicit route before catch-all)
 	s.mux.HandleFunc("GET /play", s.handlePlay)
@@ -161,6 +173,52 @@ func (s *Server) handleManuals(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFileFS(w, r, s.frontendSub, "play.html")
+}
+
+func (s *Server) handleDetailsPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFileFS(w, r, s.frontendSub, "details.html")
+}
+
+func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
+	if s.detailsFetcher == nil {
+		http.Error(w, `{"error":"IGDB not configured"}`, http.StatusNotFound)
+		return
+	}
+
+	consoleName := r.URL.Query().Get("console")
+	rom := r.URL.Query().Get("rom")
+	if consoleName == "" || rom == "" {
+		http.Error(w, `{"error":"console and rom parameters required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Look up platform IDs from config
+	var platformIDs []int
+	if romCfg, ok := s.cfg.ROMs[consoleName]; ok {
+		platformIDs = romCfg.IGDBPlatformIDs
+	}
+
+	// Strip extension from ROM filename for IGDB search
+	ext := filepath.Ext(rom)
+	gameName := covers.CleanName(strings.TrimSuffix(rom, ext))
+	if gameName == "" {
+		http.Error(w, `{"error":"invalid rom name"}`, http.StatusBadRequest)
+		return
+	}
+
+	details, err := s.detailsFetcher.FetchDetails(gameName, platformIDs)
+	if err != nil {
+		http.Error(w, `{"error":"IGDB request failed"}`, http.StatusServiceUnavailable)
+		return
+	}
+	if details == nil {
+		http.Error(w, `{"error":"game not found"}`, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(details)
 }
 
 func noCache(next http.Handler) http.Handler {
@@ -228,7 +286,10 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	fetching := s.coverStatus != nil && s.coverStatus.Fetching()
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]bool{"fetchingCovers": fetching})
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"fetchingCovers": fetching,
+		"igdbConfigured": s.detailsFetcher != nil,
+	})
 }
 
 func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {

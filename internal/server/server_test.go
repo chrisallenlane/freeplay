@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"testing/fstest"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
+	"github.com/chrisallenlane/freeplay/internal/covers"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
@@ -44,8 +46,9 @@ func testServer(t *testing.T, coverStatus ...CoverStatus) (*Server, string) {
 	}
 
 	frontendFS := fstest.MapFS{
-		"frontend/index.html": &fstest.MapFile{Data: []byte("<html>index</html>")},
-		"frontend/play.html":  &fstest.MapFile{Data: []byte("<html>play</html>")},
+		"frontend/index.html":   &fstest.MapFile{Data: []byte("<html>index</html>")},
+		"frontend/play.html":    &fstest.MapFile{Data: []byte("<html>play</html>")},
+		"frontend/details.html": &fstest.MapFile{Data: []byte("<html>details</html>")},
 	}
 	emulatorjsFS := fstest.MapFS{
 		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
@@ -56,7 +59,7 @@ func testServer(t *testing.T, coverStatus ...CoverStatus) (*Server, string) {
 		cs = coverStatus[0]
 	}
 
-	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, cs)
+	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, cs, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,6 +351,146 @@ func TestManualsNotFound(t *testing.T) {
 	}
 }
 
+func TestDetailsPage(t *testing.T) {
+	srv, _ := testServer(t)
+
+	req := httptest.NewRequest("GET", "/details?console=NES&rom=Mega+Man.nes", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+}
+
+func TestGameDetailsNoFetcher(t *testing.T) {
+	srv, _ := testServer(t) // detailsFetcher is nil
+
+	req := httptest.NewRequest("GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 404 {
+		t.Errorf("got status %d, want 404", w.Code)
+	}
+}
+
+func TestGameDetailsMissingParams(t *testing.T) {
+	srv, _ := testServerWithDetails(t, &mockDetailsFetcher{})
+
+	req := httptest.NewRequest("GET", "/api/game-details", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Errorf("got status %d, want 400", w.Code)
+	}
+}
+
+type mockDetailsFetcher struct {
+	details *covers.GameDetails
+	err     error
+}
+
+func (m *mockDetailsFetcher) FetchDetails(_ string, _ []int) (*covers.GameDetails, error) {
+	return m.details, m.err
+}
+
+func testServerWithDetails(t *testing.T, df DetailsFetcher) (*Server, string) {
+	t.Helper()
+	dir := t.TempDir()
+
+	romDir := filepath.Join(dir, "roms", "NES")
+	if err := os.MkdirAll(romDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{
+		Port: 8080,
+		ROMs: map[string]config.ROM{
+			"NES": {Path: romDir, Core: "fceumm", IGDBPlatformIDs: []int{18}},
+		},
+	}
+
+	frontendFS := fstest.MapFS{
+		"frontend/index.html":   &fstest.MapFile{Data: []byte("<html>index</html>")},
+		"frontend/play.html":    &fstest.MapFile{Data: []byte("<html>play</html>")},
+		"frontend/details.html": &fstest.MapFile{Data: []byte("<html>details</html>")},
+	}
+	emulatorjsFS := fstest.MapFS{
+		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
+	}
+
+	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, nil, df)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return srv, dir
+}
+
+func TestGameDetailsSuccess(t *testing.T) {
+	details := &covers.GameDetails{
+		Name:             "Mega Man",
+		Summary:          "A platformer.",
+		FirstReleaseDate: "1987-12-17",
+		Developers:       []string{"Capcom"},
+		Publishers:       []string{"Capcom"},
+		Platforms:        []string{"NES"},
+	}
+	srv, _ := testServerWithDetails(t, &mockDetailsFetcher{details: details})
+
+	req := httptest.NewRequest("GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+
+	ct := w.Header().Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+
+	var got covers.GameDetails
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if got.Name != "Mega Man" {
+		t.Errorf("name = %q, want %q", got.Name, "Mega Man")
+	}
+	if got.Summary != "A platformer." {
+		t.Errorf("summary = %q, want %q", got.Summary, "A platformer.")
+	}
+}
+
+func TestGameDetailsNotFound(t *testing.T) {
+	srv, _ := testServerWithDetails(t, &mockDetailsFetcher{details: nil})
+
+	req := httptest.NewRequest("GET", "/api/game-details?console=NES&rom=Unknown.nes", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 404 {
+		t.Errorf("got status %d, want 404", w.Code)
+	}
+}
+
+func TestGameDetailsFetchError(t *testing.T) {
+	srv, _ := testServerWithDetails(t, &mockDetailsFetcher{err: fmt.Errorf("network error")})
+
+	req := httptest.NewRequest("GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 503 {
+		t.Errorf("got status %d, want 503", w.Code)
+	}
+}
+
 func TestCoversNotFound(t *testing.T) {
 	srv, _ := testServer(t)
 
@@ -510,7 +653,7 @@ func (m *mockCoverStatus) Fetching() bool {
 }
 
 func TestStatusEndpointNilCover(t *testing.T) {
-	srv, _ := testServer(t) // coverStatus is nil
+	srv, _ := testServer(t) // coverStatus is nil, detailsFetcher is nil
 
 	req := httptest.NewRequest("GET", "/api/status", nil)
 	w := httptest.NewRecorder()
@@ -520,12 +663,15 @@ func TestStatusEndpointNilCover(t *testing.T) {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
 
-	var body map[string]bool
+	var body map[string]any
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
-	if body["fetchingCovers"] {
+	if body["fetchingCovers"] != false {
 		t.Error("expected fetchingCovers=false with nil coverStatus")
+	}
+	if body["igdbConfigured"] != false {
+		t.Error("expected igdbConfigured=false with nil detailsFetcher")
 	}
 }
 
@@ -540,12 +686,32 @@ func TestStatusEndpointFetching(t *testing.T) {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
 
-	var body map[string]bool
+	var body map[string]any
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
-	if !body["fetchingCovers"] {
+	if body["fetchingCovers"] != true {
 		t.Error("expected fetchingCovers=true when fetcher is active")
+	}
+}
+
+func TestStatusEndpointIGDBConfigured(t *testing.T) {
+	srv, _ := testServerWithDetails(t, &mockDetailsFetcher{})
+
+	req := httptest.NewRequest("GET", "/api/status", nil)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if body["igdbConfigured"] != true {
+		t.Error("expected igdbConfigured=true when detailsFetcher is set")
 	}
 }
 

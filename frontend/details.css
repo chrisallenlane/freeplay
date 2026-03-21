@@ -1,0 +1,155 @@
+header {
+    padding: 12px 24px;
+    justify-content: normal;
+    gap: 16px;
+    position: relative;
+    z-index: 10;
+}
+
+header a {
+    color: var(--color-link);
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+
+header a:hover {
+    text-decoration: underline;
+}
+
+header a.btn:hover {
+    text-decoration: none;
+}
+
+header a:focus-visible {
+    outline: 2px solid var(--color-link);
+    outline-offset: 2px;
+}
+
+header .game-name {
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--color-text-bright);
+    margin: 0;
+}
+
+#theme-toggle {
+    margin-left: auto;
+}
+
+main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+.details-hero {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.details-cover {
+    width: 200px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    object-fit: cover;
+    aspect-ratio: 3 / 4;
+}
+
+.details-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.details-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--color-text-bright);
+}
+
+.details-info-line {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
+.details-link {
+    color: var(--color-link);
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+
+.details-link:hover {
+    text-decoration: underline;
+}
+
+.details-section {
+    margin-bottom: 24px;
+}
+
+.details-section h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-bright);
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.details-section p {
+    font-size: 0.875rem;
+    color: var(--color-text);
+    line-height: 1.6;
+}
+
+.details-cover-full {
+    display: block;
+    max-width: 100%;
+    margin: 0 auto;
+    border-radius: 8px;
+}
+
+.details-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+}
+
+.details-gallery img {
+    height: 180px;
+    border-radius: 6px;
+}
+
+.details-gallery-full {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.details-gallery-full img {
+    max-width: 100%;
+    border-radius: 6px;
+}
+
+.error-msg {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--color-error);
+    font-size: 1rem;
+}
+
+@media (max-width: 600px) {
+    .details-hero {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .details-cover {
+        width: 160px;
+    }
+}

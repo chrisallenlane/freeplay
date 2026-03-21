@@ -209,6 +209,142 @@ func (f *IGDBFetcher) Fetch(gameName string, _ string, platformIDs []int) (image
 	return img, nil
 }
 
+// GameDetails holds metadata fetched from IGDB for a game.
+type GameDetails struct {
+	Name             string   `json:"name"`
+	Summary          string   `json:"summary,omitempty"`
+	Storyline        string   `json:"storyline,omitempty"`
+	FirstReleaseDate string   `json:"firstReleaseDate,omitempty"`
+	Developers       []string `json:"developers,omitempty"`
+	Publishers       []string `json:"publishers,omitempty"`
+	Platforms        []string `json:"platforms,omitempty"`
+	Collection       string   `json:"collection,omitempty"`
+	IGDBURL          string   `json:"igdbUrl,omitempty"`
+	CoverURL         string   `json:"coverUrl,omitempty"`
+	Screenshots      []string `json:"screenshots,omitempty"`
+	Artworks         []string `json:"artworks,omitempty"`
+}
+
+// FetchDetails retrieves game metadata from IGDB.
+// Returns nil if the game is not found.
+func (f *IGDBFetcher) FetchDetails(gameName string, platformIDs []int) (*GameDetails, error) {
+	escaped := strings.ReplaceAll(gameName, `"`, `\"`)
+
+	fields := `name, url, summary, storyline, first_release_date, cover.url, ` +
+		`involved_companies.company.name, involved_companies.developer, involved_companies.publisher, ` +
+		`platforms.name, screenshots.url, artworks.url, collection.name`
+
+	var query string
+	if len(platformIDs) > 0 {
+		ids := intsToStrings(platformIDs)
+		query = fmt.Sprintf(`search "%s"; fields %s; where platforms = (%s); limit 5;`, escaped, fields, strings.Join(ids, ","))
+	} else {
+		query = fmt.Sprintf(`search "%s"; fields %s; limit 5;`, escaped, fields)
+	}
+
+	data, err := f.apiRequest("games", query)
+	if err != nil {
+		return nil, err
+	}
+
+	var games []struct {
+		Name             string `json:"name"`
+		URL              string `json:"url"`
+		Summary          string `json:"summary"`
+		Storyline        string `json:"storyline"`
+		FirstReleaseDate int64  `json:"first_release_date"`
+		Cover            struct {
+			URL string `json:"url"`
+		} `json:"cover"`
+		InvolvedCompanies []struct {
+			Company struct {
+				Name string `json:"name"`
+			} `json:"company"`
+			Developer bool `json:"developer"`
+			Publisher bool `json:"publisher"`
+		} `json:"involved_companies"`
+		Platforms []struct {
+			Name string `json:"name"`
+		} `json:"platforms"`
+		Screenshots []struct {
+			URL string `json:"url"`
+		} `json:"screenshots"`
+		Artworks []struct {
+			URL string `json:"url"`
+		} `json:"artworks"`
+		Collection struct {
+			Name string `json:"name"`
+		} `json:"collection"`
+	}
+	if err := json.Unmarshal(data, &games); err != nil {
+		return nil, fmt.Errorf("parsing game details search: %w", err)
+	}
+	if len(games) == 0 {
+		return nil, nil
+	}
+
+	// Pick best match: prefer case-insensitive exact name match, else first
+	best := 0
+	for i, g := range games {
+		if strings.EqualFold(g.Name, gameName) {
+			best = i
+			break
+		}
+	}
+
+	g := games[best]
+	details := &GameDetails{
+		Name:      g.Name,
+		IGDBURL:   g.URL,
+		Summary:   g.Summary,
+		Storyline: g.Storyline,
+	}
+
+	if g.Cover.URL != "" {
+		details.CoverURL = transformImageURL(g.Cover.URL, "t_original")
+	}
+
+	if g.FirstReleaseDate > 0 {
+		details.FirstReleaseDate = time.Unix(g.FirstReleaseDate, 0).UTC().Format("2006-01-02")
+	}
+
+	for _, ic := range g.InvolvedCompanies {
+		if ic.Developer {
+			details.Developers = append(details.Developers, ic.Company.Name)
+		}
+		if ic.Publisher {
+			details.Publishers = append(details.Publishers, ic.Company.Name)
+		}
+	}
+
+	for _, p := range g.Platforms {
+		details.Platforms = append(details.Platforms, p.Name)
+	}
+
+	if g.Collection.Name != "" {
+		details.Collection = g.Collection.Name
+	}
+
+	for _, s := range g.Screenshots {
+		details.Screenshots = append(details.Screenshots, transformImageURL(s.URL, "t_original"))
+	}
+
+	for _, a := range g.Artworks {
+		details.Artworks = append(details.Artworks, transformImageURL(a.URL, "t_original"))
+	}
+
+	return details, nil
+}
+
+// transformImageURL prepends https and replaces the size template in an IGDB image URL.
+func transformImageURL(rawURL, size string) string {
+	u := rawURL
+	if strings.HasPrefix(u, "//") {
+		u = "https:" + u
+	}
+	return strings.Replace(u, "t_thumb", size, 1)
+}
+
 func intsToStrings(ids []int) []string {
 	s := make([]string, len(ids))
 	for i, id := range ids {
