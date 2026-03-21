@@ -1,21 +1,12 @@
 (() => {
 	const FP = window.Freeplay;
 
-	const params = new URLSearchParams(window.location.search);
-	const consoleName = params.get("console");
-	const rom = params.get("rom");
-
-	if (!consoleName || !rom) {
+	const subpage = FP.initSubpage();
+	if (!subpage) {
 		showError("Missing console or rom parameter.");
 		return;
 	}
-
-	const gameName = FP.stripExt(rom);
-	const nameEl = document.getElementById("game-name");
-	nameEl.textContent = gameName;
-	document.title = `Freeplay - ${gameName}`;
-
-	FP.initThemeToggle();
+	const { consoleName, rom, gameName } = subpage;
 
 	const catalogPromise = fetch("/api/games").then((res) => res.json());
 	const detailsPromise = fetch(
@@ -143,11 +134,6 @@
 		}
 
 		if (details.coverUrl) {
-			const section = document.createElement("section");
-			section.className = "details-section";
-			const h3 = document.createElement("h3");
-			h3.textContent = "Cover Art";
-			section.appendChild(h3);
 			const link = document.createElement("a");
 			link.href = details.coverUrl;
 			const img = document.createElement("img");
@@ -155,8 +141,7 @@
 			img.alt = `${details.name} cover art`;
 			img.className = "details-cover-full";
 			link.appendChild(img);
-			section.appendChild(link);
-			content.appendChild(section);
+			appendSectionWithContent(content, "Cover Art", link);
 		}
 
 		if (details.screenshots?.length) {
@@ -171,6 +156,16 @@
 				"details-gallery-full",
 			);
 		}
+	}
+
+	function appendSectionWithContent(parent, heading, contentEl) {
+		const section = document.createElement("section");
+		section.className = "details-section";
+		const h3 = document.createElement("h3");
+		h3.textContent = heading;
+		section.appendChild(h3);
+		section.appendChild(contentEl);
+		parent.appendChild(section);
 	}
 
 	function appendSection(parent, heading, text) {
