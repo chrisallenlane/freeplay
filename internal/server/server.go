@@ -85,6 +85,15 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
+
+		// Reject cross-origin POST requests. A custom header forces a CORS
+		// preflight that the server will not grant, so browsers block the
+		// request before it is sent.
+		if r.Method == http.MethodPost && r.Header.Get("X-Requested-With") != "freeplay" {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }
@@ -317,7 +326,7 @@ func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir
 
 	fullPath := filepath.Join(baseDir, clean)
 
-	// Verify resolved path is within base directory
+	// Verify cleaned path is within base directory
 	if !strings.HasPrefix(fullPath, baseDir+string(filepath.Separator)) && fullPath != baseDir {
 		http.NotFound(w, r)
 		return

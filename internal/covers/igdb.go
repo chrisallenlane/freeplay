@@ -97,9 +97,9 @@ func (f *IGDBFetcher) apiRequest(endpoint, body string) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("IGDB request failed: %w", err)
 		}
-		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 {
+			_ = resp.Body.Close()
 			// Token expired, clear and retry once
 			f.mu.Lock()
 			f.token = ""
@@ -109,10 +109,13 @@ func (f *IGDBFetcher) apiRequest(endpoint, body string) ([]byte, error) {
 
 		if resp.StatusCode != http.StatusOK {
 			respBody, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
 			return nil, fmt.Errorf("IGDB returned %d: %s", resp.StatusCode, string(respBody))
 		}
 
-		return io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		_ = resp.Body.Close()
+		return data, err
 	}
 	// Unreachable: loop always returns or continues
 	return nil, fmt.Errorf("IGDB request failed after retry")

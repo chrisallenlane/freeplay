@@ -3,4 +3,5 @@ testdata/
 .tickets/
 .playwright-mcp/
 .tmp/
+coverage.out
 PROJECT_PROGRESS.md
