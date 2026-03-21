@@ -84,11 +84,8 @@
 		window.EJS_onSaveState = (data) => {
 			postSave("state", data.state);
 		};
-		window.EJS_onSaveSave = (data) => {
-			postSave("sram", data.save);
-		};
-
 		// Load SRAM save from server (if exists), then register periodic saves
+		let sramHandlerRegistered = false;
 		window.EJS_onGameStart = () => {
 			if (!window.EJS_emulator) return;
 
@@ -113,12 +110,15 @@
 					gm.FS.writeFile(path, new Uint8Array(buf));
 					gm.loadSaveFiles();
 				})
-				.catch(() => {});
+				.catch((err) => console.error("SRAM restore failed:", err));
 
-			// Register periodic SRAM save
-			window.EJS_emulator.on("saveSaveFiles", (data) => {
-				postSave("sram", data);
-			});
+			// Register periodic SRAM save (once only)
+			if (!sramHandlerRegistered) {
+				sramHandlerRegistered = true;
+				window.EJS_emulator.on("saveSaveFiles", (data) => {
+					postSave("sram", data);
+				});
+			}
 		};
 
 		// Load save state if one exists, then start the emulator

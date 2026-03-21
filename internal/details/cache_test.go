@@ -216,6 +216,7 @@ func TestFetchAll_PopulatesCache(t *testing.T) {
 	// Set up a fake image server so downloadImage succeeds
 	imgServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "image/jpeg")
 			_, _ = w.Write([]byte("fakeimage"))
 		}),
 	)
@@ -336,6 +337,7 @@ func TestFetchAll_RegionalVariantsShareCache(t *testing.T) {
 	// Set up a fake image server
 	imgServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "image/jpeg")
 			_, _ = w.Write([]byte("fakeimage"))
 		}),
 	)
@@ -424,6 +426,7 @@ func TestFetchAll_FetchingFlag(t *testing.T) {
 func TestFetchAll_URLsRewrittenToLocalPaths(t *testing.T) {
 	imgServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "image/jpeg")
 			_, _ = w.Write([]byte("fakeimage"))
 		}),
 	)
@@ -478,6 +481,7 @@ func TestFetchAll_URLsRewrittenToLocalPaths(t *testing.T) {
 func TestFetchAll_NameVariantFallback(t *testing.T) {
 	imgServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "image/jpeg")
 			_, _ = w.Write([]byte("fakeimage"))
 		}),
 	)
