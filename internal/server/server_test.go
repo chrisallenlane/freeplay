@@ -17,7 +17,7 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
-func testServer(t *testing.T, coverStatus ...CoverStatus) (*Server, string) {
+func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -25,7 +25,9 @@ func testServer(t *testing.T, coverStatus ...CoverStatus) (*Server, string) {
 	if err := os.MkdirAll(romDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -54,12 +56,12 @@ func testServer(t *testing.T, coverStatus ...CoverStatus) (*Server, string) {
 		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
 	}
 
-	var cs CoverStatus
-	if len(coverStatus) > 0 {
-		cs = coverStatus[0]
+	var cache DetailsCache
+	if len(dc) > 0 {
+		cache = dc[0]
 	}
 
-	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, cs, nil)
+	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, cache, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +406,9 @@ func testServerWithDetails(t *testing.T, df DetailsFetcher) (*Server, string) {
 	if err := os.MkdirAll(romDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -644,16 +648,23 @@ func TestRescanConflict(t *testing.T) {
 	}
 }
 
-type mockCoverStatus struct {
+// mockDetailsCache is a test double for the DetailsCache interface.
+type mockDetailsCache struct {
 	fetching bool
+	details  map[string]*covers.GameDetails // key: "console/rom"
 }
 
-func (m *mockCoverStatus) Fetching() bool {
-	return m.fetching
+func (m *mockDetailsCache) Fetching() bool { return m.fetching }
+
+func (m *mockDetailsCache) Get(console, rom string) *covers.GameDetails {
+	if m.details == nil {
+		return nil
+	}
+	return m.details[console+"/"+rom]
 }
 
 func TestStatusEndpointNilCover(t *testing.T) {
-	srv, _ := testServer(t) // coverStatus is nil, detailsFetcher is nil
+	srv, _ := testServer(t) // detailsCache is nil, detailsFetcher is nil
 
 	req := httptest.NewRequest("GET", "/api/status", nil)
 	w := httptest.NewRecorder()
@@ -668,15 +679,15 @@ func TestStatusEndpointNilCover(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 	if body["fetchingCovers"] != false {
-		t.Error("expected fetchingCovers=false with nil coverStatus")
+		t.Error("expected fetchingCovers=false with nil detailsCache")
 	}
 	if body["igdbConfigured"] != false {
-		t.Error("expected igdbConfigured=false with nil detailsFetcher")
+		t.Error("expected igdbConfigured=false with nil detailsCache")
 	}
 }
 
 func TestStatusEndpointFetching(t *testing.T) {
-	srv, _ := testServer(t, &mockCoverStatus{fetching: true})
+	srv, _ := testServer(t, &mockDetailsCache{fetching: true})
 
 	req := httptest.NewRequest("GET", "/api/status", nil)
 	w := httptest.NewRecorder()
@@ -691,12 +702,12 @@ func TestStatusEndpointFetching(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 	if body["fetchingCovers"] != true {
-		t.Error("expected fetchingCovers=true when fetcher is active")
+		t.Error("expected fetchingCovers=true when cache is active")
 	}
 }
 
 func TestStatusEndpointIGDBConfigured(t *testing.T) {
-	srv, _ := testServerWithDetails(t, &mockDetailsFetcher{})
+	srv, _ := testServer(t, &mockDetailsCache{})
 
 	req := httptest.NewRequest("GET", "/api/status", nil)
 	w := httptest.NewRecorder()
@@ -711,7 +722,144 @@ func TestStatusEndpointIGDBConfigured(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 	if body["igdbConfigured"] != true {
-		t.Error("expected igdbConfigured=true when detailsFetcher is set")
+		t.Error("expected igdbConfigured=true when detailsCache is set")
+	}
+}
+
+func TestGameDetailsFromCache(t *testing.T) {
+	cached := &covers.GameDetails{
+		Name:    "Mega Man",
+		Summary: "Cached summary.",
+	}
+	cache := &mockDetailsCache{
+		details: map[string]*covers.GameDetails{
+			"NES/Mega Man.nes": cached,
+		},
+	}
+	srv, _ := testServer(t, cache)
+
+	req := httptest.NewRequest(
+		"GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil,
+	)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+
+	var got covers.GameDetails
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if got.Name != "Mega Man" {
+		t.Errorf("Name = %q, want %q", got.Name, "Mega Man")
+	}
+	if got.Summary != "Cached summary." {
+		t.Errorf("Summary = %q, want %q", got.Summary, "Cached summary.")
+	}
+}
+
+func TestGameDetailsCacheMissFallsBackToFetcher(t *testing.T) {
+	cache := &mockDetailsCache{} // returns nil for all Gets
+	fetcher := &mockDetailsFetcher{
+		details: &covers.GameDetails{
+			Name:    "Mega Man",
+			Summary: "Live summary.",
+		},
+	}
+	dir := t.TempDir()
+
+	romDir := filepath.Join(dir, "roms", "NES")
+	if err := os.MkdirAll(romDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{
+		Port: 8080,
+		ROMs: map[string]config.ROM{
+			"NES": {Path: romDir, Core: "fceumm"},
+		},
+	}
+	frontendFS := fstest.MapFS{
+		"frontend/index.html":   &fstest.MapFile{Data: []byte("<html>")},
+		"frontend/play.html":    &fstest.MapFile{Data: []byte("<html>")},
+		"frontend/details.html": &fstest.MapFile{Data: []byte("<html>")},
+	}
+	emulatorjsFS := fstest.MapFS{
+		"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
+	}
+
+	srv, err := New(cfg, dir, frontendFS, emulatorjsFS, cache, fetcher)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(
+		"GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil,
+	)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+
+	var got covers.GameDetails
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if got.Summary != "Live summary." {
+		t.Errorf("Summary = %q, want live summary", got.Summary)
+	}
+}
+
+func TestCacheFilesServing(t *testing.T) {
+	srv, dir := testServer(t)
+
+	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Mega Man")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(cacheDir, "cover.jpg"), []byte("jpgdata"), 0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(
+		"GET", "/cache/igdb/NES/Mega%20Man/cover.jpg", nil,
+	)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+	if w.Body.String() != "jpgdata" {
+		t.Errorf("body = %q, want %q", w.Body.String(), "jpgdata")
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	}
+}
+
+func TestCacheFilesNotFound(t *testing.T) {
+	srv, _ := testServer(t)
+
+	req := httptest.NewRequest(
+		"GET", "/cache/igdb/NES/Mega%20Man/cover.jpg", nil,
+	)
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != 404 {
+		t.Errorf("got status %d, want 404", w.Code)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	freeplay "github.com/chrisallenlane/freeplay"
 	"github.com/chrisallenlane/freeplay/internal/config"
 	"github.com/chrisallenlane/freeplay/internal/covers"
+	"github.com/chrisallenlane/freeplay/internal/details"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 	"github.com/chrisallenlane/freeplay/internal/server"
 )
@@ -34,36 +35,40 @@ func main() {
 		fatal(err)
 	}
 
-	// Set up IGDB fetcher if configured
+	// Set up IGDB fetcher and details cache if configured
 	var igdbFetcher *covers.IGDBFetcher
 	if cfg.CoverArtAPI == "igdb" {
 		igdbFetcher = covers.NewIGDBFetcher(cfg.CoverArtKey)
 	}
 
-	var coverFetcher covers.Fetcher
-	if igdbFetcher != nil {
-		coverFetcher = igdbFetcher
-	}
-	coverMgr := covers.New(*dataDir, coverFetcher)
+	detailsCache := details.New(*dataDir, igdbFetcher)
 
 	var detailsFetcher server.DetailsFetcher
 	if igdbFetcher != nil {
 		detailsFetcher = igdbFetcher
 	}
 
-	srv, err := server.New(cfg, *dataDir, freeplay.FrontendFS, freeplay.EmulatorjsFS, coverMgr, detailsFetcher)
+	srv, err := server.New(
+		cfg, *dataDir,
+		freeplay.FrontendFS, freeplay.EmulatorjsFS,
+		detailsCache, detailsFetcher,
+	)
 	if err != nil {
 		fatal(err)
 	}
 
-	// Wire cover art fetching to run after each scan
+	// Wire details cache population to run after each scan
 	srv.Scanner().SetOnScanComplete(func(games []scanner.Game) {
 		entries := make([]covers.GameEntry, len(games))
 		for i, g := range games {
-			entries[i] = covers.GameEntry{Console: g.Console, Filename: g.Filename, IGDBPlatformIDs: g.IGDBPlatformIDs}
+			entries[i] = covers.GameEntry{
+				Console:         g.Console,
+				Filename:        g.Filename,
+				IGDBPlatformIDs: g.IGDBPlatformIDs,
+			}
 		}
 		go func() {
-			if coverMgr.FetchMissing(entries) > 0 {
+			if detailsCache.FetchAll(entries) > 0 {
 				// Rescan so the catalog picks up newly fetched covers
 				srv.Scanner().ScanBlocking()
 			}
