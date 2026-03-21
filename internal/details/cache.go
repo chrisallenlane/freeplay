@@ -112,7 +112,11 @@ func (c *Cache) fetchOne(g covers.GameEntry, ticker *time.Ticker) bool {
 	slog.Info("fetching IGDB details", "game", cleanName, "console", g.Console)
 
 	// Phase 1: search for game ID using name variants
-	gameID := c.search(cleanName, g.IGDBPlatformIDs, ticker)
+	gameID, searchErr := c.search(cleanName, g.IGDBPlatformIDs, ticker)
+	if searchErr != nil {
+		// Transient error — do not write .notfound so the game is retried.
+		return false
+	}
 	if gameID == 0 {
 		c.writeNotFound(g.Console, cleanName)
 		return false
@@ -142,12 +146,14 @@ func (c *Cache) fetchOne(g covers.GameEntry, ticker *time.Ticker) bool {
 }
 
 // search tries each name variant with and without platform constraints,
-// returning the first matching game ID, or 0 if none found.
+// returning the first matching game ID (or 0 if not found) and any error.
+// A non-nil error means the search could not complete; the caller must not
+// treat the game as permanently not found in that case.
 func (c *Cache) search(
 	cleanName string,
 	platformIDs []int,
 	ticker *time.Ticker,
-) int {
+) (int, error) {
 	variants := covers.NameVariants(cleanName)
 
 	// Try with platform constraint first
@@ -157,10 +163,10 @@ func (c *Cache) search(
 			id, err := c.fetcher.SearchGame(name, platformIDs)
 			if err != nil {
 				slog.Warn("IGDB search failed", "game", name, "error", err)
-				return 0
+				return 0, err
 			}
 			if id != 0 {
-				return id
+				return id, nil
 			}
 		}
 	}
@@ -171,14 +177,14 @@ func (c *Cache) search(
 		id, err := c.fetcher.SearchGame(name, nil)
 		if err != nil {
 			slog.Warn("IGDB search failed", "game", name, "error", err)
-			return 0
+			return 0, err
 		}
 		if id != 0 {
-			return id
+			return id, nil
 		}
 	}
 
-	return 0
+	return 0, nil
 }
 
 // saveDetails downloads all images for details, rewrites URLs to local

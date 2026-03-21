@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -513,6 +514,72 @@ func TestSecurityHeaders(t *testing.T) {
 			t.Errorf("%s = %q, want %q", name, got, want)
 		}
 	}
+}
+
+func FuzzServeSecureFile(f *testing.F) {
+	f.Add("NES/Mega Man/cover.jpg")
+	f.Add("../../../etc/passwd")
+	f.Add("NES/../../../etc/passwd")
+	f.Add("")
+	f.Add("NES/\x00evil")
+
+	f.Fuzz(func(t *testing.T, filePath string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf(
+					"serveSecureFile panicked on path %q: %v",
+					filePath, r,
+				)
+			}
+		}()
+
+		srv, dir := testServer(t)
+
+		// Place a known file inside the cache/igdb subtree so a valid path
+		// can return 200.
+		cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Mega Man")
+		if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		const knownContent = "jpgdata"
+		if err := os.WriteFile(
+			filepath.Join(cacheDir, "cover.jpg"),
+			[]byte(knownContent), 0o644,
+		); err != nil {
+			t.Fatal(err)
+		}
+
+		// Construct the URL. The mux pattern GET /cache/igdb/{rest...}
+		// passes the raw path remainder to serveSecureFile, so we just
+		// URL-encode the fuzz input and request it.
+		encoded := (&url.URL{Path: filePath}).RequestURI()
+		req := httptest.NewRequest("GET", "/cache/igdb/"+encoded, nil)
+		w := httptest.NewRecorder()
+		srv.handler.ServeHTTP(w, req)
+
+		code := w.Code
+
+		// The server must never return a 5xx error. Traversal attempts
+		// and other bad input may produce 404 (blocked) or a 3xx
+		// redirect (mux path cleaning), but never a server error.
+		if code >= 500 {
+			t.Errorf(
+				"path %q: server error status %d (want non-5xx)",
+				filePath, code,
+			)
+		}
+
+		// When 200, the served content must match the known file.
+		if code == http.StatusOK {
+			got := w.Body.String()
+			if !strings.Contains(got, knownContent) {
+				t.Errorf(
+					"path %q: 200 response body %q does not contain known content",
+					filePath, got,
+				)
+			}
+		}
+	})
 }
 
 func FuzzSafeName(f *testing.F) {
