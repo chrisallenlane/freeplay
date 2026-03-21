@@ -20,6 +20,7 @@ type Game struct {
 	Console         string `json:"console"`
 	Core            string `json:"core"`
 	HasCover        bool   `json:"hasCover"`
+	HasManual       bool   `json:"hasManual"`
 	HasBios         bool   `json:"hasBios"`
 	IGDBPlatformIDs []int  `json:"igdbPlatformIds,omitempty"`
 }
@@ -88,13 +89,21 @@ func (s *Scanner) scan() {
 		consoleSet[consoleName] = true
 		hasBios := rom.Bios != ""
 
-		// Build a set of existing cover filenames for O(1) lookup,
-		// replacing a per-ROM os.Stat call.
+		// Build sets of existing cover/manual filenames for O(1) lookup,
+		// replacing per-ROM os.Stat calls.
 		covers := make(map[string]bool)
 		coverDir := filepath.Join(s.dataDir, "covers", consoleName)
 		if coverEntries, err := os.ReadDir(coverDir); err == nil {
 			for _, ce := range coverEntries {
 				covers[ce.Name()] = true
+			}
+		}
+
+		manuals := make(map[string]bool)
+		manualDir := filepath.Join(s.dataDir, "manuals", consoleName)
+		if manualEntries, err := os.ReadDir(manualDir); err == nil {
+			for _, me := range manualEntries {
+				manuals[me.Name()] = true
 			}
 		}
 
@@ -111,6 +120,7 @@ func (s *Scanner) scan() {
 				Console:         consoleName,
 				Core:            rom.Core,
 				HasCover:        covers[nameNoExt+".png"],
+				HasManual:       manuals[nameNoExt+".pdf"],
 				HasBios:         hasBios,
 				IGDBPlatformIDs: rom.IGDBPlatformIDs,
 			})

@@ -98,12 +98,9 @@ header h1 {
 
 .header-btn {
     border-radius: 6px;
-    line-height: 1.25rem;
-}
-
-#theme-toggle {
     padding: 8px 12px;
     font-size: 1rem;
+    line-height: 1.25rem;
 }
 
 #rescan-btn {

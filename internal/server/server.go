@@ -100,6 +100,9 @@ func (s *Server) routes() {
 	// Cover art serving
 	s.mux.HandleFunc("GET /covers/{rest...}", s.handleCovers)
 
+	// Manual serving
+	s.mux.HandleFunc("GET /manuals/{rest...}", s.handleManuals)
+
 	// Embedded EmulatorJS — immutable cache; assets are embedded at build time
 	s.mux.Handle("/emulatorjs/", longCache(http.StripPrefix("/emulatorjs/", http.FileServerFS(s.emulatorjsSub))))
 
@@ -149,6 +152,10 @@ func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
 	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "covers"), r.PathValue("rest"))
+}
+
+func (s *Server) handleManuals(w http.ResponseWriter, r *http.Request) {
+	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "manuals"), r.PathValue("rest"))
 }
 
 func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {

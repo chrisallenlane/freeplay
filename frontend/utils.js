@@ -24,6 +24,9 @@
 	exports.coverUrl = (game) =>
 		`/covers/${encodeURIComponent(game.console)}/${encodeURIComponent(exports.stripExt(game.filename))}.png`;
 
+	exports.manualUrl = (game) =>
+		`/manuals/${encodeURIComponent(game.console)}/${encodeURIComponent(exports.stripExt(game.filename))}.pdf`;
+
 	exports.playUrl = (game) =>
 		`/play?console=${encodeURIComponent(game.console)}&rom=${encodeURIComponent(game.filename)}`;
 
