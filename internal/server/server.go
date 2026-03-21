@@ -18,14 +18,15 @@ import (
 
 const longCacheValue = "public, max-age=31536000, immutable"
 
-// CoverStatus reports whether cover art is being fetched.
-type CoverStatus interface {
-	Fetching() bool
-}
-
 // DetailsFetcher retrieves game metadata from IGDB.
 type DetailsFetcher interface {
 	FetchDetails(gameName string, platformIDs []int) (*covers.GameDetails, error)
+}
+
+// DetailsCache serves locally-cached game metadata.
+type DetailsCache interface {
+	Get(console, romFilename string) *covers.GameDetails
+	Fetching() bool
 }
 
 // Server is the Freeplay HTTP server.
@@ -34,7 +35,7 @@ type Server struct {
 	dataDir        string
 	scanner        *scanner.Scanner
 	saves          *saves.Manager
-	coverStatus    CoverStatus
+	detailsCache   DetailsCache
 	detailsFetcher DetailsFetcher
 	frontendSub    fs.FS
 	emulatorjsSub  fs.FS
@@ -43,8 +44,14 @@ type Server struct {
 }
 
 // New creates a configured Server ready to listen.
-// coverStatus and detailsFetcher may be nil if IGDB is not configured.
-func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS, coverStatus CoverStatus, detailsFetcher DetailsFetcher) (*Server, error) {
+// detailsCache and detailsFetcher may be nil if IGDB is not configured.
+func New(
+	cfg *config.Config,
+	dataDir string,
+	frontendFS, emulatorjsFS fs.FS,
+	detailsCache DetailsCache,
+	detailsFetcher DetailsFetcher,
+) (*Server, error) {
 	frontendSub, err := fs.Sub(frontendFS, "frontend")
 	if err != nil {
 		return nil, fmt.Errorf("frontend fs: %w", err)
@@ -59,7 +66,7 @@ func New(cfg *config.Config, dataDir string, frontendFS, emulatorjsFS fs.FS, cov
 		dataDir:        dataDir,
 		scanner:        scanner.New(cfg, dataDir),
 		saves:          saves.New(dataDir),
-		coverStatus:    coverStatus,
+		detailsCache:   detailsCache,
 		detailsFetcher: detailsFetcher,
 		frontendSub:    frontendSub,
 		emulatorjsSub:  emulatorjsSub,
@@ -107,6 +114,9 @@ func (s *Server) routes() {
 
 	// Cover art serving
 	s.mux.HandleFunc("GET /covers/{rest...}", s.handleCovers)
+
+	// Cached IGDB images
+	s.mux.HandleFunc("GET /cache/igdb/{rest...}", s.handleCacheFiles)
 
 	// Manual serving
 	s.mux.HandleFunc("GET /manuals/{rest...}", s.handleManuals)
@@ -166,6 +176,15 @@ func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
 	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "covers"), r.PathValue("rest"))
 }
 
+func (s *Server) handleCacheFiles(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", longCacheValue)
+	s.serveSecureFile(
+		w, r,
+		filepath.Join(s.dataDir, "cache", "igdb"),
+		r.PathValue("rest"),
+	)
+}
+
 func (s *Server) handleManuals(w http.ResponseWriter, r *http.Request) {
 	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "manuals"), r.PathValue("rest"))
 }
@@ -181,7 +200,7 @@ func (s *Server) handleDetailsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
-	if s.detailsFetcher == nil {
+	if s.detailsCache == nil && s.detailsFetcher == nil {
 		http.Error(w, `{"error":"IGDB not configured"}`, http.StatusNotFound)
 		return
 	}
@@ -189,7 +208,26 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 	consoleName := r.URL.Query().Get("console")
 	rom := r.URL.Query().Get("rom")
 	if consoleName == "" || rom == "" {
-		http.Error(w, `{"error":"console and rom parameters required"}`, http.StatusBadRequest)
+		http.Error(
+			w,
+			`{"error":"console and rom parameters required"}`,
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	// Check local cache first
+	if s.detailsCache != nil {
+		if d := s.detailsCache.Get(consoleName, rom); d != nil {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(d)
+			return
+		}
+	}
+
+	// Fall back to live IGDB fetch
+	if s.detailsFetcher == nil {
+		http.Error(w, `{"error":"game not found"}`, http.StatusNotFound)
 		return
 	}
 
@@ -209,7 +247,11 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 
 	details, err := s.detailsFetcher.FetchDetails(gameName, platformIDs)
 	if err != nil {
-		http.Error(w, `{"error":"IGDB request failed"}`, http.StatusServiceUnavailable)
+		http.Error(
+			w,
+			`{"error":"IGDB request failed"}`,
+			http.StatusServiceUnavailable,
+		)
 		return
 	}
 	if details == nil {
@@ -284,11 +326,12 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
-	fetching := s.coverStatus != nil && s.coverStatus.Fetching()
+	fetching := s.detailsCache != nil && s.detailsCache.Fetching()
+	igdbConfigured := s.detailsCache != nil || s.detailsFetcher != nil
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"fetchingCovers": fetching,
-		"igdbConfigured": s.detailsFetcher != nil,
+		"igdbConfigured": igdbConfigured,
 	})
 }
 
