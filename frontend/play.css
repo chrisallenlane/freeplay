@@ -6,45 +6,6 @@ body {
     overflow: hidden;
 }
 
-header {
-    padding: 12px 24px;
-    justify-content: normal;
-    gap: 16px;
-    position: relative;
-    z-index: 10;
-}
-
-header a {
-    color: var(--color-link);
-    text-decoration: none;
-    font-size: 0.875rem;
-}
-
-header a:hover {
-    text-decoration: underline;
-}
-
-header a.btn:hover {
-    text-decoration: none;
-}
-
-header a:focus-visible {
-    outline: 2px solid var(--color-link);
-    outline-offset: 2px;
-}
-
-header .game-name {
-    font-family: inherit;
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--color-text-bright);
-    margin: 0;
-}
-
-#theme-toggle {
-    margin-left: auto;
-}
-
 #game {
     flex: 1;
     min-height: 0;
@@ -53,11 +14,4 @@ header .game-name {
 
 #game > .ejs_game {
     height: 100% !important;
-}
-
-.error-msg {
-    text-align: center;
-    padding: 60px 24px;
-    color: var(--color-error);
-    font-size: 1rem;
 }
