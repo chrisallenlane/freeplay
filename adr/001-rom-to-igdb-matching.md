@@ -20,6 +20,7 @@ Examples of the mismatch:
 | `Nobunaga's Ambition - Lord of Darkness (U).sfc`   | Nobunaga's Ambition: Lord of Darkness      |
 | `Sim City (USA).sfc`                               | SimCity                                    |
 | `Front Mission - Gun Hazard (ENG) # SNES.sfc`      | Front Mission: Gun Hazard                  |
+| `Deja Vu.nes`                                      | Déjà Vu                                    |
 
 ## Decision
 
@@ -82,12 +83,28 @@ This catches cases where IGDB's platform metadata is incomplete.
 ### Match Criteria
 
 IGDB's `search` endpoint returns up to 5 results per query. We iterate over
-them and accept only a **case-insensitive exact match** against the searched
-variant name (`strings.EqualFold`). There is no fuzzy matching, edit-distance
-scoring, or ranking — an exact match or nothing.
+them and apply three matching tiers, in order:
 
-This is a deliberate choice favoring precision: a wrong match (showing
-Castlevania II's cover art on Castlevania III) is worse than no match.
+1. **Case-insensitive exact match** (`strings.EqualFold`). The highest
+   confidence tier — the IGDB name and the search variant are identical
+   modulo casing.
+
+2. **Diacritics-insensitive match.** Both the IGDB name and the search variant
+   are Unicode-normalized (NFD decomposition, strip combining marks, NFC
+   recomposition) before comparison. This handles ROM filenames that use ASCII
+   approximations of accented titles (e.g., `Deja Vu` matching IGDB's
+   `Déjà Vu`). Implementation: `covers.stripDiacritics()`.
+
+3. **Platform-constrained first-result fallback.** When platform IDs are
+   present and neither of the above tiers matched, we accept the first search
+   result. IGDB's relevance ranking combined with the platform filter makes
+   this reliable in practice. This fallback is **not** applied to
+   unconstrained searches, where the risk of a false match is too high.
+
+This tiered approach favors precision while avoiding the failure mode where
+diacritics or minor title differences cause a platform-constrained search to
+fail, only for the unconstrained fallback to match a completely wrong game on
+a different platform.
 
 Implementation: `covers.IGDBFetcher.SearchGame()`, `details.Cache.search()`
 
@@ -113,6 +130,11 @@ stay within API limits.
 ### What works well
 
 - High precision: exact matching rarely produces wrong results.
+- Diacritics-insensitive matching handles accented titles without introducing
+  false positives (e.g., `Deja Vu` -> `Déjà Vu`, `Pokemon` -> `Pokémon`).
+- Platform-constrained fallback improves recall for titles where IGDB's name
+  differs more substantially, while the platform filter prevents cross-platform
+  false matches.
 - Efficient: regional variants share a single API lookup and cache entry.
 - Resilient: transient errors don't permanently mark games as not-found.
 - The variant pipeline handles the most common No-Intro/IGDB naming
@@ -129,6 +151,10 @@ stay within API limits.
 - **Single-word titles with common names** (e.g., `Golf`, `Tennis`) may match
   the wrong game in unconstrained search if the correct platform-specific
   entry has different capitalization or punctuation.
+- **Platform fallback trust:** The platform-constrained first-result fallback
+  trusts IGDB's relevance ranking. If IGDB returns an unexpected first result
+  for a platform-constrained query, we may match the wrong game. In practice
+  this is rare because the platform filter constrains the result set heavily.
 - **IGDB search ranking is opaque:** We rely on the top 5 results from IGDB's
   search endpoint containing the correct game. If IGDB ranks the match lower,
   we will miss it.

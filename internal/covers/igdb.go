@@ -10,6 +10,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 // IGDBFetcher fetches cover art from the IGDB API.
@@ -167,11 +172,29 @@ func (f *IGDBFetcher) SearchGame(gameName string, platformIDs []int) (int, error
 		return 0, fmt.Errorf("parsing game search: %w", err)
 	}
 
+	// Prefer exact case-insensitive match.
 	for _, g := range games {
 		if strings.EqualFold(g.Name, gameName) {
 			return g.ID, nil
 		}
 	}
+
+	// Try diacritics-insensitive match (e.g. "Déjà Vu" == "Deja Vu").
+	normalizedSearch := stripDiacritics(gameName)
+	for _, g := range games {
+		if strings.EqualFold(stripDiacritics(g.Name), normalizedSearch) {
+			return g.ID, nil
+		}
+	}
+
+	// When platform-constrained, fall back to the first result. IGDB's
+	// relevance ranking combined with the platform filter is usually
+	// correct, and this covers cases where the IGDB title differs more
+	// substantially from the ROM filename.
+	if len(platformIDs) > 0 && len(games) > 0 {
+		return games[0].ID, nil
+	}
+
 	return 0, nil
 }
 
@@ -288,6 +311,20 @@ func transformImageURL(rawURL, size string) string {
 		u = "https:" + u
 	}
 	return strings.Replace(u, "t_thumb", size, 1)
+}
+
+// stripDiacritics removes diacritical marks from a string using Unicode
+// NFD decomposition. For example, "Déjà Vu" becomes "Deja Vu".
+func stripDiacritics(s string) string {
+	result, _, _ := transform.String(
+		transform.Chain(
+			norm.NFD,
+			runes.Remove(runes.In(unicode.Mn)),
+			norm.NFC,
+		),
+		s,
+	)
+	return result
 }
 
 func intsToStrings(ids []int) []string {
