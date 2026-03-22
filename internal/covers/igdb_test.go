@@ -184,6 +184,98 @@ func TestSearchGameNoMatch(t *testing.T) {
 	}
 }
 
+func TestStripDiacritics(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"Déjà Vu", "Deja Vu"},
+		{"Mega Man", "Mega Man"},
+		{"Pokémon", "Pokemon"},
+		{"", ""},
+		{"Ōkami", "Okami"},
+		{"Señor", "Senor"},
+		{"naïve", "naive"},
+	}
+	for _, tt := range tests {
+		got := stripDiacritics(tt.input)
+		if got != tt.want {
+			t.Errorf(
+				"stripDiacritics(%q) = %q, want %q",
+				tt.input, got, tt.want,
+			)
+		}
+	}
+}
+
+func TestSearchGameDiacriticsMatch(t *testing.T) {
+	searchResp, _ := json.Marshal([]map[string]any{
+		{"id": 55, "name": "Déjà Vu"},
+	})
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write(searchResp)
+		}
+	})
+
+	id, err := f.SearchGame("Deja Vu", nil)
+	if err != nil {
+		t.Fatalf("SearchGame returned error: %v", err)
+	}
+	if id != 55 {
+		t.Errorf("SearchGame() = %d, want 55 (diacritics match)", id)
+	}
+}
+
+func TestSearchGamePlatformFallback(t *testing.T) {
+	searchResp, _ := json.Marshal([]map[string]any{
+		{"id": 77, "name": "Completely Different Title"},
+	})
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write(searchResp)
+		}
+	})
+
+	// With platform IDs: falls back to first result
+	id, err := f.SearchGame("Some Game", []int{18})
+	if err != nil {
+		t.Fatalf("SearchGame returned error: %v", err)
+	}
+	if id != 77 {
+		t.Errorf("SearchGame() = %d, want 77 (platform fallback)", id)
+	}
+}
+
+func TestSearchGameNoPlatformNoFallback(t *testing.T) {
+	searchResp, _ := json.Marshal([]map[string]any{
+		{"id": 77, "name": "Completely Different Title"},
+	})
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write(searchResp)
+		}
+	})
+
+	// Without platform IDs: no fallback, returns 0
+	id, err := f.SearchGame("Some Game", nil)
+	if err != nil {
+		t.Fatalf("SearchGame returned error: %v", err)
+	}
+	if id != 0 {
+		t.Errorf("SearchGame() = %d, want 0 (no fallback without platform)", id)
+	}
+}
+
 func TestSearchGameWithPlatformFilter(t *testing.T) {
 	var capturedQuery string
 	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
