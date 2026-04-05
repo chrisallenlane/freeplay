@@ -96,7 +96,7 @@
 
 	function renderCard(game) {
 		const key = FP.favKey(game);
-		const displayName = FP.stripExt(game.filename);
+		const displayName = game.igdbName || FP.stripExt(game.filename);
 
 		const card = el("a", "game-card");
 		card.href = FP.detailsUrl(game);
