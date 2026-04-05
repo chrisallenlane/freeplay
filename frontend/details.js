@@ -9,9 +9,7 @@
 	const { consoleName, rom, gameName } = subpage;
 
 	const catalogPromise = fetch("/api/games").then((res) => res.json());
-	const detailsPromise = fetch(
-		`/api/game-details?console=${encodeURIComponent(consoleName)}&rom=${encodeURIComponent(rom)}`,
-	)
+	const detailsPromise = fetch(FP.gameDetailsUrl(consoleName, rom))
 		.then((res) => {
 			if (!res.ok) return null;
 			return res.json();
