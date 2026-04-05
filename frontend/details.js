@@ -3,15 +3,13 @@
 
 	const subpage = FP.initSubpage();
 	if (!subpage) {
-		showError("Missing console or rom parameter.");
+		FP.showError("content", "Missing console or rom parameter.");
 		return;
 	}
 	const { consoleName, rom, gameName } = subpage;
 
 	const catalogPromise = fetch("/api/games").then((res) => res.json());
-	const detailsPromise = fetch(
-		`/api/game-details?console=${encodeURIComponent(consoleName)}&rom=${encodeURIComponent(rom)}`,
-	)
+	const detailsPromise = fetch(FP.gameDetailsUrl(consoleName, rom))
 		.then((res) => {
 			if (!res.ok) return null;
 			return res.json();
@@ -22,43 +20,22 @@
 		.then(([catalog, details]) => {
 			const game = FP.findGame(catalog.games, consoleName, rom);
 			if (!game) {
-				showError("Game not found. It may have been removed from the library.");
+				FP.showError(
+					"content",
+					"Game not found. It may have been removed from the library.",
+				);
 				return;
 			}
-			buildHeaderActions(game);
 			render(game, details);
 		})
 		.catch(() => {
-			showError("Could not load game data.");
+			FP.showError("content", "Could not load game data.");
 		});
 
-	function showError(msg) {
-		document.getElementById("content").style.display = "none";
-		const el = document.getElementById("error");
-		el.style.display = "";
-		el.textContent = msg;
-	}
-
-	function buildHeaderActions(game) {
-		const actions = document.getElementById("header-actions");
-
-		const playLink = document.createElement("a");
-		playLink.href = FP.playUrl(game);
-		playLink.className = "btn header-btn";
-		playLink.textContent = "Play";
-		actions.appendChild(playLink);
-
-		if (game.hasManual) {
-			const manualLink = document.createElement("a");
-			manualLink.href = FP.manualUrl(game);
-			manualLink.className = "btn header-btn";
-			manualLink.title = "View the manual";
-			manualLink.textContent = "Manual";
-			actions.appendChild(manualLink);
-		}
-	}
-
 	function render(game, details) {
+		const displayName = details?.name || gameName;
+		document.title = `Freeplay - ${displayName}`;
+
 		const content = document.getElementById("content");
 		content.innerHTML = "";
 
@@ -81,47 +58,65 @@
 		title.textContent = details ? details.name : gameName;
 		meta.appendChild(title);
 
+		const rows = [];
 		if (details) {
-			const info = [];
+			rows.push(["Console", consoleName]);
 			if (details.firstReleaseDate)
-				info.push(
-					`${consoleName} \u00B7 ${details.firstReleaseDate.substring(0, 4)}`,
-				);
-			else info.push(consoleName);
+				rows.push(["Year", details.firstReleaseDate.substring(0, 4)]);
 			if (details.developers?.length)
-				info.push(`Developer: ${details.developers.join(", ")}`);
+				rows.push(["Developer", details.developers.join(", ")]);
 			if (details.publishers?.length)
-				info.push(`Publisher: ${details.publishers.join(", ")}`);
+				rows.push(["Publisher", details.publishers.join(", ")]);
 			if (details.platforms?.length)
-				info.push(`Platforms: ${details.platforms.join(", ")}`);
-			if (details.collection) info.push(`Series: ${details.collection}`);
-
-			for (const line of info) {
-				const p = document.createElement("p");
-				p.className = "details-info-line";
-				p.textContent = line;
-				meta.appendChild(p);
-			}
-
-			if (details.igdbUrl) {
-				const p = document.createElement("p");
-				p.className = "details-info-line";
-				const a = document.createElement("a");
-				a.href = details.igdbUrl;
-				a.textContent = "View on IGDB";
-				a.className = "details-link";
-				p.appendChild(a);
-				meta.appendChild(p);
-			}
+				rows.push(["Platforms", details.platforms.join(", ")]);
+			if (details.collection) rows.push(["Series", details.collection]);
 		} else {
-			const p = document.createElement("p");
-			p.className = "details-info-line";
-			p.textContent = consoleName;
-			meta.appendChild(p);
+			rows.push(["Console", consoleName]);
+		}
+
+		const table = document.createElement("table");
+		table.className = "details-meta-table";
+		for (const [label, value] of rows) {
+			const tr = document.createElement("tr");
+			const th = document.createElement("th");
+			th.textContent = label;
+			const td = document.createElement("td");
+			td.textContent = value;
+			tr.appendChild(th);
+			tr.appendChild(td);
+			table.appendChild(tr);
+		}
+		meta.appendChild(table);
+
+		if (details?.igdbUrl) {
+			const a = document.createElement("a");
+			a.href = details.igdbUrl;
+			a.textContent = "View on IGDB";
+			a.className = "details-link";
+			meta.appendChild(a);
 		}
 
 		hero.appendChild(meta);
 		content.appendChild(hero);
+
+		const actions = document.createElement("div");
+		actions.className = "details-actions";
+
+		const playLink = document.createElement("a");
+		playLink.href = FP.playUrl(game);
+		playLink.className = "btn details-action-btn details-play-btn";
+		playLink.textContent = "Play";
+		actions.appendChild(playLink);
+
+		if (game.hasManual) {
+			const manualLink = document.createElement("a");
+			manualLink.href = FP.manualUrl(game);
+			manualLink.className = "btn details-action-btn details-manual-btn";
+			manualLink.textContent = "View Manual";
+			actions.appendChild(manualLink);
+		}
+
+		content.appendChild(actions);
 
 		if (!details) return;
 
@@ -141,64 +136,59 @@
 			img.alt = `${details.name} cover art`;
 			img.className = "details-cover-full";
 			link.appendChild(img);
-			appendSectionWithContent(content, "Cover Art", link);
+			appendSection(content, "Cover Art", link);
 		}
 
 		if (details.screenshots?.length) {
-			appendGallery(content, "Screenshots", details.screenshots);
+			appendSection(
+				content,
+				"Screenshots",
+				buildGallery("Screenshots", details.screenshots),
+			);
 		}
 
 		if (details.artworks?.length) {
-			appendGallery(
+			appendSection(
 				content,
 				"Artworks",
-				details.artworks,
-				"details-gallery-full",
+				buildGallery("Artworks", details.artworks, "details-gallery-full"),
 			);
 		}
 	}
 
-	function appendSectionWithContent(parent, heading, contentEl) {
+	function appendSection(parent, heading, content) {
 		const section = document.createElement("section");
 		section.className = "details-section";
 		const h3 = document.createElement("h3");
 		h3.textContent = heading;
 		section.appendChild(h3);
-		section.appendChild(contentEl);
+		if (typeof content === "string") {
+			const p = document.createElement("p");
+			p.textContent = content;
+			section.appendChild(p);
+		} else {
+			section.appendChild(content);
+		}
 		parent.appendChild(section);
 	}
 
-	function appendSection(parent, heading, text) {
-		const section = document.createElement("section");
-		section.className = "details-section";
-		const h3 = document.createElement("h3");
-		h3.textContent = heading;
-		section.appendChild(h3);
-		const p = document.createElement("p");
-		p.textContent = text;
-		section.appendChild(p);
-		parent.appendChild(section);
-	}
-
-	function appendGallery(parent, heading, urls, galleryClass) {
-		const section = document.createElement("section");
-		section.className = "details-section";
-		const h3 = document.createElement("h3");
-		h3.textContent = heading;
-		section.appendChild(h3);
+	function buildGallery(heading, urls, galleryClass) {
 		const gallery = document.createElement("div");
 		gallery.className = galleryClass || "details-gallery";
-		for (const url of urls) {
+		for (let i = 0; i < urls.length; i++) {
 			const link = document.createElement("a");
-			link.href = url;
+			link.href = urls[i];
 			const img = document.createElement("img");
-			img.src = url;
+			img.src = urls[i];
 			img.loading = "lazy";
-			img.alt = heading;
+			img.alt = `${heading} ${i + 1} of ${urls.length}`;
+			link.setAttribute(
+				"aria-label",
+				`View full image: ${heading} ${i + 1} of ${urls.length}`,
+			);
 			link.appendChild(img);
 			gallery.appendChild(link);
 		}
-		section.appendChild(gallery);
-		parent.appendChild(section);
+		return gallery;
 	}
 })();

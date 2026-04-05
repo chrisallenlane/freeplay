@@ -90,27 +90,24 @@ func TestCallbackScanDeadlock(t *testing.T) {
 	}
 }
 
-// TestSetOnScanCompleteDataRace verifies that setting the callback
-// concurrently with a scan triggers a data race. The field
-// s.onScanComplete is read in scan() (line 154) and written in
-// SetOnScanComplete (line 161) without synchronization.
-//
-// Run with: go test -race -run TestSetOnScanCompleteDataRace
-// Expected: FAIL with "DATA RACE" when run with -race flag.
+// TestSetOnScanCompleteDataRace verifies that concurrent scans and
+// SetOnScanComplete calls are race-free. Both scan() and SetOnScanComplete
+// hold s.mu while accessing s.onScanComplete, so the race detector must not
+// report a DATA RACE here.
 func TestSetOnScanCompleteDataRace(t *testing.T) {
 	dir, cfg := setupTestDir(t)
 	s := New(cfg, dir)
 
 	var wg sync.WaitGroup
 
-	// Launch concurrent scans that read s.onScanComplete
+	// Launch concurrent scans that read s.onScanComplete while holding s.mu.
 	for range 5 {
 		wg.Go(func() {
 			s.ScanBlocking()
 		})
 	}
 
-	// Concurrently write to s.onScanComplete
+	// Concurrently write to s.onScanComplete while holding s.mu.
 	for range 5 {
 		wg.Go(func() {
 			s.SetOnScanComplete(func(_ []Game) {})
@@ -118,6 +115,8 @@ func TestSetOnScanCompleteDataRace(t *testing.T) {
 	}
 
 	wg.Wait()
+	// If the race detector reports DATA RACE here, the mutex protection
+	// of s.onScanComplete has been broken.
 }
 
 // TestOnScanCompleteGoroutineRescanTerminates simulates the exact pattern

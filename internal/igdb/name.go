@@ -1,5 +1,5 @@
-// Package covers manages cover art fetching and caching.
-package covers
+// Package igdb manages IGDB API access and name-cleaning utilities.
+package igdb
 
 import (
 	"path/filepath"
@@ -62,11 +62,6 @@ func CleanFilename(filename string) (nameNoExt, cleanName string) {
 	nameNoExt = strings.TrimSuffix(filename, ext)
 	cleanName = CleanName(nameNoExt)
 	return
-}
-
-// CoverPath returns the expected filesystem path for a game's cover art.
-func CoverPath(dataDir, console, filenameWithoutExt string) string {
-	return filepath.Join(dataDir, "covers", console, filenameWithoutExt+".png")
 }
 
 // GameEntry describes a game for cache population.

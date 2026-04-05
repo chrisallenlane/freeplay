@@ -23,6 +23,7 @@ type Game struct {
 	HasManual       bool   `json:"hasManual"`
 	HasBios         bool   `json:"hasBios"`
 	IGDBPlatformIDs []int  `json:"igdbPlatformIds,omitempty"`
+	IGDBName        string `json:"igdbName,omitempty"`
 }
 
 // Catalog is the full game library served by GET /api/games.
@@ -33,6 +34,9 @@ type Catalog struct {
 
 // ScanCallback is called after a scan completes with the list of games.
 type ScanCallback func(games []Game)
+
+// NameLookup returns the IGDB name for a game, or "" if not cached.
+type NameLookup func(console, romFilename string) string
 
 // Scanner builds and stores the game catalog.
 type Scanner struct {
@@ -54,6 +58,21 @@ func New(cfg *config.Config, dataDir string) *Scanner {
 // CatalogJSON returns the catalog as JSON bytes.
 func (s *Scanner) CatalogJSON() ([]byte, error) {
 	return json.Marshal(s.catalog.Load())
+}
+
+// EnrichNames populates IGDBName for each game in the catalog using
+// the provided lookup function.
+func (s *Scanner) EnrichNames(lookup NameLookup) {
+	cat := s.catalog.Load()
+	enriched := &Catalog{Consoles: cat.Consoles, Games: make([]Game, len(cat.Games))}
+	copy(enriched.Games, cat.Games)
+	for i := range enriched.Games {
+		g := &enriched.Games[i]
+		if name := lookup(g.Console, g.Filename); name != "" {
+			g.IGDBName = name
+		}
+	}
+	s.catalog.Store(enriched)
 }
 
 // Scan rebuilds the catalog by reading ROM directories.

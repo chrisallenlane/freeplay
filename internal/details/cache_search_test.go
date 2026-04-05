@@ -2,13 +2,11 @@ package details
 
 import (
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/chrisallenlane/freeplay/internal/covers"
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
 // platformAwareMockFetcher extends mockIGDBFetcher to make SearchGame
@@ -21,7 +19,7 @@ type platformAwareMockFetcher struct {
 	// unconstrainedResults maps gameName -> gameID for unconstrained searches
 	unconstrainedResults map[string]int
 	// detailsResults maps gameID -> GameDetails
-	detailsResults map[int]*covers.GameDetails
+	detailsResults map[int]*igdb.GameDetails
 
 	searchCalls        int
 	detailsCalls       int
@@ -64,7 +62,7 @@ func (m *platformAwareMockFetcher) SearchGame(
 
 func (m *platformAwareMockFetcher) FetchDetailsByID(
 	gameID int,
-) (*covers.GameDetails, error) {
+) (*igdb.GameDetails, error) {
 	m.detailsCalls++
 	if m.detailsResults == nil {
 		return nil, nil
@@ -77,13 +75,7 @@ func (m *platformAwareMockFetcher) FetchDetailsByID(
 // is not attempted. This is the early-return path at line 169 of
 // cache.go that was identified as having limited test coverage.
 func TestSearch_ConstrainedMatchSkipsUnconstrained(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
@@ -93,7 +85,7 @@ func TestSearch_ConstrainedMatchSkipsUnconstrained(t *testing.T) {
 		// unconstrained path is reached, FetchDetailsByID would get a
 		// different ID, and we can detect it.
 		unconstrainedResults: map[string]int{"Mega Man": 99},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 			99: {Name: "Mega Man Wrong", CoverURL: coverURL},
 		},
@@ -102,7 +94,7 @@ func TestSearch_ConstrainedMatchSkipsUnconstrained(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{
 			Console:         "NES",
 			Filename:        "Mega Man.nes",
@@ -141,13 +133,7 @@ func TestSearch_ConstrainedMatchSkipsUnconstrained(t *testing.T) {
 // matches, the search stops and returns that match without trying
 // unconstrained search.
 func TestSearch_ConstrainedMatchOnSecondVariant(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
@@ -160,7 +146,7 @@ func TestSearch_ConstrainedMatchOnSecondVariant(t *testing.T) {
 		unconstrainedResults: map[string]int{
 			"Game: Subtitle": 99,
 		},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			42: {Name: "Game: Subtitle", CoverURL: coverURL},
 			99: {Name: "Wrong Game", CoverURL: coverURL},
 		},
@@ -169,7 +155,7 @@ func TestSearch_ConstrainedMatchOnSecondVariant(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{
 			Console:         "NES",
 			Filename:        "Game - Subtitle.nes",
@@ -217,7 +203,7 @@ func TestSearch_ErrorOnConstrainedAbortsSearch(t *testing.T) {
 		// Even though unconstrained would find a match, it should never
 		// be reached.
 		unconstrainedResults: map[string]int{"Mega Man": 42},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			42: {Name: "Mega Man"},
 		},
 	}
@@ -225,7 +211,7 @@ func TestSearch_ErrorOnConstrainedAbortsSearch(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{
 			Console:         "NES",
 			Filename:        "Mega Man.nes",
@@ -264,20 +250,14 @@ func TestSearch_ErrorOnConstrainedAbortsSearch(t *testing.T) {
 // platformIDs is empty, only unconstrained search calls are made (the
 // constrained loop is skipped entirely).
 func TestSearch_NoPlatformIDs_OnlyUnconstrainedCalls(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
 	fetcher := &platformAwareMockFetcher{
 		constrainedResults:   map[string]int{"Mega Man": 99},
 		unconstrainedResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
 	}
@@ -285,7 +265,7 @@ func TestSearch_NoPlatformIDs_OnlyUnconstrainedCalls(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{
 			Console:  "NES",
 			Filename: "Mega Man.nes",
@@ -313,13 +293,7 @@ func TestSearch_NoPlatformIDs_OnlyUnconstrainedCalls(t *testing.T) {
 // two-phase fallback: all constrained variants miss, then unconstrained
 // search finds the game.
 func TestSearch_ConstrainedMiss_UnconstrainedHit(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
@@ -328,7 +302,7 @@ func TestSearch_ConstrainedMiss_UnconstrainedHit(t *testing.T) {
 		constrainedResults: map[string]int{},
 		// Unconstrained search finds the game
 		unconstrainedResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
 	}
@@ -336,7 +310,7 @@ func TestSearch_ConstrainedMiss_UnconstrainedHit(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{
 			Console:         "NES",
 			Filename:        "Mega Man.nes",
@@ -382,7 +356,7 @@ func TestSearch_ConstrainedErrorOnSecondVariant(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{
 			Console:         "NES",
 			Filename:        "Game - Subtitle.nes", // has multiple variants
@@ -422,7 +396,7 @@ func TestSearch_AllVariantsNotFound_WritesNotFound(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{
 			Console:         "NES",
 			Filename:        "Unknown - Game.nes",
@@ -446,7 +420,7 @@ func TestSearch_AllVariantsNotFound_WritesNotFound(t *testing.T) {
 	// 3. "Unknown-Game" (spaces removed)
 	// 4. "Unknown" (subtitle dropped)
 	// Total: 4 variants * 2 (constrained + unconstrained) = 8 calls
-	variants := covers.NameVariants("Unknown - Game")
+	variants := igdb.NameVariants("Unknown - Game")
 	expectedCalls := len(variants) * 2
 	if fetcher.searchCalls != expectedCalls {
 		t.Errorf(
@@ -461,20 +435,14 @@ func TestSearch_AllVariantsNotFound_WritesNotFound(t *testing.T) {
 // platformIDs slice is treated the same as nil: the constrained search
 // phase is skipped.
 func TestSearch_EmptyPlatformIDsSlice(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
 	fetcher := &platformAwareMockFetcher{
 		constrainedResults:   map[string]int{"Mega Man": 99},
 		unconstrainedResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
 	}
@@ -482,7 +450,7 @@ func TestSearch_EmptyPlatformIDsSlice(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{
 			Console:         "NES",
 			Filename:        "Mega Man.nes",
@@ -525,7 +493,7 @@ func TestSearch_ErrorOnUnconstrainedAfterConstrainedMiss(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{
 			Console:         "NES",
 			Filename:        "Metroid.nes",

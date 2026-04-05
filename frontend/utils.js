@@ -41,6 +41,9 @@
 
 	exports.biosUrl = (consoleName) => `/bios/${encodeURIComponent(consoleName)}`;
 
+	exports.gameDetailsUrl = (consoleName, rom) =>
+		`/api/game-details?console=${encodeURIComponent(consoleName)}&rom=${encodeURIComponent(rom)}`;
+
 	// Logical actions for directional navigation (shared by keyboard and gamepad).
 	exports.ACTION_LEFT = "left";
 	exports.ACTION_RIGHT = "right";
@@ -89,17 +92,11 @@
 		return null;
 	};
 
-	exports.isIGDBConfigured = () => {
-		const cached = sessionStorage.getItem("freeplay-igdb-configured");
-		if (cached !== null) return Promise.resolve(cached === "true");
-		return fetch("/api/status")
-			.then((res) => res.json())
-			.then((status) => {
-				const val = !!status.igdbConfigured;
-				sessionStorage.setItem("freeplay-igdb-configured", String(val));
-				return val;
-			})
-			.catch(() => false);
+	exports.showError = (containerId, msg) => {
+		document.getElementById(containerId).style.display = "none";
+		const el = document.getElementById("error");
+		el.style.display = "";
+		el.textContent = msg;
 	};
 
 	exports.initSubpage = () => {
@@ -108,8 +105,6 @@
 		const rom = params.get("rom");
 		if (!consoleName || !rom) return null;
 		const gameName = exports.stripExt(rom);
-		const nameEl = document.getElementById("game-name");
-		if (nameEl) nameEl.textContent = gameName;
 		document.title = `Freeplay - ${gameName}`;
 		exports.initThemeToggle();
 		return { consoleName, rom, gameName };

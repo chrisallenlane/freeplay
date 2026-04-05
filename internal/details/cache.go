@@ -15,13 +15,13 @@ import (
 	"time"
 
 	"github.com/chrisallenlane/freeplay/internal/atomicfile"
-	"github.com/chrisallenlane/freeplay/internal/covers"
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
-// igdbFetcher is the subset of covers.IGDBFetcher used by the cache.
+// igdbFetcher is the subset of igdb.Fetcher used by the cache.
 type igdbFetcher interface {
 	SearchGame(gameName string, platformIDs []int) (int, error)
-	FetchDetailsByID(gameID int) (*covers.GameDetails, error)
+	FetchDetailsByID(gameID int) (*igdb.GameDetails, error)
 }
 
 // Cache stores IGDB game details and images locally.
@@ -53,8 +53,8 @@ func (c *Cache) cacheDir(console, cleanName string) string {
 
 // Get returns cached GameDetails for the given console and ROM filename,
 // or nil if not cached.
-func (c *Cache) Get(console, romFilename string) *covers.GameDetails {
-	_, cleanName := covers.CleanFilename(romFilename)
+func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
+	_, cleanName := igdb.CleanFilename(romFilename)
 	if cleanName == "" {
 		return nil
 	}
@@ -65,7 +65,7 @@ func (c *Cache) Get(console, romFilename string) *covers.GameDetails {
 		return nil
 	}
 
-	var d covers.GameDetails
+	var d igdb.GameDetails
 	if err := json.Unmarshal(data, &d); err != nil {
 		return nil
 	}
@@ -74,7 +74,7 @@ func (c *Cache) Get(console, romFilename string) *covers.GameDetails {
 
 // FetchAll populates the cache for any games not yet cached.
 // Returns the count of newly cached games.
-func (c *Cache) FetchAll(games []covers.GameEntry) int {
+func (c *Cache) FetchAll(games []igdb.GameEntry) int {
 	if c.fetcher == nil {
 		return 0
 	}
@@ -96,8 +96,8 @@ func (c *Cache) FetchAll(games []covers.GameEntry) int {
 
 // fetchOne handles cache population for a single game entry.
 // Returns true if new details were cached.
-func (c *Cache) fetchOne(g covers.GameEntry, ticker *time.Ticker) bool {
-	nameNoExt, cleanName := covers.CleanFilename(g.Filename)
+func (c *Cache) fetchOne(g igdb.GameEntry, ticker *time.Ticker) bool {
+	nameNoExt, cleanName := igdb.CleanFilename(g.Filename)
 	if cleanName == "" {
 		return false
 	}
@@ -154,13 +154,12 @@ func (c *Cache) search(
 	platformIDs []int,
 	ticker *time.Ticker,
 ) (int, error) {
-	variants := covers.NameVariants(cleanName)
+	variants := igdb.NameVariants(cleanName)
 
-	// Try with platform constraint first
-	if len(platformIDs) > 0 {
+	tryVariants := func(ids []int) (int, error) {
 		for _, name := range variants {
 			<-ticker.C
-			id, err := c.fetcher.SearchGame(name, platformIDs)
+			id, err := c.fetcher.SearchGame(name, ids)
 			if err != nil {
 				slog.Warn("IGDB search failed", "game", name, "error", err)
 				return 0, err
@@ -169,29 +168,23 @@ func (c *Cache) search(
 				return id, nil
 			}
 		}
+		return 0, nil
 	}
 
-	// Try without platform constraint
-	for _, name := range variants {
-		<-ticker.C
-		id, err := c.fetcher.SearchGame(name, nil)
-		if err != nil {
-			slog.Warn("IGDB search failed", "game", name, "error", err)
-			return 0, err
-		}
-		if id != 0 {
-			return id, nil
+	// Try with platform constraint first, then without
+	if len(platformIDs) > 0 {
+		if id, err := tryVariants(platformIDs); id != 0 || err != nil {
+			return id, err
 		}
 	}
-
-	return 0, nil
+	return tryVariants(nil)
 }
 
 // saveDetails downloads all images for details, rewrites URLs to local
 // paths, and writes details.json.
 func (c *Cache) saveDetails(
 	console, cleanName string,
-	details *covers.GameDetails,
+	details *igdb.GameDetails,
 ) error {
 	cacheDir := c.cacheDir(console, cleanName)
 	urlBase := "/cache/igdb/" +
@@ -216,43 +209,39 @@ func (c *Cache) saveDetails(
 		}
 	}
 
-	// Screenshots
-	var screenshots []string
-	for i, u := range details.Screenshots {
-		filename := fmt.Sprintf("screenshot_%d.jpg", i)
-		_, localURL, err := c.downloadImage(u, cacheDir, urlBase, filename)
-		if err != nil {
-			slog.Warn(
-				"downloading screenshot failed",
-				"game", cleanName, "index", i, "error", err,
-			)
-			continue
-		}
-		screenshots = append(screenshots, localURL)
-	}
-	details.Screenshots = screenshots
-
-	// Artworks
-	var artworks []string
-	for i, u := range details.Artworks {
-		filename := fmt.Sprintf("artwork_%d.jpg", i)
-		_, localURL, err := c.downloadImage(u, cacheDir, urlBase, filename)
-		if err != nil {
-			slog.Warn(
-				"downloading artwork failed",
-				"game", cleanName, "index", i, "error", err,
-			)
-			continue
-		}
-		artworks = append(artworks, localURL)
-	}
-	details.Artworks = artworks
+	details.Screenshots = c.downloadImageSet(
+		details.Screenshots, cacheDir, urlBase, cleanName, "screenshot",
+	)
+	details.Artworks = c.downloadImageSet(
+		details.Artworks, cacheDir, urlBase, cleanName, "artwork",
+	)
 
 	// Write details.json
 	jsonPath := filepath.Join(cacheDir, "details.json")
 	return atomicfile.Write(jsonPath, func(w io.Writer) error {
 		return json.NewEncoder(w).Encode(details)
 	})
+}
+
+// downloadImageSet downloads a batch of images (screenshots or artworks),
+// logging warnings for individual failures and returning the local URLs.
+func (c *Cache) downloadImageSet(
+	urls []string, cacheDir, urlBase, cleanName, prefix string,
+) []string {
+	var out []string
+	for i, u := range urls {
+		filename := fmt.Sprintf("%s_%d.jpg", prefix, i)
+		_, localURL, err := c.downloadImage(u, cacheDir, urlBase, filename)
+		if err != nil {
+			slog.Warn(
+				"downloading "+prefix+" failed",
+				"game", cleanName, "index", i, "error", err,
+			)
+			continue
+		}
+		out = append(out, localURL)
+	}
+	return out
 }
 
 // downloadImage fetches a remote URL and saves it to cacheDir/filename.
@@ -293,7 +282,7 @@ func (c *Cache) downloadImage(
 // ensureCoverThumbnail copies the cached cover image to the standard cover
 // path (used by the covers handler) if it doesn't already exist.
 func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
-	dst := covers.CoverPath(c.dataDir, console, nameNoExt)
+	dst := coverPath(c.dataDir, console, nameNoExt)
 	if _, err := os.Stat(dst); err == nil {
 		return // already exists
 	}
@@ -324,13 +313,17 @@ func (c *Cache) isCached(console, cleanName string) bool {
 // writeNotFound writes a .notfound marker so the game is not retried.
 func (c *Cache) writeNotFound(console, cleanName string) {
 	path := filepath.Join(c.cacheDir(console, cleanName), ".notfound")
-	_ = atomicfile.Write(path, func(w io.Writer) error {
-		_, err := w.Write([]byte(""))
-		return err
+	_ = atomicfile.Write(path, func(_ io.Writer) error {
+		return nil
 	})
 }
 
 // detailsPath returns the filesystem path for the game's details.json.
 func (c *Cache) detailsPath(console, cleanName string) string {
 	return filepath.Join(c.cacheDir(console, cleanName), "details.json")
+}
+
+// coverPath returns the expected filesystem path for a game's cover art.
+func coverPath(dataDir, console, filenameWithoutExt string) string {
+	return filepath.Join(dataDir, "covers", console, filenameWithoutExt+".png")
 }

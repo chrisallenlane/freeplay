@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chrisallenlane/freeplay/internal/covers"
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
 // mockIGDBFetcher is a test double for igdbFetcher.
@@ -18,7 +18,7 @@ type mockIGDBFetcher struct {
 	// searchResults maps gameName -> gameID (0 = not found)
 	searchResults map[string]int
 	// detailsResults maps gameID -> GameDetails (nil = not found)
-	detailsResults map[int]*covers.GameDetails
+	detailsResults map[int]*igdb.GameDetails
 	searchCalls    int
 	detailsCalls   int
 
@@ -65,7 +65,7 @@ func (m *mockIGDBFetcher) SearchGame(
 
 func (m *mockIGDBFetcher) FetchDetailsByID(
 	gameID int,
-) (*covers.GameDetails, error) {
+) (*igdb.GameDetails, error) {
 	m.detailsCalls++
 	if m.detailsErr != nil {
 		return nil, m.detailsErr
@@ -129,7 +129,7 @@ func FuzzCacheGetMalformedJSON(f *testing.F) {
 
 		// Derive the cache path the same way the implementation does, so
 		// the written file is actually found by Get.
-		_, cleanName := covers.CleanFilename(romFilename)
+		_, cleanName := igdb.CleanFilename(romFilename)
 		if cleanName != "" && console != "" {
 			cacheDir := filepath.Join(
 				dir, "cache", "igdb", console, cleanName,
@@ -155,7 +155,7 @@ func TestGet_CacheHit(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, nil)
 
-	details := &covers.GameDetails{
+	details := &igdb.GameDetails{
 		Name:    "Mega Man",
 		Summary: "A platformer.",
 	}
@@ -204,7 +204,7 @@ func TestGet_EmptyCleanName(t *testing.T) {
 
 func TestFetchAll_NilFetcher(t *testing.T) {
 	c := New(t.TempDir(), nil)
-	got := c.FetchAll([]covers.GameEntry{
+	got := c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man.nes"},
 	})
 	if got != 0 {
@@ -214,19 +214,13 @@ func TestFetchAll_NilFetcher(t *testing.T) {
 
 func TestFetchAll_PopulatesCache(t *testing.T) {
 	// Set up a fake image server so downloadImage succeeds
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
 	fetcher := &mockIGDBFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {
 				Name:     "Mega Man",
 				Summary:  "A platformer.",
@@ -238,7 +232,7 @@ func TestFetchAll_PopulatesCache(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	})
 
@@ -255,7 +249,7 @@ func TestFetchAll_PopulatesCache(t *testing.T) {
 	}
 
 	// Cover thumbnail should exist at standard cover path
-	coverPath := covers.CoverPath(dir, "NES", "Mega Man (USA)")
+	coverPath := coverPath(dir, "NES", "Mega Man (USA)")
 	if _, err := os.Stat(coverPath); err != nil {
 		t.Errorf("expected cover at %q, got: %v", coverPath, err)
 	}
@@ -264,7 +258,7 @@ func TestFetchAll_PopulatesCache(t *testing.T) {
 func TestFetchAll_SkipsExisting(t *testing.T) {
 	fetcher := &mockIGDBFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man"},
 		},
 	}
@@ -284,7 +278,7 @@ func TestFetchAll_SkipsExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	})
 
@@ -306,7 +300,7 @@ func TestFetchAll_NotFoundMarker(t *testing.T) {
 	c := New(dir, fetcher)
 
 	// First call: no match, writes .notfound
-	c.FetchAll([]covers.GameEntry{
+	c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Unknown Game.nes"},
 	})
 
@@ -321,7 +315,7 @@ func TestFetchAll_NotFoundMarker(t *testing.T) {
 	fetcher.searchCalls = 0
 
 	// Second call: should be skipped due to .notfound marker
-	c.FetchAll([]covers.GameEntry{
+	c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Unknown Game.nes"},
 	})
 
@@ -335,19 +329,13 @@ func TestFetchAll_NotFoundMarker(t *testing.T) {
 
 func TestFetchAll_RegionalVariantsShareCache(t *testing.T) {
 	// Set up a fake image server
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
 	fetcher := &mockIGDBFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
 	}
@@ -356,7 +344,7 @@ func TestFetchAll_RegionalVariantsShareCache(t *testing.T) {
 	c := New(dir, fetcher)
 
 	// Two regional variants of the same game
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 		{Console: "NES", Filename: "Mega Man (Japan).nes"},
 	}
@@ -376,7 +364,7 @@ func TestFetchAll_RegionalVariantsShareCache(t *testing.T) {
 
 	// Both ROMs should have cover thumbnails
 	for _, name := range []string{"Mega Man (USA)", "Mega Man (Japan)"} {
-		cp := covers.CoverPath(dir, "NES", name)
+		cp := coverPath(dir, "NES", name)
 		if _, err := os.Stat(cp); err != nil {
 			t.Errorf("expected cover at %q, got: %v", cp, err)
 		}
@@ -402,7 +390,7 @@ func TestFetchAll_FetchingFlag(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		c.FetchAll([]covers.GameEntry{
+		c.FetchAll([]igdb.GameEntry{
 			{Console: "NES", Filename: "Game.nes"},
 		})
 	}()
@@ -424,19 +412,13 @@ func TestFetchAll_FetchingFlag(t *testing.T) {
 }
 
 func TestFetchAll_URLsRewrittenToLocalPaths(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	imgURL := imgServer.URL + "/img.jpg"
 
 	fetcher := &mockIGDBFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {
 				Name:        "Mega Man",
 				CoverURL:    imgURL,
@@ -449,7 +431,7 @@ func TestFetchAll_URLsRewrittenToLocalPaths(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	c.FetchAll([]covers.GameEntry{
+	c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man.nes"},
 	})
 
@@ -476,16 +458,10 @@ func TestFetchAll_URLsRewrittenToLocalPaths(t *testing.T) {
 
 // TestFetchAll_NameVariantFallback verifies that when the primary search name
 // returns no result but a colon-substituted variant does, FetchAll still
-// caches the game. This exercises the covers.NameVariants fallback path where
+// caches the game. This exercises the igdb.NameVariants fallback path where
 // No-Intro " - " subtitle separators are tried as IGDB ": " separators.
 func TestFetchAll_NameVariantFallback(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
@@ -495,7 +471,7 @@ func TestFetchAll_NameVariantFallback(t *testing.T) {
 		searchResults: map[string]int{
 			"Game: Subtitle": 42,
 		},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			42: {Name: "Game: Subtitle", CoverURL: coverURL},
 		},
 	}
@@ -503,7 +479,7 @@ func TestFetchAll_NameVariantFallback(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Game - Subtitle.nes"},
 	})
 
@@ -523,7 +499,7 @@ func TestFetchAll_DetailsError(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	})
 
@@ -552,7 +528,7 @@ func TestFetchAll_DetailsNil(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	})
 
@@ -582,7 +558,7 @@ func TestFetchAll_PlatformConstrainedSearch(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	c.FetchAll([]covers.GameEntry{
+	c.FetchAll([]igdb.GameEntry{
 		{
 			Console:         "NES",
 			Filename:        "Mega Man (USA).nes",
@@ -632,7 +608,7 @@ func TestFetchAll_SearchError(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	})
 
@@ -669,7 +645,7 @@ func TestFetchAll_ImageDownloadFailure(t *testing.T) {
 
 	fetcher := &mockIGDBFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {
 				Name:        "Mega Man",
 				Summary:     "A platformer.",
@@ -683,7 +659,7 @@ func TestFetchAll_ImageDownloadFailure(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{
+	count := c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	})
 

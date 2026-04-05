@@ -1,14 +1,12 @@
 package details
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
 
-	"github.com/chrisallenlane/freeplay/internal/covers"
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
 // TestFetchAllIdempotent verifies that calling FetchAll twice with the
@@ -21,7 +19,7 @@ func TestFetchAllIdempotent(t *testing.T) {
 
 	fetcher := &mockIGDBFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
 	}
@@ -29,7 +27,7 @@ func TestFetchAllIdempotent(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	}
 
@@ -58,7 +56,7 @@ func TestFetchAllAfterCacheCorruption(t *testing.T) {
 	var fetchCount atomic.Int32
 	fetcher := &countingMockFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
 		fetchCount: &fetchCount,
@@ -67,7 +65,7 @@ func TestFetchAllAfterCacheCorruption(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	}
 
@@ -118,7 +116,7 @@ func TestFetchAllEmptyEntries(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{})
+	count := c.FetchAll([]igdb.GameEntry{})
 	if count != 0 {
 		t.Errorf("FetchAll([]) = %d, want 0", count)
 	}
@@ -141,7 +139,7 @@ func TestFetchingFlagResetOnCompletion(t *testing.T) {
 		t.Error("Fetching() should be false before FetchAll")
 	}
 
-	c.FetchAll([]covers.GameEntry{
+	c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Game.nes"},
 	})
 
@@ -159,7 +157,7 @@ func TestIsCachedConsistencyAfterSaveDetails(t *testing.T) {
 
 	fetcher := &mockIGDBFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
 	}
@@ -172,7 +170,7 @@ func TestIsCachedConsistencyAfterSaveDetails(t *testing.T) {
 		t.Fatal("isCached should be false before fetching")
 	}
 
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	}
 
@@ -200,7 +198,7 @@ func TestIsCachedAfterNotFound(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Unknown Game.nes"},
 	}
 
@@ -227,7 +225,7 @@ func TestIsCachedAfterTransientSearchError(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man.nes"},
 	}
 
@@ -249,13 +247,9 @@ func TestIsCachedAfterTransientSearchError(t *testing.T) {
 
 // TestFetchingFlagConcurrentFetchAll verifies that when two FetchAll calls
 // run concurrently on the same Cache, the Fetching() flag remains true until
-// BOTH complete. Currently, FetchAll uses a simple Store(true)/defer
-// Store(false) pattern which means the first goroutine to finish will set
-// Fetching()=false while the second is still running.
-//
-// This can happen in practice when an HTTP rescan triggers onScanComplete
-// (spawning a FetchAll goroutine) while a previous FetchAll goroutine from
-// the initial scan is still in progress.
+// BOTH complete. FetchAll uses atomic reference counting (Add(1)/Add(-1)),
+// so a second call completing early must not reset the flag while the first
+// call is still in progress.
 func TestFetchingFlagConcurrentFetchAll(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
@@ -267,45 +261,51 @@ func TestFetchingFlagConcurrentFetchAll(t *testing.T) {
 
 	c := New(t.TempDir(), fetcher)
 
-	// Start first FetchAll with a game that will block in SearchGame
+	// Start first FetchAll with a game that will block in SearchGame.
 	done1 := make(chan struct{})
 	go func() {
 		defer close(done1)
-		c.FetchAll([]covers.GameEntry{
+		c.FetchAll([]igdb.GameEntry{
 			{Console: "NES", Filename: "Game.nes"},
 		})
 	}()
 
-	// Wait for first FetchAll to block in SearchGame
+	// Wait for first FetchAll to block in SearchGame.
 	<-entered
 
 	if !c.Fetching() {
-		t.Fatal("Fetching() should be true while FetchAll is blocked")
+		t.Fatal("Fetching() should be true while first FetchAll is blocked")
 	}
 
-	// Start a second FetchAll with no games (completes immediately).
-	// It sets fetching=true then immediately sets fetching=false.
+	// Start a second FetchAll with no games; it completes immediately.
+	// With reference counting, this increments then decrements the counter,
+	// but the counter remains > 0 because the first FetchAll is still running.
 	done2 := make(chan struct{})
 	go func() {
 		defer close(done2)
-		c.FetchAll([]covers.GameEntry{})
+		c.FetchAll([]igdb.GameEntry{})
 	}()
 	<-done2
 
-	// BUG: The second FetchAll completed and set Fetching()=false,
-	// even though the first FetchAll is still blocked in SearchGame.
+	// Fetching() must still be true: the first FetchAll has not finished.
 	if !c.Fetching() {
 		t.Error(
-			"BUG: Fetching() returns false while a FetchAll call is still " +
-				"in progress. A concurrent FetchAll that completed first " +
-				"reset the flag prematurely. The Fetching() flag should use " +
-				"reference counting or a mutex to handle concurrent calls.",
+			"Fetching() returned false while first FetchAll is still running. " +
+				"Reference counting (Add/Add) must keep the flag true until " +
+				"all concurrent FetchAll calls complete.",
 		)
 	}
 
-	// Cleanup: release the blocked FetchAll
+	// Release the blocked FetchAll and wait for it to finish.
 	close(release)
 	<-done1
+
+	// Now both FetchAll calls have completed; Fetching() must be false.
+	if c.Fetching() {
+		t.Error(
+			"Fetching() should be false after all FetchAll calls complete",
+		)
+	}
 }
 
 // --- test helpers ---
@@ -319,7 +319,7 @@ func (e errType) Error() string { return string(e) }
 // countingMockFetcher wraps mockIGDBFetcher and counts fetches atomically.
 type countingMockFetcher struct {
 	searchResults  map[string]int
-	detailsResults map[int]*covers.GameDetails
+	detailsResults map[int]*igdb.GameDetails
 	fetchCount     *atomic.Int32
 }
 
@@ -334,22 +334,10 @@ func (m *countingMockFetcher) SearchGame(
 
 func (m *countingMockFetcher) FetchDetailsByID(
 	gameID int,
-) (*covers.GameDetails, error) {
+) (*igdb.GameDetails, error) {
 	m.fetchCount.Add(1)
 	if m.detailsResults == nil {
 		return nil, nil
 	}
 	return m.detailsResults[gameID], nil
-}
-
-func startFakeImageServer(t *testing.T) *httptest.Server {
-	t.Helper()
-	srv := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	t.Cleanup(srv.Close)
-	return srv
 }

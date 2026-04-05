@@ -17,7 +17,8 @@ cmd/freeplay/       CLI entrypoint
 internal/
   atomicfile/       Atomic file writes
   config/           TOML config loading and validation
-  covers/           IGDB cover art fetching and caching
+  details/          IGDB details caching and fetch orchestration
+  igdb/             IGDB API client, name cleaning, and variant generation
   saves/            Save-state persistence
   scanner/          ROM directory scanning and catalog building
   server/           HTTP server and API routes
@@ -41,6 +42,7 @@ Run `make help` for the full list. The most useful targets:
 | `make test`          | Run Go and JS unit tests                |
 | `make coverage`      | Generate HTML coverage report           |
 | `make coverage-text` | Show per-function coverage in terminal  |
+| `make a11y`          | Run accessibility audit against live server |
 | `make vendor`        | Tidy and re-vendor Go dependencies      |
 | `make vendor-update` | Update all dependencies then re-vendor  |
 | `make docker`        | Build the Docker image                  |

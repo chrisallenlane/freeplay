@@ -1,4 +1,4 @@
-package covers
+package igdb
 
 import (
 	"encoding/json"
@@ -17,8 +17,8 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// IGDBFetcher fetches cover art from the IGDB API.
-type IGDBFetcher struct {
+// Fetcher fetches game metadata from the IGDB API.
+type Fetcher struct {
 	clientID     string
 	clientSecret string
 
@@ -28,16 +28,16 @@ type IGDBFetcher struct {
 	client      *http.Client
 }
 
-// NewIGDBFetcher creates an IGDB cover art fetcher.
+// NewFetcher creates an IGDB game metadata fetcher.
 // apiKey should be in "client_id:client_secret" format.
-func NewIGDBFetcher(apiKey string) *IGDBFetcher {
+func NewFetcher(apiKey string) *Fetcher {
 	parts := strings.SplitN(apiKey, ":", 2)
 	var clientID, clientSecret string
 	if len(parts) == 2 {
 		clientID = parts[0]
 		clientSecret = parts[1]
 	}
-	return &IGDBFetcher{
+	return &Fetcher{
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		client: &http.Client{
@@ -46,7 +46,7 @@ func NewIGDBFetcher(apiKey string) *IGDBFetcher {
 	}
 }
 
-func (f *IGDBFetcher) getToken() (string, error) {
+func (f *Fetcher) getToken() (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -84,7 +84,7 @@ func (f *IGDBFetcher) getToken() (string, error) {
 	return f.token, nil
 }
 
-func (f *IGDBFetcher) apiRequest(endpoint, body string) ([]byte, error) {
+func (f *Fetcher) apiRequest(endpoint, body string) ([]byte, error) {
 	for attempt := range 2 {
 		token, err := f.getToken()
 		if err != nil {
@@ -145,7 +145,7 @@ type GameDetails struct {
 // SearchGame searches IGDB for a game by name and returns the IGDB game ID
 // of the best case-insensitive exact name match. Returns 0 if no match is
 // found. When platformIDs is non-empty, results are filtered to those IDs.
-func (f *IGDBFetcher) SearchGame(gameName string, platformIDs []int) (int, error) {
+func (f *Fetcher) SearchGame(gameName string, platformIDs []int) (int, error) {
 	escaped := strings.ReplaceAll(gameName, `"`, `\"`)
 	var query string
 	if len(platformIDs) > 0 {
@@ -200,7 +200,7 @@ func (f *IGDBFetcher) SearchGame(gameName string, platformIDs []int) (int, error
 
 // FetchDetailsByID retrieves full game metadata from IGDB by game ID.
 // Returns nil if the game is not found.
-func (f *IGDBFetcher) FetchDetailsByID(gameID int) (*GameDetails, error) {
+func (f *Fetcher) FetchDetailsByID(gameID int) (*GameDetails, error) {
 	fields := `name, url, summary, storyline, first_release_date, cover.url, ` +
 		`involved_companies.company.name, involved_companies.developer, ` +
 		`involved_companies.publisher, platforms.name, screenshots.url, ` +
@@ -305,8 +305,7 @@ func gameDetailsFromIGDB(g igdbGame) *GameDetails {
 }
 
 // transformImageURL prepends https and replaces the size template in an IGDB image URL.
-func transformImageURL(rawURL, size string) string {
-	u := rawURL
+func transformImageURL(u, size string) string {
 	if strings.HasPrefix(u, "//") {
 		u = "https:" + u
 	}

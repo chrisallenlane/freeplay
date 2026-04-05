@@ -185,10 +185,16 @@ describe("SRAM restore: edge case — trailing slash in path", () => {
 });
 
 describe("postSave: data guard behavior", () => {
+	// NOTE: These tests verify JavaScript language semantics, not application
+	// code. They are intentional documentation tests that record the truthiness
+	// assumptions the postSave guard (`if (data) fetch(...)`) relies on. They
+	// will pass regardless of any changes to play.js and cannot detect
+	// regressions in postSave itself.
+	//
 	// The postSave function (lines 75-82) has this guard:
 	//   if (data) fetch(...)
-	// This means falsy values prevent the save. Let's verify which values
-	// are falsy in JavaScript and would skip saving.
+	// This means falsy values prevent the save. The tests below document
+	// which values are falsy vs. truthy and what that means for postSave.
 
 	it("null is falsy — save skipped correctly", () => {
 		assert.ok(!null);
@@ -211,6 +217,11 @@ describe("postSave: data guard behavior", () => {
 });
 
 describe("SRAM save: duplicate save on manual button click", () => {
+	// NOTE: This test documents a known bug in EmulatorJS behavior using a
+	// local simulation. It does NOT exercise play.js code and cannot detect
+	// if the bug is fixed or regresses. It exists to record the upstream
+	// EmulatorJS call sequence that causes duplicate POSTs on manual save.
+	//
 	// When the user clicks "Save SRAM" in EmulatorJS:
 	//
 	// 1. emulator.js calls: const file = await this.gameManager.getSaveFile()
@@ -246,6 +257,11 @@ describe("SRAM save: duplicate save on manual button click", () => {
 });
 
 describe("SRAM save: duplicate handler registration on game restart", () => {
+	// NOTE: This test documents a known bug in EmulatorJS behavior using a
+	// local simulation. It does NOT exercise play.js code and cannot detect
+	// if the bug is fixed or regresses. It exists to record the root cause
+	// of duplicate POSTs when games are restarted within the same page load.
+	//
 	// EJS_onGameStart registers a "saveSaveFiles" event handler each time
 	// it's called (play.js line 119). EmulatorJS's emulator.on() appends
 	// to an array (emulator.js lines 407-410):
@@ -286,6 +302,11 @@ describe("SRAM save: duplicate handler registration on game restart", () => {
 });
 
 describe("SRAM save: exit triggers double saveSaveFiles", () => {
+	// NOTE: This test documents a known bug in EmulatorJS behavior using a
+	// local simulation. It does NOT exercise play.js code and cannot detect
+	// if the bug is fixed or regresses. It exists to record the upstream
+	// EmulatorJS call sequence that causes duplicate POSTs on exit.
+	//
 	// On exit, GameManager.js calls saveSaveFiles() TWICE (lines 48-50):
 	//   this.EJS.on("exit", () => {
 	//       if (!this.EJS.failedToStart) {
