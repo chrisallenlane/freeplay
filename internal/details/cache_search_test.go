@@ -2,8 +2,6 @@ package details
 
 import (
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -77,13 +75,7 @@ func (m *platformAwareMockFetcher) FetchDetailsByID(
 // is not attempted. This is the early-return path at line 169 of
 // cache.go that was identified as having limited test coverage.
 func TestSearch_ConstrainedMatchSkipsUnconstrained(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
@@ -141,13 +133,7 @@ func TestSearch_ConstrainedMatchSkipsUnconstrained(t *testing.T) {
 // matches, the search stops and returns that match without trying
 // unconstrained search.
 func TestSearch_ConstrainedMatchOnSecondVariant(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
@@ -264,13 +250,7 @@ func TestSearch_ErrorOnConstrainedAbortsSearch(t *testing.T) {
 // platformIDs is empty, only unconstrained search calls are made (the
 // constrained loop is skipped entirely).
 func TestSearch_NoPlatformIDs_OnlyUnconstrainedCalls(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
@@ -313,13 +293,7 @@ func TestSearch_NoPlatformIDs_OnlyUnconstrainedCalls(t *testing.T) {
 // two-phase fallback: all constrained variants miss, then unconstrained
 // search finds the game.
 func TestSearch_ConstrainedMiss_UnconstrainedHit(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
@@ -461,13 +435,7 @@ func TestSearch_AllVariantsNotFound_WritesNotFound(t *testing.T) {
 // platformIDs slice is treated the same as nil: the constrained search
 // phase is skipped.
 func TestSearch_EmptyPlatformIDsSlice(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	coverURL := imgServer.URL + "/cover.jpg"
 

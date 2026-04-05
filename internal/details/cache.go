@@ -156,11 +156,10 @@ func (c *Cache) search(
 ) (int, error) {
 	variants := covers.NameVariants(cleanName)
 
-	// Try with platform constraint first
-	if len(platformIDs) > 0 {
+	tryVariants := func(ids []int) (int, error) {
 		for _, name := range variants {
 			<-ticker.C
-			id, err := c.fetcher.SearchGame(name, platformIDs)
+			id, err := c.fetcher.SearchGame(name, ids)
 			if err != nil {
 				slog.Warn("IGDB search failed", "game", name, "error", err)
 				return 0, err
@@ -169,22 +168,16 @@ func (c *Cache) search(
 				return id, nil
 			}
 		}
+		return 0, nil
 	}
 
-	// Try without platform constraint
-	for _, name := range variants {
-		<-ticker.C
-		id, err := c.fetcher.SearchGame(name, nil)
-		if err != nil {
-			slog.Warn("IGDB search failed", "game", name, "error", err)
-			return 0, err
-		}
-		if id != 0 {
-			return id, nil
+	// Try with platform constraint first, then without
+	if len(platformIDs) > 0 {
+		if id, err := tryVariants(platformIDs); id != 0 || err != nil {
+			return id, err
 		}
 	}
-
-	return 0, nil
+	return tryVariants(nil)
 }
 
 // saveDetails downloads all images for details, rewrites URLs to local
@@ -216,43 +209,39 @@ func (c *Cache) saveDetails(
 		}
 	}
 
-	// Screenshots
-	var screenshots []string
-	for i, u := range details.Screenshots {
-		filename := fmt.Sprintf("screenshot_%d.jpg", i)
-		_, localURL, err := c.downloadImage(u, cacheDir, urlBase, filename)
-		if err != nil {
-			slog.Warn(
-				"downloading screenshot failed",
-				"game", cleanName, "index", i, "error", err,
-			)
-			continue
-		}
-		screenshots = append(screenshots, localURL)
-	}
-	details.Screenshots = screenshots
-
-	// Artworks
-	var artworks []string
-	for i, u := range details.Artworks {
-		filename := fmt.Sprintf("artwork_%d.jpg", i)
-		_, localURL, err := c.downloadImage(u, cacheDir, urlBase, filename)
-		if err != nil {
-			slog.Warn(
-				"downloading artwork failed",
-				"game", cleanName, "index", i, "error", err,
-			)
-			continue
-		}
-		artworks = append(artworks, localURL)
-	}
-	details.Artworks = artworks
+	details.Screenshots = c.downloadImageSet(
+		details.Screenshots, cacheDir, urlBase, cleanName, "screenshot",
+	)
+	details.Artworks = c.downloadImageSet(
+		details.Artworks, cacheDir, urlBase, cleanName, "artwork",
+	)
 
 	// Write details.json
 	jsonPath := filepath.Join(cacheDir, "details.json")
 	return atomicfile.Write(jsonPath, func(w io.Writer) error {
 		return json.NewEncoder(w).Encode(details)
 	})
+}
+
+// downloadImageSet downloads a batch of images (screenshots or artworks),
+// logging warnings for individual failures and returning the local URLs.
+func (c *Cache) downloadImageSet(
+	urls []string, cacheDir, urlBase, cleanName, prefix string,
+) []string {
+	var out []string
+	for i, u := range urls {
+		filename := fmt.Sprintf("%s_%d.jpg", prefix, i)
+		_, localURL, err := c.downloadImage(u, cacheDir, urlBase, filename)
+		if err != nil {
+			slog.Warn(
+				"downloading "+prefix+" failed",
+				"game", cleanName, "index", i, "error", err,
+			)
+			continue
+		}
+		out = append(out, localURL)
+	}
+	return out
 }
 
 // downloadImage fetches a remote URL and saves it to cacheDir/filename.
@@ -324,9 +313,8 @@ func (c *Cache) isCached(console, cleanName string) bool {
 // writeNotFound writes a .notfound marker so the game is not retried.
 func (c *Cache) writeNotFound(console, cleanName string) {
 	path := filepath.Join(c.cacheDir(console, cleanName), ".notfound")
-	_ = atomicfile.Write(path, func(w io.Writer) error {
-		_, err := w.Write([]byte(""))
-		return err
+	_ = atomicfile.Write(path, func(_ io.Writer) error {
+		return nil
 	})
 }
 

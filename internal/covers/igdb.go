@@ -305,8 +305,7 @@ func gameDetailsFromIGDB(g igdbGame) *GameDetails {
 }
 
 // transformImageURL prepends https and replaces the size template in an IGDB image URL.
-func transformImageURL(rawURL, size string) string {
-	u := rawURL
+func transformImageURL(u, size string) string {
 	if strings.HasPrefix(u, "//") {
 		u = "https:" + u
 	}

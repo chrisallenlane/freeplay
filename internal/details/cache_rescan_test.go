@@ -1,8 +1,6 @@
 package details
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -340,16 +338,4 @@ func (m *countingMockFetcher) FetchDetailsByID(
 		return nil, nil
 	}
 	return m.detailsResults[gameID], nil
-}
-
-func startFakeImageServer(t *testing.T) *httptest.Server {
-	t.Helper()
-	srv := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("fakeimage"))
-		}),
-	)
-	t.Cleanup(srv.Close)
-	return srv
 }
