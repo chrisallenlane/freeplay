@@ -536,13 +536,7 @@ func TestDownloadImage_AtomicWriteConsistency(t *testing.T) {
 // TestSaveDetails_WritesDetailsJSON verifies that saveDetails writes a
 // valid details.json file that can be round-tripped back.
 func TestSaveDetails_WritesDetailsJSON(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("imagedata"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	dir := t.TempDir()
 	c := New(dir, nil)
