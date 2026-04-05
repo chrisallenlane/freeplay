@@ -3,7 +3,9 @@ package saves
 import (
 	"bytes"
 	"path/filepath"
+	"strings"
 	"testing"
+	"testing/iotest"
 )
 
 func TestSavePath(t *testing.T) {
@@ -80,6 +82,19 @@ func TestPutCreatesDirectories(t *testing.T) {
 	}
 	if string(got) != "sram data" {
 		t.Errorf("got %q, want %q", string(got), "sram data")
+	}
+}
+
+func TestPutReaderError(t *testing.T) {
+	dir := t.TempDir()
+	m := New(dir)
+
+	err := m.Put("NES", "game1", "state", iotest.ErrReader(iotest.ErrTimeout))
+	if err == nil {
+		t.Fatal("expected error from ErrReader, got nil")
+	}
+	if !strings.Contains(err.Error(), "reading save data") {
+		t.Errorf("error should mention %q, got: %v", "reading save data", err)
 	}
 }
 

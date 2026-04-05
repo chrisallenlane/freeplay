@@ -615,6 +615,58 @@ func FuzzSafeName(f *testing.F) {
 	})
 }
 
+func FuzzParseSaveParams(f *testing.F) {
+	f.Add("NES", "game1", "state")
+	f.Add("NES", "game1", "sram")
+	f.Add("", "", "")
+	f.Add("..", "game", "state")
+	f.Add("NES", "../secret", "state")
+	f.Add("NES", "game", "badtype")
+
+	f.Fuzz(func(t *testing.T, console, game, saveType string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf(
+					"parseSaveParams panicked on (%q, %q, %q): %v",
+					console, game, saveType, r,
+				)
+			}
+		}()
+
+		// Build a base request on a fixed URL and inject fuzzed values via
+		// SetPathValue so that arbitrary strings (including control characters)
+		// don't cause httptest.NewRequest to panic on URL parsing.
+		req := httptest.NewRequest("GET", "/api/saves/x/x/x", nil)
+		req.SetPathValue("console", console)
+		req.SetPathValue("game", game)
+		req.SetPathValue("type", saveType)
+
+		gotConsole, gotGame, gotSaveType, ok := parseSaveParams(req)
+
+		if ok {
+			// When parseSaveParams reports success, the invariants must hold.
+			if !safeName(gotConsole) {
+				t.Errorf(
+					"ok=true but gotConsole %q fails safeName",
+					gotConsole,
+				)
+			}
+			if !safeName(gotGame) {
+				t.Errorf(
+					"ok=true but gotGame %q fails safeName",
+					gotGame,
+				)
+			}
+			if gotSaveType != "state" && gotSaveType != "sram" {
+				t.Errorf(
+					"ok=true but gotSaveType %q is not \"state\" or \"sram\"",
+					gotSaveType,
+				)
+			}
+		}
+	})
+}
+
 func TestRescanConflict(t *testing.T) {
 	srv, _ := testServer(t)
 
@@ -811,6 +863,98 @@ func TestCacheFilesNotFound(t *testing.T) {
 
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
+	}
+}
+
+func TestCSRFHeaderValidation(t *testing.T) {
+	srv, _ := testServer(t)
+
+	tests := []struct {
+		name       string
+		headerVal  string // "" means do not set the header at all
+		setHeader  bool
+		wantStatus int
+	}{
+		{
+			name:       "wrong value XMLHttpRequest",
+			setHeader:  true,
+			headerVal:  "XMLHttpRequest",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "empty header value",
+			setHeader:  true,
+			headerVal:  "",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "correct value freeplay",
+			setHeader:  true,
+			headerVal:  "freeplay",
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/api/rescan", nil)
+			if tt.setHeader {
+				req.Header.Set("X-Requested-With", tt.headerVal)
+			}
+			w := httptest.NewRecorder()
+			srv.handler.ServeHTTP(w, req)
+			if w.Code != tt.wantStatus {
+				t.Errorf(
+					"POST /api/rescan with X-Requested-With=%q: got %d, want %d",
+					tt.headerVal, w.Code, tt.wantStatus,
+				)
+			}
+		})
+	}
+}
+
+func TestPostSaveInvalidType(t *testing.T) {
+	srv, _ := testServer(t)
+
+	req := httptest.NewRequest(
+		"POST", "/api/saves/NES/game1/badtype",
+		strings.NewReader("data"),
+	)
+	req.Header.Set("X-Requested-With", "freeplay")
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("got status %d, want 400", w.Code)
+	}
+}
+
+func TestNoCacheMiddleware(t *testing.T) {
+	srv, _ := testServer(t)
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{"index", "/"},
+		{"play page", "/play?console=NES&rom=test.nes"},
+		{"details page", "/details?console=NES&rom=test.nes"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.path, nil)
+			w := httptest.NewRecorder()
+			srv.handler.ServeHTTP(w, req)
+
+			cc := w.Header().Get("Cache-Control")
+			if cc != "no-cache" {
+				t.Errorf(
+					"GET %s: Cache-Control = %q, want %q",
+					tt.path, cc, "no-cache",
+				)
+			}
+		})
 	}
 }
 
