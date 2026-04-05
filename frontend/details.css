@@ -78,12 +78,17 @@ main {
 
 .details-manual-btn {
     background: var(--color-border);
-    color: var(--color-text-muted);
+    color: var(--color-text);
     border: 1px solid var(--color-border-hi);
 }
 
 .details-manual-btn:hover {
     background: var(--color-border-hi);
+}
+
+.details-action-btn:focus-visible {
+    outline: 2px solid var(--color-link);
+    outline-offset: 2px;
 }
 
 .details-section {

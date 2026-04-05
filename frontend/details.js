@@ -187,13 +187,13 @@
 		section.appendChild(h3);
 		const gallery = document.createElement("div");
 		gallery.className = galleryClass || "details-gallery";
-		for (const url of urls) {
+		for (let i = 0; i < urls.length; i++) {
 			const link = document.createElement("a");
-			link.href = url;
+			link.href = urls[i];
 			const img = document.createElement("img");
-			img.src = url;
+			img.src = urls[i];
 			img.loading = "lazy";
-			img.alt = heading;
+			img.alt = `${heading} ${i + 1} of ${urls.length}`;
 			link.appendChild(img);
 			gallery.appendChild(link);
 		}
