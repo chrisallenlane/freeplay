@@ -30,10 +30,25 @@ main {
     color: var(--color-text-bright);
 }
 
-.details-info-line {
+.details-meta-table {
     font-size: 0.875rem;
     color: var(--color-text-muted);
     line-height: 1.5;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.details-meta-table th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-text);
+    padding: 2px 16px 2px 0;
+    vertical-align: top;
+    white-space: nowrap;
+}
+
+.details-meta-table td {
+    padding: 2px 0;
 }
 
 .details-link {

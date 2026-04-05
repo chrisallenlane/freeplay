@@ -58,43 +58,42 @@
 		title.textContent = details ? details.name : gameName;
 		meta.appendChild(title);
 
+		const rows = [];
 		if (details) {
-			const info = [];
+			rows.push(["Console", consoleName]);
 			if (details.firstReleaseDate)
-				info.push(
-					`${consoleName} \u00B7 ${details.firstReleaseDate.substring(0, 4)}`,
-				);
-			else info.push(consoleName);
+				rows.push(["Year", details.firstReleaseDate.substring(0, 4)]);
 			if (details.developers?.length)
-				info.push(`Developer: ${details.developers.join(", ")}`);
+				rows.push(["Developer", details.developers.join(", ")]);
 			if (details.publishers?.length)
-				info.push(`Publisher: ${details.publishers.join(", ")}`);
+				rows.push(["Publisher", details.publishers.join(", ")]);
 			if (details.platforms?.length)
-				info.push(`Platforms: ${details.platforms.join(", ")}`);
-			if (details.collection) info.push(`Series: ${details.collection}`);
-
-			for (const line of info) {
-				const p = document.createElement("p");
-				p.className = "details-info-line";
-				p.textContent = line;
-				meta.appendChild(p);
-			}
-
-			if (details.igdbUrl) {
-				const p = document.createElement("p");
-				p.className = "details-info-line";
-				const a = document.createElement("a");
-				a.href = details.igdbUrl;
-				a.textContent = "View on IGDB";
-				a.className = "details-link";
-				p.appendChild(a);
-				meta.appendChild(p);
-			}
+				rows.push(["Platforms", details.platforms.join(", ")]);
+			if (details.collection) rows.push(["Series", details.collection]);
 		} else {
-			const p = document.createElement("p");
-			p.className = "details-info-line";
-			p.textContent = consoleName;
-			meta.appendChild(p);
+			rows.push(["Console", consoleName]);
+		}
+
+		const table = document.createElement("table");
+		table.className = "details-meta-table";
+		for (const [label, value] of rows) {
+			const tr = document.createElement("tr");
+			const th = document.createElement("th");
+			th.textContent = label;
+			const td = document.createElement("td");
+			td.textContent = value;
+			tr.appendChild(th);
+			tr.appendChild(td);
+			table.appendChild(tr);
+		}
+		meta.appendChild(table);
+
+		if (details?.igdbUrl) {
+			const a = document.createElement("a");
+			a.href = details.igdbUrl;
+			a.textContent = "View on IGDB";
+			a.className = "details-link";
+			meta.appendChild(a);
 		}
 
 		hero.appendChild(meta);
