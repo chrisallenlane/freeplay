@@ -3,7 +3,7 @@
 
 	const subpage = FP.initSubpage();
 	if (!subpage) {
-		showError("Missing console or rom parameter.");
+		FP.showError("content", "Missing console or rom parameter.");
 		return;
 	}
 	const { consoleName, rom, gameName } = subpage;
@@ -20,21 +20,17 @@
 		.then(([catalog, details]) => {
 			const game = FP.findGame(catalog.games, consoleName, rom);
 			if (!game) {
-				showError("Game not found. It may have been removed from the library.");
+				FP.showError(
+					"content",
+					"Game not found. It may have been removed from the library.",
+				);
 				return;
 			}
 			render(game, details);
 		})
 		.catch(() => {
-			showError("Could not load game data.");
+			FP.showError("content", "Could not load game data.");
 		});
-
-	function showError(msg) {
-		document.getElementById("content").style.display = "none";
-		const el = document.getElementById("error");
-		el.style.display = "";
-		el.textContent = msg;
-	}
 
 	function render(game, details) {
 		const displayName = details?.name || gameName;

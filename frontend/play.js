@@ -3,7 +3,7 @@
 
 	const subpage = FP.initSubpage();
 	if (!subpage) {
-		showError("Missing console or rom parameter.");
+		FP.showError("game", "Missing console or rom parameter.");
 		return;
 	}
 	const { consoleName, rom, gameName } = subpage;
@@ -13,7 +13,10 @@
 		.then((catalog) => {
 			const game = FP.findGame(catalog.games, consoleName, rom);
 			if (!game) {
-				showError("Game not found. It may have been removed from the library.");
+				FP.showError(
+					"game",
+					"Game not found. It may have been removed from the library.",
+				);
 				return;
 			}
 			const toggle = document.getElementById("theme-toggle");
@@ -37,15 +40,8 @@
 			startEmulator(game);
 		})
 		.catch(() => {
-			showError("Could not load game catalog.");
+			FP.showError("game", "Could not load game catalog.");
 		});
-
-	function showError(msg) {
-		document.getElementById("game").style.display = "none";
-		const el = document.getElementById("error");
-		el.style.display = "";
-		el.textContent = msg;
-	}
 
 	function startEmulator(game) {
 		const saveBase = FP.saveBasePath(consoleName, gameName);

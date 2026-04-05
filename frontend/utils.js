@@ -92,6 +92,13 @@
 		return null;
 	};
 
+	exports.showError = (containerId, msg) => {
+		document.getElementById(containerId).style.display = "none";
+		const el = document.getElementById("error");
+		el.style.display = "";
+		el.textContent = msg;
+	};
+
 	exports.initSubpage = () => {
 		const params = new URLSearchParams(window.location.search);
 		const consoleName = params.get("console");
