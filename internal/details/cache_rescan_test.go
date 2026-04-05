@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/chrisallenlane/freeplay/internal/covers"
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
 // TestFetchAllIdempotent verifies that calling FetchAll twice with the
@@ -19,7 +19,7 @@ func TestFetchAllIdempotent(t *testing.T) {
 
 	fetcher := &mockIGDBFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
 	}
@@ -27,7 +27,7 @@ func TestFetchAllIdempotent(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	}
 
@@ -56,7 +56,7 @@ func TestFetchAllAfterCacheCorruption(t *testing.T) {
 	var fetchCount atomic.Int32
 	fetcher := &countingMockFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
 		fetchCount: &fetchCount,
@@ -65,7 +65,7 @@ func TestFetchAllAfterCacheCorruption(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	}
 
@@ -116,7 +116,7 @@ func TestFetchAllEmptyEntries(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	count := c.FetchAll([]covers.GameEntry{})
+	count := c.FetchAll([]igdb.GameEntry{})
 	if count != 0 {
 		t.Errorf("FetchAll([]) = %d, want 0", count)
 	}
@@ -139,7 +139,7 @@ func TestFetchingFlagResetOnCompletion(t *testing.T) {
 		t.Error("Fetching() should be false before FetchAll")
 	}
 
-	c.FetchAll([]covers.GameEntry{
+	c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Game.nes"},
 	})
 
@@ -157,7 +157,7 @@ func TestIsCachedConsistencyAfterSaveDetails(t *testing.T) {
 
 	fetcher := &mockIGDBFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*covers.GameDetails{
+		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
 	}
@@ -170,7 +170,7 @@ func TestIsCachedConsistencyAfterSaveDetails(t *testing.T) {
 		t.Fatal("isCached should be false before fetching")
 	}
 
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},
 	}
 
@@ -198,7 +198,7 @@ func TestIsCachedAfterNotFound(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Unknown Game.nes"},
 	}
 
@@ -225,7 +225,7 @@ func TestIsCachedAfterTransientSearchError(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, fetcher)
 
-	entries := []covers.GameEntry{
+	entries := []igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man.nes"},
 	}
 
@@ -269,7 +269,7 @@ func TestFetchingFlagConcurrentFetchAll(t *testing.T) {
 	done1 := make(chan struct{})
 	go func() {
 		defer close(done1)
-		c.FetchAll([]covers.GameEntry{
+		c.FetchAll([]igdb.GameEntry{
 			{Console: "NES", Filename: "Game.nes"},
 		})
 	}()
@@ -286,7 +286,7 @@ func TestFetchingFlagConcurrentFetchAll(t *testing.T) {
 	done2 := make(chan struct{})
 	go func() {
 		defer close(done2)
-		c.FetchAll([]covers.GameEntry{})
+		c.FetchAll([]igdb.GameEntry{})
 	}()
 	<-done2
 
@@ -317,7 +317,7 @@ func (e errType) Error() string { return string(e) }
 // countingMockFetcher wraps mockIGDBFetcher and counts fetches atomically.
 type countingMockFetcher struct {
 	searchResults  map[string]int
-	detailsResults map[int]*covers.GameDetails
+	detailsResults map[int]*igdb.GameDetails
 	fetchCount     *atomic.Int32
 }
 
@@ -332,7 +332,7 @@ func (m *countingMockFetcher) SearchGame(
 
 func (m *countingMockFetcher) FetchDetailsByID(
 	gameID int,
-) (*covers.GameDetails, error) {
+) (*igdb.GameDetails, error) {
 	m.fetchCount.Add(1)
 	if m.detailsResults == nil {
 		return nil, nil

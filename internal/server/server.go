@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
-	"github.com/chrisallenlane/freeplay/internal/covers"
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 	"github.com/chrisallenlane/freeplay/internal/saves"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
@@ -20,7 +20,7 @@ const longCacheValue = "public, max-age=31536000, immutable"
 
 // DetailsCache serves locally-cached game metadata.
 type DetailsCache interface {
-	Get(console, romFilename string) *covers.GameDetails
+	Get(console, romFilename string) *igdb.GameDetails
 	Fetching() bool
 }
 
