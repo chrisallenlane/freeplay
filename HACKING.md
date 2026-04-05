@@ -43,6 +43,8 @@ Run `make help` for the full list. The most useful targets:
 | `make coverage`      | Generate HTML coverage report           |
 | `make coverage-text` | Show per-function coverage in terminal  |
 | `make a11y`          | Run accessibility audit against live server |
+| `make fuzz`          | Run fuzz tests (15s each)               |
+| `make fuzz-long`     | Run fuzz tests (10m each)               |
 | `make vendor`        | Tidy and re-vendor Go dependencies      |
 | `make vendor-update` | Update all dependencies then re-vendor  |
 | `make docker`        | Build the Docker image                  |
