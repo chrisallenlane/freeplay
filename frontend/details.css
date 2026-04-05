@@ -38,12 +38,8 @@ main {
 
 .details-link {
     color: var(--color-link);
-    text-decoration: none;
-    font-size: 0.875rem;
-}
-
-.details-link:hover {
     text-decoration: underline;
+    font-size: 0.875rem;
 }
 
 .details-actions {
