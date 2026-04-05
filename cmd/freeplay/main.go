@@ -52,6 +52,14 @@ func main() {
 		fatal(err)
 	}
 
+	// nameLookup returns the IGDB name for a game from the details cache.
+	nameLookup := func(console, romFilename string) string {
+		if d := detailsCache.Get(console, romFilename); d != nil {
+			return d.Name
+		}
+		return ""
+	}
+
 	// Wire details cache population to run after each scan
 	srv.Scanner().SetOnScanComplete(func(games []scanner.Game) {
 		entries := make([]covers.GameEntry, len(games))
@@ -62,6 +70,7 @@ func main() {
 				IGDBPlatformIDs: g.IGDBPlatformIDs,
 			}
 		}
+		srv.Scanner().EnrichNames(nameLookup)
 		go func() {
 			if detailsCache.FetchAll(entries) > 0 {
 				// Rescan so the catalog picks up newly fetched covers
