@@ -102,22 +102,27 @@ main {
 }
 
 .details-section {
-    margin-bottom: 24px;
+    margin-bottom: 40px;
 }
 
 .details-section h3 {
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--color-text-bright);
-    margin-bottom: 8px;
+    margin-top: 16px;
+    margin-bottom: 12px;
     padding-bottom: 4px;
     border-bottom: 1px solid var(--color-border);
 }
 
 .details-section p {
-    font-size: 0.875rem;
-    color: var(--color-text);
-    line-height: 1.6;
+    font-size: 1rem;
+    color: #aaa;
+    line-height: 1.8;
+}
+
+:root[data-theme="light"] .details-section p {
+    color: #666;
 }
 
 .details-cover-full {
