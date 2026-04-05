@@ -39,6 +39,9 @@
 	}
 
 	function render(game, details) {
+		const displayName = details?.name || gameName;
+		document.title = `Freeplay - ${displayName}`;
+
 		const content = document.getElementById("content");
 		content.innerHTML = "";
 
