@@ -39,7 +39,6 @@ main {
 .details-link {
     color: var(--color-link);
     text-decoration: underline;
-    font-size: 0.875rem;
 }
 
 .details-actions {

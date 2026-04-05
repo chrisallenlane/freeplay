@@ -95,8 +95,6 @@
 		const rom = params.get("rom");
 		if (!consoleName || !rom) return null;
 		const gameName = exports.stripExt(rom);
-		const nameEl = document.getElementById("game-name");
-		if (nameEl) nameEl.textContent = gameName;
 		document.title = `Freeplay - ${gameName}`;
 		exports.initThemeToggle();
 		return { consoleName, rom, gameName };
