@@ -13,6 +13,7 @@
 	const filtersBar = document.getElementById("filters");
 	const searchInput = document.getElementById("search");
 	const rescanBtn = document.getElementById("rescan-btn");
+	const rescanStatus = document.getElementById("rescan-status");
 
 	// Key of the currently focused game card, used to restore focus after re-renders.
 	let focusedKey = null;
@@ -64,6 +65,7 @@
 			`btn filter-btn${isActive ? " active" : ""}`,
 			label,
 		);
+		btn.setAttribute("aria-pressed", isActive ? "true" : "false");
 		btn.addEventListener("click", onClick);
 		filtersBar.appendChild(btn);
 	}
@@ -107,6 +109,12 @@
 			`fav-btn${isFav ? " favorited" : ""}`,
 			isFav ? "\u2605" : "\u2606",
 		);
+		fav.setAttribute(
+			"aria-label",
+			isFav
+				? `Remove ${displayName} from favorites`
+				: `Add ${displayName} to favorites`,
+		);
 		fav.addEventListener("click", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
@@ -114,6 +122,12 @@
 			if (wasSet) favorites.delete(key);
 			else favorites.add(key);
 			fav.textContent = wasSet ? "\u2606" : "\u2605";
+			fav.setAttribute(
+				"aria-label",
+				wasSet
+					? `Add ${displayName} to favorites`
+					: `Remove ${displayName} from favorites`,
+			);
 			fav.classList.toggle("favorited", !wasSet);
 			saveFavorites();
 			if (activeFavorites) renderGrid();
@@ -360,6 +374,7 @@
 		rescanBtn.disabled = false;
 		rescanBtn.textContent = "Rescan \u21BB";
 		rescanBtn.classList.remove("fetching");
+		rescanStatus.textContent = "";
 	}
 
 	function pollCoverStatus() {
@@ -371,6 +386,7 @@
 					rescanBtn.innerHTML =
 						'<span class="spinner">\u21BB</span> Fetching covers\u2026';
 					rescanBtn.classList.add("fetching");
+					rescanStatus.textContent = "Fetching covers\u2026";
 					statusPollTimer = setTimeout(pollCoverStatus, 2000);
 				} else {
 					resetRescanBtn();
@@ -383,6 +399,7 @@
 	rescanBtn.addEventListener("click", () => {
 		rescanBtn.disabled = true;
 		rescanBtn.textContent = "Scanning\u2026";
+		rescanStatus.textContent = "Scanning\u2026";
 		fetch("/api/rescan", {
 			method: "POST",
 			headers: { "X-Requested-With": "freeplay" },
