@@ -1,4 +1,4 @@
-package covers
+package igdb
 
 import (
 	"encoding/json"
@@ -30,15 +30,15 @@ func writeTokenResponse(w http.ResponseWriter) {
 	})
 }
 
-// newTestFetcher creates an IGDBFetcher whose HTTP client is wired to call
+// newTestFetcher creates a Fetcher whose HTTP client is wired to call
 // handler instead of the real IGDB API. The test server is closed via
 // t.Cleanup when the test completes.
-func newTestFetcher(t *testing.T, handler http.HandlerFunc) *IGDBFetcher {
+func newTestFetcher(t *testing.T, handler http.HandlerFunc) *Fetcher {
 	t.Helper()
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
 
-	f := NewIGDBFetcher("test-id:test-secret")
+	f := NewFetcher("test-id:test-secret")
 	f.client = &http.Client{
 		Transport: &rewriteTransport{
 			base:   http.DefaultTransport,
@@ -89,7 +89,7 @@ func FuzzTransformImageURL(f *testing.F) {
 	})
 }
 
-func FuzzNewIGDBFetcher(f *testing.F) {
+func FuzzNewFetcher(f *testing.F) {
 	f.Add("client_id:client_secret")
 	f.Add("a:b")
 	f.Add(":")
@@ -102,10 +102,10 @@ func FuzzNewIGDBFetcher(f *testing.F) {
 	f.Fuzz(func(t *testing.T, apiKey string) {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("NewIGDBFetcher panicked on input %q: %v", apiKey, r)
+				t.Errorf("NewFetcher panicked on input %q: %v", apiKey, r)
 			}
 		}()
-		NewIGDBFetcher(apiKey)
+		NewFetcher(apiKey)
 	})
 }
 

@@ -1,4 +1,4 @@
-package covers
+package igdb
 
 import (
 	"testing"
@@ -85,14 +85,6 @@ func TestNameVariants(t *testing.T) {
 				)
 			}
 		}
-	}
-}
-
-func TestCoverPath(t *testing.T) {
-	got := CoverPath("/data", "NES", "Mega Man")
-	want := "/data/covers/NES/Mega Man.png"
-	if got != want {
-		t.Errorf("CoverPath() = %q, want %q", got, want)
 	}
 }
 

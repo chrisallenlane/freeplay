@@ -9,8 +9,8 @@ import (
 
 	freeplay "github.com/chrisallenlane/freeplay"
 	"github.com/chrisallenlane/freeplay/internal/config"
-	"github.com/chrisallenlane/freeplay/internal/covers"
 	"github.com/chrisallenlane/freeplay/internal/details"
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 	"github.com/chrisallenlane/freeplay/internal/server"
 )
@@ -36,9 +36,9 @@ func main() {
 	}
 
 	// Set up IGDB fetcher and details cache if configured
-	var igdbFetcher *covers.IGDBFetcher
+	var igdbFetcher *igdb.Fetcher
 	if cfg.CoverArtAPI == "igdb" {
-		igdbFetcher = covers.NewIGDBFetcher(cfg.CoverArtKey)
+		igdbFetcher = igdb.NewFetcher(cfg.CoverArtKey)
 	}
 
 	detailsCache := details.New(*dataDir, igdbFetcher)
@@ -62,9 +62,9 @@ func main() {
 
 	// Wire details cache population to run after each scan
 	srv.Scanner().SetOnScanComplete(func(games []scanner.Game) {
-		entries := make([]covers.GameEntry, len(games))
+		entries := make([]igdb.GameEntry, len(games))
 		for i, g := range games {
-			entries[i] = covers.GameEntry{
+			entries[i] = igdb.GameEntry{
 				Console:         g.Console,
 				Filename:        g.Filename,
 				IGDBPlatformIDs: g.IGDBPlatformIDs,

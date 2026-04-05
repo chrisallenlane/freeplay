@@ -13,7 +13,7 @@ import (
 	"testing/fstest"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
-	"github.com/chrisallenlane/freeplay/internal/covers"
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
@@ -661,12 +661,12 @@ func TestPostWithoutCSRFHeaderRejected(t *testing.T) {
 // mockDetailsCache is a test double for the DetailsCache interface.
 type mockDetailsCache struct {
 	fetching bool
-	details  map[string]*covers.GameDetails // key: "console/rom"
+	details  map[string]*igdb.GameDetails // key: "console/rom"
 }
 
 func (m *mockDetailsCache) Fetching() bool { return m.fetching }
 
-func (m *mockDetailsCache) Get(console, rom string) *covers.GameDetails {
+func (m *mockDetailsCache) Get(console, rom string) *igdb.GameDetails {
 	if m.details == nil {
 		return nil
 	}
@@ -737,12 +737,12 @@ func TestStatusEndpointIGDBConfigured(t *testing.T) {
 }
 
 func TestGameDetailsFromCache(t *testing.T) {
-	cached := &covers.GameDetails{
+	cached := &igdb.GameDetails{
 		Name:    "Mega Man",
 		Summary: "Cached summary.",
 	}
 	cache := &mockDetailsCache{
-		details: map[string]*covers.GameDetails{
+		details: map[string]*igdb.GameDetails{
 			"NES/Mega Man.nes": cached,
 		},
 	}
@@ -758,7 +758,7 @@ func TestGameDetailsFromCache(t *testing.T) {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
 
-	var got covers.GameDetails
+	var got igdb.GameDetails
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}

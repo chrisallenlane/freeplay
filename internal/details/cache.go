@@ -15,13 +15,13 @@ import (
 	"time"
 
 	"github.com/chrisallenlane/freeplay/internal/atomicfile"
-	"github.com/chrisallenlane/freeplay/internal/covers"
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
-// igdbFetcher is the subset of covers.IGDBFetcher used by the cache.
+// igdbFetcher is the subset of igdb.Fetcher used by the cache.
 type igdbFetcher interface {
 	SearchGame(gameName string, platformIDs []int) (int, error)
-	FetchDetailsByID(gameID int) (*covers.GameDetails, error)
+	FetchDetailsByID(gameID int) (*igdb.GameDetails, error)
 }
 
 // Cache stores IGDB game details and images locally.
@@ -53,8 +53,8 @@ func (c *Cache) cacheDir(console, cleanName string) string {
 
 // Get returns cached GameDetails for the given console and ROM filename,
 // or nil if not cached.
-func (c *Cache) Get(console, romFilename string) *covers.GameDetails {
-	_, cleanName := covers.CleanFilename(romFilename)
+func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
+	_, cleanName := igdb.CleanFilename(romFilename)
 	if cleanName == "" {
 		return nil
 	}
@@ -65,7 +65,7 @@ func (c *Cache) Get(console, romFilename string) *covers.GameDetails {
 		return nil
 	}
 
-	var d covers.GameDetails
+	var d igdb.GameDetails
 	if err := json.Unmarshal(data, &d); err != nil {
 		return nil
 	}
@@ -74,7 +74,7 @@ func (c *Cache) Get(console, romFilename string) *covers.GameDetails {
 
 // FetchAll populates the cache for any games not yet cached.
 // Returns the count of newly cached games.
-func (c *Cache) FetchAll(games []covers.GameEntry) int {
+func (c *Cache) FetchAll(games []igdb.GameEntry) int {
 	if c.fetcher == nil {
 		return 0
 	}
@@ -96,8 +96,8 @@ func (c *Cache) FetchAll(games []covers.GameEntry) int {
 
 // fetchOne handles cache population for a single game entry.
 // Returns true if new details were cached.
-func (c *Cache) fetchOne(g covers.GameEntry, ticker *time.Ticker) bool {
-	nameNoExt, cleanName := covers.CleanFilename(g.Filename)
+func (c *Cache) fetchOne(g igdb.GameEntry, ticker *time.Ticker) bool {
+	nameNoExt, cleanName := igdb.CleanFilename(g.Filename)
 	if cleanName == "" {
 		return false
 	}
@@ -154,7 +154,7 @@ func (c *Cache) search(
 	platformIDs []int,
 	ticker *time.Ticker,
 ) (int, error) {
-	variants := covers.NameVariants(cleanName)
+	variants := igdb.NameVariants(cleanName)
 
 	tryVariants := func(ids []int) (int, error) {
 		for _, name := range variants {
@@ -184,7 +184,7 @@ func (c *Cache) search(
 // paths, and writes details.json.
 func (c *Cache) saveDetails(
 	console, cleanName string,
-	details *covers.GameDetails,
+	details *igdb.GameDetails,
 ) error {
 	cacheDir := c.cacheDir(console, cleanName)
 	urlBase := "/cache/igdb/" +
@@ -282,7 +282,7 @@ func (c *Cache) downloadImage(
 // ensureCoverThumbnail copies the cached cover image to the standard cover
 // path (used by the covers handler) if it doesn't already exist.
 func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
-	dst := covers.CoverPath(c.dataDir, console, nameNoExt)
+	dst := coverPath(c.dataDir, console, nameNoExt)
 	if _, err := os.Stat(dst); err == nil {
 		return // already exists
 	}
@@ -321,4 +321,9 @@ func (c *Cache) writeNotFound(console, cleanName string) {
 // detailsPath returns the filesystem path for the game's details.json.
 func (c *Cache) detailsPath(console, cleanName string) string {
 	return filepath.Join(c.cacheDir(console, cleanName), "details.json")
+}
+
+// coverPath returns the expected filesystem path for a game's cover art.
+func coverPath(dataDir, console, filenameWithoutExt string) string {
+	return filepath.Join(dataDir, "covers", console, filenameWithoutExt+".png")
 }
