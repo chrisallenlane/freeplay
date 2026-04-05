@@ -12,19 +12,21 @@
     <script src="/app.js" defer></script>
 </head>
 <body>
-    <header>
-        <h1><span aria-hidden="true">🕹️</span> Freeplay</h1>
-        <div class="header-actions">
-            <button type="button" id="theme-toggle" class="btn header-btn" title="Toggle light/dark mode" aria-label="Toggle light/dark mode"></button>
-            <button type="button" id="rescan-btn" class="btn header-btn" title="Rescan ROMs and fetch cover art">Rescan &#8635;</button>
-        </div>
-    </header>
-    <main>
+    <div class="toolbar">
+        <header>
+            <h1><span aria-hidden="true">🕹️</span> Freeplay</h1>
+            <div class="header-actions">
+                <button type="button" id="theme-toggle" class="btn header-btn" title="Toggle light/dark mode" aria-label="Toggle light/dark mode"></button>
+                <button type="button" id="rescan-btn" class="btn header-btn" title="Rescan ROMs and fetch cover art">Rescan &#8635;</button>
+            </div>
+        </header>
         <div class="filters" id="filters" role="group" aria-label="Filter games"></div>
         <div class="search-bar">
             <label for="search" class="sr-only">Search games</label>
             <input type="text" id="search" placeholder="Search games..." autofocus>
         </div>
+    </div>
+    <main>
         <div class="game-grid" id="game-grid"></div>
     </main>
     <div id="rescan-status" role="status" aria-live="polite" class="sr-only"></div>
