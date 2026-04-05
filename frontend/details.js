@@ -143,51 +143,43 @@
 			img.alt = `${details.name} cover art`;
 			img.className = "details-cover-full";
 			link.appendChild(img);
-			appendSectionWithContent(content, "Cover Art", link);
+			appendSection(content, "Cover Art", link);
 		}
 
 		if (details.screenshots?.length) {
-			appendGallery(content, "Screenshots", details.screenshots);
+			appendSection(
+				content,
+				"Screenshots",
+				buildGallery("Screenshots", details.screenshots),
+			);
 		}
 
 		if (details.artworks?.length) {
-			appendGallery(
+			appendSection(
 				content,
 				"Artworks",
-				details.artworks,
-				"details-gallery-full",
+				buildGallery("Artworks", details.artworks, "details-gallery-full"),
 			);
 		}
 	}
 
-	function appendSectionWithContent(parent, heading, contentEl) {
+	function appendSection(parent, heading, content) {
 		const section = document.createElement("section");
 		section.className = "details-section";
 		const h3 = document.createElement("h3");
 		h3.textContent = heading;
 		section.appendChild(h3);
-		section.appendChild(contentEl);
+		if (typeof content === "string") {
+			const p = document.createElement("p");
+			p.textContent = content;
+			section.appendChild(p);
+		} else {
+			section.appendChild(content);
+		}
 		parent.appendChild(section);
 	}
 
-	function appendSection(parent, heading, text) {
-		const section = document.createElement("section");
-		section.className = "details-section";
-		const h3 = document.createElement("h3");
-		h3.textContent = heading;
-		section.appendChild(h3);
-		const p = document.createElement("p");
-		p.textContent = text;
-		section.appendChild(p);
-		parent.appendChild(section);
-	}
-
-	function appendGallery(parent, heading, urls, galleryClass) {
-		const section = document.createElement("section");
-		section.className = "details-section";
-		const h3 = document.createElement("h3");
-		h3.textContent = heading;
-		section.appendChild(h3);
+	function buildGallery(heading, urls, galleryClass) {
 		const gallery = document.createElement("div");
 		gallery.className = galleryClass || "details-gallery";
 		for (let i = 0; i < urls.length; i++) {
@@ -204,7 +196,6 @@
 			link.appendChild(img);
 			gallery.appendChild(link);
 		}
-		section.appendChild(gallery);
-		parent.appendChild(section);
+		return gallery;
 	}
 })();
