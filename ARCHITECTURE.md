@@ -21,13 +21,16 @@ images.
 ```
 Browser ──► HTTP Server ──► Embedded frontend (HTML/JS/CSS)
                 │
-                ├──► /api/games       ──► In-memory catalog (built by scanner)
-                ├──► /api/saves/...   ──► Filesystem: <data>/saves/
-                ├──► /api/rescan      ──► Triggers scanner
-                ├──► /roms/...        ──► Filesystem: configured ROM directories
-                ├──► /bios/...        ──► Filesystem: configured BIOS files
-                ├──► /covers/...      ──► Filesystem: <data>/covers/
-                └──► /emulatorjs/...  ──► Embedded EmulatorJS assets
+                ├──► /api/games          ──► In-memory catalog (built by scanner)
+                ├──► /api/game-details   ──► Filesystem: <data>/cache/igdb/
+                ├──► /api/saves/...      ──► Filesystem: <data>/saves/
+                ├──► /api/rescan         ──► Triggers scanner
+                ├──► /roms/...           ──► Filesystem: configured ROM directories
+                ├──► /bios/...           ──► Filesystem: configured BIOS files
+                ├──► /covers/...         ──► Filesystem: <data>/covers/
+                ├──► /cache/igdb/...     ──► Filesystem: <data>/cache/igdb/
+                ├──► /manuals/...        ──► Filesystem: <data>/manuals/
+                └──► /emulatorjs/...     ──► Embedded EmulatorJS assets
 ```
 
 Everything the server needs is either embedded in the binary or read from the
@@ -52,26 +55,31 @@ device patches (lightgun support). The individual source files in
 All API routes are internal to the frontend. They are not versioned and may
 change without notice.
 
-| Method | Path                                 | Description                                       |
-|--------|--------------------------------------|---------------------------------------------------|
-| `GET`  | `/api/health`                        | Health check -- returns `{"status":"ok"}`         |
-| `GET`  | `/api/games`                         | Full game catalog (consoles + games list)         |
-| `GET`  | `/api/status`                        | IGDB fetch status (`{"fetchingDetails":bool}`)    |
-| `POST` | `/api/rescan`                        | Trigger a ROM directory rescan                    |
-| `GET`  | `/api/saves/{console}/{game}/{type}` | Download a save file (`type`: `state` or `sram`)  |
-| `POST` | `/api/saves/{console}/{game}/{type}` | Upload a save file (64 MB max)                    |
+| Method | Path                                 | Description                                              |
+|--------|--------------------------------------|----------------------------------------------------------|
+| `GET`  | `/api/health`                        | Health check -- returns `{"status":"ok"}`                |
+| `GET`  | `/api/games`                         | Full game catalog (consoles + games list)                |
+| `GET`  | `/api/status`                        | IGDB fetch status (`{"fetchingDetails":bool}`)           |
+| `GET`  | `/api/game-details`                  | IGDB metadata for a single game (`?console=&rom=`)       |
+| `POST` | `/api/rescan`                        | Trigger a ROM directory rescan                           |
+| `GET`  | `/api/saves/{console}/{game}/{type}` | Download a save file (`type`: `state` or `sram`)         |
+| `POST` | `/api/saves/{console}/{game}/{type}` | Upload a save file (64 MB max)                           |
 
 ## Static file routes
 
-| Path                     | Source                        | Cache-Control                              |
-|--------------------------|-------------------------------|--------------------------------------------|
-| `/roms/{console}/{file}` | Configured ROM directory      | `public, max-age=31536000, immutable`      |
-| `/bios/{console}`        | Configured BIOS file          | `public, max-age=31536000, immutable`      |
-| `/covers/{rest...}`      | `<data>/covers/`              | `public, max-age=31536000, immutable`      |
-| `/emulatorjs/...`        | Embedded EmulatorJS assets    | `public, max-age=31536000, immutable`      |
-| `/play`                  | Embedded player page          | `no-cache`                                 |
-| `/`                      | Embedded frontend (catch-all) | `no-cache`                                 |
+| Path                      | Source                         | Cache-Control                              |
+|---------------------------|--------------------------------|--------------------------------------------|
+| `/roms/{console}/{file}`  | Configured ROM directory       | `public, max-age=31536000, immutable`      |
+| `/bios/{console}`         | Configured BIOS file           | `public, max-age=31536000, immutable`      |
+| `/covers/{rest...}`       | `<data>/covers/`               | `public, max-age=31536000, immutable`      |
+| `/cache/igdb/{rest...}`   | `<data>/cache/igdb/`           | `public, max-age=31536000, immutable`      |
+| `/manuals/{rest...}`      | `<data>/manuals/`              | `public, max-age=31536000, immutable`      |
+| `/emulatorjs/...`         | Embedded EmulatorJS assets     | `public, max-age=31536000, immutable`      |
+| `/details`                | Embedded details page          | `no-cache`                                 |
+| `/play`                   | Embedded player page           | `no-cache`                                 |
+| `/`                       | Embedded frontend (catch-all)  | `no-cache`                                 |
 
-ROMs, BIOS files, covers, and EmulatorJS assets are immutable or change
-infrequently, so they use aggressive long-cache headers. The frontend and
-player page use `no-cache` so that redeployments are picked up immediately.
+ROMs, BIOS files, covers, cached IGDB images, and EmulatorJS assets are
+immutable or change infrequently, so they use aggressive long-cache headers.
+The frontend, details page, and player page use `no-cache` so that
+redeployments are picked up immediately.
