@@ -97,7 +97,7 @@
 		const displayName = FP.stripExt(game.filename);
 
 		const card = el("a", "game-card");
-		card.href = FP.playUrl(game);
+		card.href = FP.detailsUrl(game);
 		card.dataset.key = key;
 
 		// Favorite button

@@ -18,17 +18,6 @@
 			}
 			const toggle = document.getElementById("theme-toggle");
 
-			FP.isIGDBConfigured().then((configured) => {
-				if (configured) {
-					const detailsLink = document.createElement("a");
-					detailsLink.href = FP.detailsUrl(game);
-					detailsLink.className = "btn header-btn";
-					detailsLink.title = "View game details";
-					detailsLink.textContent = "Details";
-					toggle.parentNode.insertBefore(detailsLink, toggle);
-				}
-			});
-
 			if (game.hasManual) {
 				const manualLink = document.createElement("a");
 				manualLink.href = FP.manualUrl(game);

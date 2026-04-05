@@ -89,19 +89,6 @@
 		return null;
 	};
 
-	exports.isIGDBConfigured = () => {
-		const cached = sessionStorage.getItem("freeplay-igdb-configured");
-		if (cached !== null) return Promise.resolve(cached === "true");
-		return fetch("/api/status")
-			.then((res) => res.json())
-			.then((status) => {
-				const val = !!status.igdbConfigured;
-				sessionStorage.setItem("freeplay-igdb-configured", String(val));
-				return val;
-			})
-			.catch(() => false);
-	};
-
 	exports.initSubpage = () => {
 		const params = new URLSearchParams(window.location.search);
 		const consoleName = params.get("console");

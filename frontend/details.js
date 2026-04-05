@@ -25,7 +25,6 @@
 				showError("Game not found. It may have been removed from the library.");
 				return;
 			}
-			buildHeaderActions(game);
 			render(game, details);
 		})
 		.catch(() => {
@@ -37,25 +36,6 @@
 		const el = document.getElementById("error");
 		el.style.display = "";
 		el.textContent = msg;
-	}
-
-	function buildHeaderActions(game) {
-		const actions = document.getElementById("header-actions");
-
-		const playLink = document.createElement("a");
-		playLink.href = FP.playUrl(game);
-		playLink.className = "btn header-btn";
-		playLink.textContent = "Play";
-		actions.appendChild(playLink);
-
-		if (game.hasManual) {
-			const manualLink = document.createElement("a");
-			manualLink.href = FP.manualUrl(game);
-			manualLink.className = "btn header-btn";
-			manualLink.title = "View the manual";
-			manualLink.textContent = "Manual";
-			actions.appendChild(manualLink);
-		}
 	}
 
 	function render(game, details) {
@@ -122,6 +102,25 @@
 
 		hero.appendChild(meta);
 		content.appendChild(hero);
+
+		const actions = document.createElement("div");
+		actions.className = "details-actions";
+
+		const playLink = document.createElement("a");
+		playLink.href = FP.playUrl(game);
+		playLink.className = "btn details-action-btn details-play-btn";
+		playLink.textContent = "Play";
+		actions.appendChild(playLink);
+
+		if (game.hasManual) {
+			const manualLink = document.createElement("a");
+			manualLink.href = FP.manualUrl(game);
+			manualLink.className = "btn details-action-btn details-manual-btn";
+			manualLink.textContent = "View Manual";
+			actions.appendChild(manualLink);
+		}
+
+		content.appendChild(actions);
 
 		if (!details) return;
 
