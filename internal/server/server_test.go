@@ -688,8 +688,8 @@ func TestStatusEndpointNilCover(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
-	if body["fetchingCovers"] != false {
-		t.Error("expected fetchingCovers=false with nil detailsCache")
+	if body["fetchingDetails"] != false {
+		t.Error("expected fetchingDetails=false with nil detailsCache")
 	}
 	if body["igdbConfigured"] != false {
 		t.Error("expected igdbConfigured=false with nil detailsCache")
@@ -711,8 +711,8 @@ func TestStatusEndpointFetching(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
-	if body["fetchingCovers"] != true {
-		t.Error("expected fetchingCovers=true when cache is active")
+	if body["fetchingDetails"] != true {
+		t.Error("expected fetchingDetails=true when cache is active")
 	}
 }
 

@@ -294,8 +294,8 @@ func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	igdbConfigured := s.detailsCache != nil
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"fetchingCovers": fetching,
-		"igdbConfigured": igdbConfigured,
+		"fetchingDetails": fetching,
+		"igdbConfigured":  igdbConfigured,
 	})
 }
 

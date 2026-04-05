@@ -106,7 +106,7 @@ diacritics or minor title differences cause a platform-constrained search to
 fail, only for the unconstrained fallback to match a completely wrong game on
 a different platform.
 
-Implementation: `covers.IGDBFetcher.SearchGame()`, `details.Cache.search()`
+Implementation: `igdb.Fetcher.SearchGame()`, `details.Cache.search()`
 
 ### Caching and Failure Handling
 

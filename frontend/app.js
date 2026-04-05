@@ -381,12 +381,12 @@
 		fetch("/api/status")
 			.then((res) => res.json())
 			.then((data) => {
-				if (data.fetchingCovers) {
+				if (data.fetchingDetails) {
 					rescanBtn.disabled = true;
 					rescanBtn.innerHTML =
-						'<span class="spinner">\u21BB</span> Fetching covers\u2026';
+						'<span class="spinner">\u21BB</span> Fetching game data\u2026';
 					rescanBtn.classList.add("fetching");
-					rescanStatus.textContent = "Fetching covers\u2026";
+					rescanStatus.textContent = "Fetching game data\u2026";
 					statusPollTimer = setTimeout(pollCoverStatus, 2000);
 				} else {
 					resetRescanBtn();
