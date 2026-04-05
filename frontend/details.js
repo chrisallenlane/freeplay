@@ -163,9 +163,13 @@
 		h3.textContent = heading;
 		section.appendChild(h3);
 		if (typeof content === "string") {
-			const p = document.createElement("p");
-			p.textContent = content;
-			section.appendChild(p);
+			for (const para of content.split(/\n\n+/)) {
+				const text = para.trim();
+				if (!text) continue;
+				const p = document.createElement("p");
+				p.textContent = text;
+				section.appendChild(p);
+			}
 		} else {
 			section.appendChild(content);
 		}
