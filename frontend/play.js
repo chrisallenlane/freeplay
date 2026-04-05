@@ -19,9 +19,7 @@
 			const toggle = document.getElementById("theme-toggle");
 
 			// Update page title with IGDB name if available
-			fetch(
-				`/api/game-details?console=${encodeURIComponent(consoleName)}&rom=${encodeURIComponent(rom)}`,
-			)
+			fetch(FP.gameDetailsUrl(consoleName, rom))
 				.then((res) => (res.ok ? res.json() : null))
 				.then((details) => {
 					if (details?.name) document.title = `Freeplay - ${details.name}`;

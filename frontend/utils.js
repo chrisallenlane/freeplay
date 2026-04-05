@@ -41,6 +41,9 @@
 
 	exports.biosUrl = (consoleName) => `/bios/${encodeURIComponent(consoleName)}`;
 
+	exports.gameDetailsUrl = (consoleName, rom) =>
+		`/api/game-details?console=${encodeURIComponent(consoleName)}&rom=${encodeURIComponent(rom)}`;
+
 	// Logical actions for directional navigation (shared by keyboard and gamepad).
 	exports.ACTION_LEFT = "left";
 	exports.ACTION_RIGHT = "right";
