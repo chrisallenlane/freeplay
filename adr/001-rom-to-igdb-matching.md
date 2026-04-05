@@ -43,7 +43,7 @@ Strip No-Intro metadata from the filename to extract the game title:
 
 This produces a "clean name" used for searching and as the cache key.
 
-Implementation: `covers.CleanName()`, `covers.CleanFilename()`
+Implementation: `igdb.CleanName()`, `igdb.CleanFilename()`
 
 ### Stage 2: Name Variant Generation
 
@@ -60,7 +60,7 @@ lowest confidence:
 Duplicate variants are suppressed. If no transformations produce new strings
 (e.g., `Metroid`), only the original is searched.
 
-Implementation: `covers.NameVariants()`
+Implementation: `igdb.NameVariants()`
 
 ### Stage 3: IGDB Search (Platform-Constrained)
 

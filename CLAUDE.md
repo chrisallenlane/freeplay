@@ -10,6 +10,7 @@ make build      # build binary to dist/
 make run        # build and run with testdata
 make fuzz       # run fuzz tests (15s each)
 make fuzz-long  # run fuzz tests (10m each)
+make a11y       # run accessibility audit against live server
 make setup      # install dev tools (gofumpt, golangci-lint)
 ```
 
