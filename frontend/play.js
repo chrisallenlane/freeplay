@@ -18,6 +18,16 @@
 			}
 			const toggle = document.getElementById("theme-toggle");
 
+			// Update page title with IGDB name if available
+			fetch(
+				`/api/game-details?console=${encodeURIComponent(consoleName)}&rom=${encodeURIComponent(rom)}`,
+			)
+				.then((res) => (res.ok ? res.json() : null))
+				.then((details) => {
+					if (details?.name) document.title = `Freeplay - ${details.name}`;
+				})
+				.catch(() => {});
+
 			if (game.hasManual) {
 				const manualLink = document.createElement("a");
 				manualLink.href = FP.manualUrl(game);
