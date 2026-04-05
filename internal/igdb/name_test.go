@@ -88,6 +88,54 @@ func TestNameVariants(t *testing.T) {
 	}
 }
 
+func TestCleanFilename(t *testing.T) {
+	tests := []struct {
+		input     string
+		wantNoExt string
+		wantClean string
+	}{
+		{
+			input:     "Super Mario Bros (USA).zip",
+			wantNoExt: "Super Mario Bros (USA)",
+			wantClean: "Super Mario Bros",
+		},
+		{
+			// Extensionless filename: nothing to strip.
+			input:     "Zelda",
+			wantNoExt: "Zelda",
+			wantClean: "Zelda",
+		},
+		{
+			// Multiple dots: only the last extension is removed.
+			input:     "Mega Man 2.rev1.nes",
+			wantNoExt: "Mega Man 2.rev1",
+			wantClean: "Mega Man 2.rev1",
+		},
+		{
+			// Empty string: both outputs are empty.
+			input:     "",
+			wantNoExt: "",
+			wantClean: "",
+		},
+	}
+
+	for _, tt := range tests {
+		gotNoExt, gotClean := CleanFilename(tt.input)
+		if gotNoExt != tt.wantNoExt {
+			t.Errorf(
+				"CleanFilename(%q) nameNoExt = %q, want %q",
+				tt.input, gotNoExt, tt.wantNoExt,
+			)
+		}
+		if gotClean != tt.wantClean {
+			t.Errorf(
+				"CleanFilename(%q) cleanName = %q, want %q",
+				tt.input, gotClean, tt.wantClean,
+			)
+		}
+	}
+}
+
 func FuzzCleanName(f *testing.F) {
 	f.Add("Super Mario Bros (USA)")
 	f.Add("Zelda [!]")

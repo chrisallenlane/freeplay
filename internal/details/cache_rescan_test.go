@@ -247,13 +247,9 @@ func TestIsCachedAfterTransientSearchError(t *testing.T) {
 
 // TestFetchingFlagConcurrentFetchAll verifies that when two FetchAll calls
 // run concurrently on the same Cache, the Fetching() flag remains true until
-// BOTH complete. Currently, FetchAll uses a simple Store(true)/defer
-// Store(false) pattern which means the first goroutine to finish will set
-// Fetching()=false while the second is still running.
-//
-// This can happen in practice when an HTTP rescan triggers onScanComplete
-// (spawning a FetchAll goroutine) while a previous FetchAll goroutine from
-// the initial scan is still in progress.
+// BOTH complete. FetchAll uses atomic reference counting (Add(1)/Add(-1)),
+// so a second call completing early must not reset the flag while the first
+// call is still in progress.
 func TestFetchingFlagConcurrentFetchAll(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
@@ -265,7 +261,7 @@ func TestFetchingFlagConcurrentFetchAll(t *testing.T) {
 
 	c := New(t.TempDir(), fetcher)
 
-	// Start first FetchAll with a game that will block in SearchGame
+	// Start first FetchAll with a game that will block in SearchGame.
 	done1 := make(chan struct{})
 	go func() {
 		defer close(done1)
@@ -274,15 +270,16 @@ func TestFetchingFlagConcurrentFetchAll(t *testing.T) {
 		})
 	}()
 
-	// Wait for first FetchAll to block in SearchGame
+	// Wait for first FetchAll to block in SearchGame.
 	<-entered
 
 	if !c.Fetching() {
-		t.Fatal("Fetching() should be true while FetchAll is blocked")
+		t.Fatal("Fetching() should be true while first FetchAll is blocked")
 	}
 
-	// Start a second FetchAll with no games (completes immediately).
-	// It sets fetching=true then immediately sets fetching=false.
+	// Start a second FetchAll with no games; it completes immediately.
+	// With reference counting, this increments then decrements the counter,
+	// but the counter remains > 0 because the first FetchAll is still running.
 	done2 := make(chan struct{})
 	go func() {
 		defer close(done2)
@@ -290,20 +287,25 @@ func TestFetchingFlagConcurrentFetchAll(t *testing.T) {
 	}()
 	<-done2
 
-	// BUG: The second FetchAll completed and set Fetching()=false,
-	// even though the first FetchAll is still blocked in SearchGame.
+	// Fetching() must still be true: the first FetchAll has not finished.
 	if !c.Fetching() {
 		t.Error(
-			"BUG: Fetching() returns false while a FetchAll call is still " +
-				"in progress. A concurrent FetchAll that completed first " +
-				"reset the flag prematurely. The Fetching() flag should use " +
-				"reference counting or a mutex to handle concurrent calls.",
+			"Fetching() returned false while first FetchAll is still running. " +
+				"Reference counting (Add/Add) must keep the flag true until " +
+				"all concurrent FetchAll calls complete.",
 		)
 	}
 
-	// Cleanup: release the blocked FetchAll
+	// Release the blocked FetchAll and wait for it to finish.
 	close(release)
 	<-done1
+
+	// Now both FetchAll calls have completed; Fetching() must be false.
+	if c.Fetching() {
+		t.Error(
+			"Fetching() should be false after all FetchAll calls complete",
+		)
+	}
 }
 
 // --- test helpers ---
