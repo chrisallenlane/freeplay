@@ -93,7 +93,7 @@ them and apply three matching tiers, in order:
    are Unicode-normalized (NFD decomposition, strip combining marks, NFC
    recomposition) before comparison. This handles ROM filenames that use ASCII
    approximations of accented titles (e.g., `Deja Vu` matching IGDB's
-   `Déjà Vu`). Implementation: `covers.stripDiacritics()`.
+   `Déjà Vu`). Implementation: `igdb.stripDiacritics()`.
 
 3. **Platform-constrained first-result fallback.** When platform IDs are
    present and neither of the above tiers matched, we accept the first search
