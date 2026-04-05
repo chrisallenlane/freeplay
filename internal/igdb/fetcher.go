@@ -17,7 +17,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// Fetcher fetches cover art from the IGDB API.
+// Fetcher fetches game metadata from the IGDB API.
 type Fetcher struct {
 	clientID     string
 	clientSecret string
@@ -28,7 +28,7 @@ type Fetcher struct {
 	client      *http.Client
 }
 
-// NewFetcher creates an IGDB cover art fetcher.
+// NewFetcher creates an IGDB game metadata fetcher.
 // apiKey should be in "client_id:client_secret" format.
 func NewFetcher(apiKey string) *Fetcher {
 	parts := strings.SplitN(apiKey, ":", 2)

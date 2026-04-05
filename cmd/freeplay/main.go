@@ -73,7 +73,7 @@ func main() {
 		srv.Scanner().EnrichNames(nameLookup)
 		go func() {
 			if detailsCache.FetchAll(entries) > 0 {
-				// Rescan so the catalog picks up newly fetched covers
+				// Rescan so the catalog picks up newly fetched IGDB data
 				srv.Scanner().ScanBlocking()
 			}
 		}()
