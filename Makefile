@@ -78,6 +78,11 @@ fuzz:
 fuzz-long:
 	@./test/fuzz.sh 10m
 
+## a11y: run accessibility audit against live server
+.PHONY: a11y
+a11y: build
+	@./test/a11y.sh $(dist_dir)/freeplay
+
 ## check: format, lint, vet, and run unit tests
 .PHONY: check
 check: fmt lint vet test

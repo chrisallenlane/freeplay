@@ -30,39 +30,99 @@ main {
     color: var(--color-text-bright);
 }
 
-.details-info-line {
+.details-meta-table {
     font-size: 0.875rem;
     color: var(--color-text-muted);
     line-height: 1.5;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.details-meta-table th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-text);
+    padding: 2px 16px 2px 0;
+    vertical-align: top;
+    white-space: nowrap;
+}
+
+.details-meta-table td {
+    padding: 2px 0;
 }
 
 .details-link {
     color: var(--color-link);
-    text-decoration: none;
-    font-size: 0.875rem;
-}
-
-.details-link:hover {
     text-decoration: underline;
 }
 
+.details-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 32px;
+}
+
+.details-action-btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    text-align: center;
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.details-play-btn {
+    background: var(--color-link);
+    color: var(--color-bg);
+    border: 1px solid var(--color-link);
+}
+
+.details-play-btn:hover {
+    background: var(--color-link);
+    filter: brightness(1.15);
+}
+
+.details-manual-btn {
+    background: var(--color-border);
+    color: var(--color-text);
+    border: 1px solid var(--color-border-hi);
+}
+
+.details-manual-btn:hover {
+    background: var(--color-border-hi);
+}
+
+.details-action-btn:focus-visible {
+    outline: 2px solid var(--color-link);
+    outline-offset: 2px;
+}
+
 .details-section {
-    margin-bottom: 24px;
+    margin-bottom: 40px;
 }
 
 .details-section h3 {
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--color-text-bright);
-    margin-bottom: 8px;
+    margin-top: 16px;
+    margin-bottom: 12px;
     padding-bottom: 4px;
     border-bottom: 1px solid var(--color-border);
 }
 
 .details-section p {
-    font-size: 0.875rem;
-    color: var(--color-text);
-    line-height: 1.6;
+    font-size: 1rem;
+    color: #aaa;
+    line-height: 1.8;
+}
+
+:root[data-theme="light"] .details-section p {
+    color: #666;
 }
 
 .details-cover-full {

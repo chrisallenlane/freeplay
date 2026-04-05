@@ -40,8 +40,8 @@
     --color-text-bright: #111;
     --color-text-secondary: #333;
     --color-text-muted: #555;
-    --color-text-dim: #777;
-    --color-text-faint: #999;
+    --color-text-dim: #555;
+    --color-text-faint: #666;
     --color-link: #3a3ae8;
     --color-error: #cc3333;
     --color-gold: #c89600;
@@ -70,6 +70,9 @@ header {
     padding: 16px 24px;
     background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 header h1 {
@@ -89,6 +92,7 @@ header h1 {
     background: var(--color-border);
     border: 1px solid var(--color-border-hi);
     color: var(--color-text-muted);
+    text-decoration: none;
     cursor: pointer;
 }
 
@@ -125,6 +129,13 @@ header h1 {
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+.toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--color-bg);
 }
 
 .filters {
@@ -309,21 +320,4 @@ header h1 {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
-}
-
-.skip-link {
-    position: absolute;
-    top: -100%;
-    left: 16px;
-    background: var(--color-accent);
-    color: var(--color-text-bright);
-    padding: 8px 16px;
-    border-radius: 4px;
-    z-index: 100;
-    text-decoration: none;
-    font-size: 0.875rem;
-}
-
-.skip-link:focus {
-    top: 8px;
 }

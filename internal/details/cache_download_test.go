@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chrisallenlane/freeplay/internal/covers"
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
 // TestDownloadImage_HTMLContentRejected verifies that downloadImage rejects
@@ -279,7 +279,7 @@ func TestSaveDetails_HTMLCoverRejected(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, nil)
 
-	details := &covers.GameDetails{
+	details := &igdb.GameDetails{
 		Name:     "Evil Game",
 		CoverURL: imgServer.URL + "/t_original/cover.jpg",
 	}
@@ -352,7 +352,7 @@ func TestSaveDetails_ScreenshotAndArtworkImageErrors(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, nil)
 
-	details := &covers.GameDetails{
+	details := &igdb.GameDetails{
 		Name: "Test Game",
 		Screenshots: []string{
 			imgServer.URL + "/ss0.jpg",
@@ -404,7 +404,7 @@ func TestSaveDetails_PartialScreenshotDownloads(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, nil)
 
-	details := &covers.GameDetails{
+	details := &igdb.GameDetails{
 		Name: "Test Game",
 		Screenshots: []string{
 			imgServer.URL + "/ss0.jpg", // request 1: succeeds
@@ -459,7 +459,7 @@ func TestSaveDetails_CoverThumbDownloadIgnored(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, nil)
 
-	details := &covers.GameDetails{
+	details := &igdb.GameDetails{
 		Name:     "Test Game",
 		CoverURL: imgServer.URL + "/t_original/cover.jpg",
 	}
@@ -536,18 +536,12 @@ func TestDownloadImage_AtomicWriteConsistency(t *testing.T) {
 // TestSaveDetails_WritesDetailsJSON verifies that saveDetails writes a
 // valid details.json file that can be round-tripped back.
 func TestSaveDetails_WritesDetailsJSON(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("imagedata"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	dir := t.TempDir()
 	c := New(dir, nil)
 
-	details := &covers.GameDetails{
+	details := &igdb.GameDetails{
 		Name:        "Test Game",
 		Summary:     "A test game.",
 		CoverURL:    imgServer.URL + "/t_original/cover.jpg",
@@ -596,7 +590,7 @@ func TestSaveDetails_EmptyCoverURL(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, nil)
 
-	details := &covers.GameDetails{
+	details := &igdb.GameDetails{
 		Name: "No Cover Game",
 	}
 
@@ -629,7 +623,7 @@ func TestEnsureCoverThumbnail_NoCoverThumb(t *testing.T) {
 	c.ensureCoverThumbnail("NES", "Test Game", "Test Game")
 
 	// The cover path should not exist
-	coverPath := covers.CoverPath(dir, "NES", "Test Game")
+	coverPath := coverPath(dir, "NES", "Test Game")
 	if _, err := os.Stat(coverPath); err == nil {
 		t.Errorf("cover should not exist when no cover_thumb.jpg exists")
 	}
@@ -655,7 +649,7 @@ func TestEnsureCoverThumbnail_AlreadyExists(t *testing.T) {
 	}
 
 	// Pre-create the destination cover
-	coverPath := covers.CoverPath(dir, "NES", "Test Game")
+	coverPath := coverPath(dir, "NES", "Test Game")
 	if err := os.MkdirAll(filepath.Dir(coverPath), 0o755); err != nil {
 		t.Fatal(err)
 	}

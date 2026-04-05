@@ -3,7 +3,7 @@
 
 	const subpage = FP.initSubpage();
 	if (!subpage) {
-		showError("Missing console or rom parameter.");
+		FP.showError("game", "Missing console or rom parameter.");
 		return;
 	}
 	const { consoleName, rom, gameName } = subpage;
@@ -13,21 +13,21 @@
 		.then((catalog) => {
 			const game = FP.findGame(catalog.games, consoleName, rom);
 			if (!game) {
-				showError("Game not found. It may have been removed from the library.");
+				FP.showError(
+					"game",
+					"Game not found. It may have been removed from the library.",
+				);
 				return;
 			}
 			const toggle = document.getElementById("theme-toggle");
 
-			FP.isIGDBConfigured().then((configured) => {
-				if (configured) {
-					const detailsLink = document.createElement("a");
-					detailsLink.href = FP.detailsUrl(game);
-					detailsLink.className = "btn header-btn";
-					detailsLink.title = "View game details";
-					detailsLink.textContent = "Details";
-					toggle.parentNode.insertBefore(detailsLink, toggle);
-				}
-			});
+			// Update page title with IGDB name if available
+			fetch(FP.gameDetailsUrl(consoleName, rom))
+				.then((res) => (res.ok ? res.json() : null))
+				.then((details) => {
+					if (details?.name) document.title = `Freeplay - ${details.name}`;
+				})
+				.catch(() => {});
 
 			if (game.hasManual) {
 				const manualLink = document.createElement("a");
@@ -40,15 +40,8 @@
 			startEmulator(game);
 		})
 		.catch(() => {
-			showError("Could not load game catalog.");
+			FP.showError("game", "Could not load game catalog.");
 		});
-
-	function showError(msg) {
-		document.getElementById("game").style.display = "none";
-		const el = document.getElementById("error");
-		el.style.display = "";
-		el.textContent = msg;
-	}
 
 	function startEmulator(game) {
 		const saveBase = FP.saveBasePath(consoleName, gameName);

@@ -1,9 +1,10 @@
-package covers
+package igdb
 
 import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -30,15 +31,15 @@ func writeTokenResponse(w http.ResponseWriter) {
 	})
 }
 
-// newTestFetcher creates an IGDBFetcher whose HTTP client is wired to call
+// newTestFetcher creates a Fetcher whose HTTP client is wired to call
 // handler instead of the real IGDB API. The test server is closed via
 // t.Cleanup when the test completes.
-func newTestFetcher(t *testing.T, handler http.HandlerFunc) *IGDBFetcher {
+func newTestFetcher(t *testing.T, handler http.HandlerFunc) *Fetcher {
 	t.Helper()
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
 
-	f := NewIGDBFetcher("test-id:test-secret")
+	f := NewFetcher("test-id:test-secret")
 	f.client = &http.Client{
 		Transport: &rewriteTransport{
 			base:   http.DefaultTransport,
@@ -89,7 +90,7 @@ func FuzzTransformImageURL(f *testing.F) {
 	})
 }
 
-func FuzzNewIGDBFetcher(f *testing.F) {
+func FuzzNewFetcher(f *testing.F) {
 	f.Add("client_id:client_secret")
 	f.Add("a:b")
 	f.Add(":")
@@ -102,10 +103,10 @@ func FuzzNewIGDBFetcher(f *testing.F) {
 	f.Fuzz(func(t *testing.T, apiKey string) {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("NewIGDBFetcher panicked on input %q: %v", apiKey, r)
+				t.Errorf("NewFetcher panicked on input %q: %v", apiKey, r)
 			}
 		}()
-		NewIGDBFetcher(apiKey)
+		NewFetcher(apiKey)
 	})
 }
 
@@ -598,4 +599,108 @@ func TestFetchDetailsByIDMalformedJSON(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected parse error, got nil")
 	}
+}
+
+// FuzzStripDiacritics verifies that stripDiacritics never panics and is
+// idempotent: applying it twice produces the same result as applying it once.
+func FuzzStripDiacritics(f *testing.F) {
+	f.Add("Déjà Vu")
+	f.Add("Mega Man")
+	f.Add("Pokémon")
+	f.Add("")
+	f.Add("Ōkami")
+	f.Add("\x00")
+	f.Add("naïve café")
+
+	f.Fuzz(func(t *testing.T, s string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("stripDiacritics panicked on %q: %v", s, r)
+			}
+		}()
+
+		once := stripDiacritics(s)
+		twice := stripDiacritics(once)
+		if once != twice {
+			t.Errorf(
+				"stripDiacritics not idempotent on %q: first=%q second=%q",
+				s, once, twice,
+			)
+		}
+	})
+}
+
+// FuzzGameDetailsFromIGDB verifies that gameDetailsFromIGDB never panics on
+// arbitrary JSON-derived input. When FirstReleaseDate is populated, it must
+// match the YYYY-MM-DD format.
+func FuzzGameDetailsFromIGDB(f *testing.F) {
+	f.Add([]byte(`[{"name":"Mega Man","first_release_date":565920000}]`))
+	f.Add([]byte(`[{}]`))
+	f.Add([]byte(`[]`))
+	f.Add([]byte(`[{"name":"","first_release_date":0}]`))
+	f.Add([]byte(`[{"name":"Game","first_release_date":-1}]`))
+
+	// Regexp for YYYY-MM-DD date validation.
+	datePattern := `^\d{4}-\d{2}-\d{2}$`
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("gameDetailsFromIGDB panicked on %q: %v", data, r)
+			}
+		}()
+
+		var games []igdbGame
+		if err := json.Unmarshal(data, &games); err != nil || len(games) == 0 {
+			return
+		}
+
+		details := gameDetailsFromIGDB(games[0])
+		if details == nil {
+			return
+		}
+
+		if details.FirstReleaseDate != "" {
+			matched, err := regexp.MatchString(datePattern, details.FirstReleaseDate)
+			if err != nil {
+				t.Fatalf("regexp error: %v", err)
+			}
+			if !matched {
+				t.Errorf(
+					"FirstReleaseDate = %q does not match YYYY-MM-DD",
+					details.FirstReleaseDate,
+				)
+			}
+		}
+	})
+}
+
+// FuzzSearchGame verifies that SearchGame never panics on arbitrary game name
+// input when called against a test server that always returns an empty result.
+func FuzzSearchGame(f *testing.F) {
+	f.Add("Mega Man")
+	f.Add("")
+	f.Add(`"injected"`)
+	f.Add("Game\x00Name")
+	f.Add("A\nB")
+	f.Add(strings.Repeat("x", 512))
+
+	f.Fuzz(func(t *testing.T, gameName string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("SearchGame panicked on %q: %v", gameName, r)
+			}
+		}()
+
+		fetcher := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+				writeTokenResponse(w)
+			case strings.HasSuffix(r.URL.Path, "/v4/games"):
+				_, _ = w.Write([]byte("[]"))
+			}
+		})
+
+		_, _ = fetcher.SearchGame(gameName, nil)
+	})
 }

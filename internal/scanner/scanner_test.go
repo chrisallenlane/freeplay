@@ -311,3 +311,81 @@ func TestScanReturnsTrue(t *testing.T) {
 		t.Errorf("got %d games, want 3", len(cat.Games))
 	}
 }
+
+func TestEnrichNames(t *testing.T) {
+	dir, cfg := setupTestDir(t)
+	s := New(cfg, dir)
+	s.ScanBlocking()
+
+	// Pre-scan: verify games have no IGDBName yet.
+	for _, g := range getCatalog(s).Games {
+		if g.IGDBName != "" {
+			t.Errorf(
+				"expected empty IGDBName before enrichment for %q, got %q",
+				g.Filename, g.IGDBName,
+			)
+		}
+	}
+
+	// EnrichNames with a lookup that matches "Mega Man.zip" only.
+	lookup := func(console, romFilename string) string {
+		if console == "NES" && romFilename == "Mega Man.zip" {
+			return "Mega Man"
+		}
+		return ""
+	}
+	s.EnrichNames(lookup)
+
+	cat := getCatalog(s)
+	if len(cat.Games) != 3 {
+		t.Fatalf("expected 3 games after enrichment, got %d", len(cat.Games))
+	}
+
+	found := false
+	for _, g := range cat.Games {
+		if g.Console == "NES" && g.Filename == "Mega Man.zip" {
+			found = true
+			if g.IGDBName != "Mega Man" {
+				t.Errorf(
+					"Mega Man.zip IGDBName = %q, want %q",
+					g.IGDBName, "Mega Man",
+				)
+			}
+			// Other fields must be preserved.
+			if g.Core != "fceumm" {
+				t.Errorf("Core = %q, want %q", g.Core, "fceumm")
+			}
+		} else {
+			// All other games must still have empty IGDBName.
+			if g.IGDBName != "" {
+				t.Errorf(
+					"game %q / %q should have empty IGDBName, got %q",
+					g.Console, g.Filename, g.IGDBName,
+				)
+			}
+		}
+	}
+	if !found {
+		t.Error("Mega Man.zip not found in catalog after enrichment")
+	}
+
+	// Verify enrichment is reflected in CatalogJSON output.
+	data, err := s.CatalogJSON()
+	if err != nil {
+		t.Fatalf("CatalogJSON error: %v", err)
+	}
+	var serialized Catalog
+	if err := json.Unmarshal(data, &serialized); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	for _, g := range serialized.Games {
+		if g.Console == "NES" && g.Filename == "Mega Man.zip" {
+			if g.IGDBName != "Mega Man" {
+				t.Errorf(
+					"CatalogJSON IGDBName for Mega Man.zip = %q, want %q",
+					g.IGDBName, "Mega Man",
+				)
+			}
+		}
+	}
+}

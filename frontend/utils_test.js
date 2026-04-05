@@ -198,6 +198,54 @@ describe("biosUrl", () => {
 	});
 });
 
+describe("detailsUrl", () => {
+	it("builds a details URL with encoded components", () => {
+		assert.equal(
+			FP.detailsUrl({ console: "SNES", filename: "Zelda.smc" }),
+			"/details?console=SNES&rom=Zelda.smc",
+		);
+	});
+
+	it("encodes special characters", () => {
+		assert.equal(
+			FP.detailsUrl({ console: "Game Boy", filename: "Pok\u00e9mon (USA).gb" }),
+			"/details?console=Game%20Boy&rom=Pok%C3%A9mon%20(USA).gb",
+		);
+	});
+});
+
+describe("manualUrl", () => {
+	it("builds a manual URL, stripping the ROM extension", () => {
+		assert.equal(
+			FP.manualUrl({ console: "NES", filename: "Mega Man.nes" }),
+			"/manuals/NES/Mega%20Man.pdf",
+		);
+	});
+
+	it("encodes special characters", () => {
+		assert.equal(
+			FP.manualUrl({ console: "Game Boy", filename: "Pok\u00e9mon (USA).gb" }),
+			"/manuals/Game%20Boy/Pok%C3%A9mon%20(USA).pdf",
+		);
+	});
+});
+
+describe("gameDetailsUrl", () => {
+	it("builds a game-details API URL with encoded components", () => {
+		assert.equal(
+			FP.gameDetailsUrl("NES", "Mega Man.nes"),
+			"/api/game-details?console=NES&rom=Mega%20Man.nes",
+		);
+	});
+
+	it("encodes special characters", () => {
+		assert.equal(
+			FP.gameDetailsUrl("Game Boy", "Pok\u00e9mon (USA).gb"),
+			"/api/game-details?console=Game%20Boy&rom=Pok%C3%A9mon%20(USA).gb",
+		);
+	});
+});
+
 describe("gridColumns", () => {
 	it("returns 1 for empty list", () => {
 		assert.equal(FP.gridColumns([]), 1);
