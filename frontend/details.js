@@ -194,6 +194,10 @@
 			img.src = urls[i];
 			img.loading = "lazy";
 			img.alt = `${heading} ${i + 1} of ${urls.length}`;
+			link.setAttribute(
+				"aria-label",
+				`View full image: ${heading} ${i + 1} of ${urls.length}`,
+			);
 			link.appendChild(img);
 			gallery.appendChild(link);
 		}
