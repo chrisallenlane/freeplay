@@ -27,6 +27,50 @@
 				return;
 			}
 			render(game, details);
+
+			const navItems = [
+				document.querySelector("a.header-btn"),
+				document.querySelector(".details-play-btn"),
+				document.querySelector(".details-manual-btn"),
+			].filter(Boolean);
+
+			let navIndex = Math.min(1, navItems.length - 1);
+
+			function highlight(el) {
+				for (const item of navItems) {
+					item.classList.remove("highlighted");
+				}
+				if (el) {
+					el.classList.add("highlighted");
+					el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+				}
+			}
+
+			function handleAction(action) {
+				switch (action) {
+					case FP.ACTION_UP:
+						if (navIndex > 0) {
+							navIndex--;
+							highlight(navItems[navIndex]);
+						}
+						break;
+					case FP.ACTION_DOWN:
+						if (navIndex < navItems.length - 1) {
+							navIndex++;
+							highlight(navItems[navIndex]);
+						}
+						break;
+					case FP.ACTION_ACTIVATE:
+						navItems[navIndex]?.click();
+						break;
+					case FP.ACTION_BACK:
+						window.location.href = "/";
+						break;
+				}
+			}
+
+			highlight(navItems[navIndex]);
+			FP.gamepadLoop(handleAction);
 		})
 		.catch(() => {
 			FP.showError("content", "Could not load game data.");

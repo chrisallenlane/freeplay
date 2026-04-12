@@ -348,6 +348,11 @@ describe("readGamepadAction", () => {
 		assert.equal(FP.readGamepadAction(gp), FP.ACTION_ACTIVATE);
 	});
 
+	it("maps button 1 (B/Circle) to ACTION_BACK", () => {
+		var gp = makeGamepad((g) => (g.buttons[1].pressed = true));
+		assert.equal(FP.readGamepadAction(gp), FP.ACTION_BACK);
+	});
+
 	it("maps L1 (button 4) to ACTION_PREV_FILTER", () => {
 		var gp = makeGamepad((g) => (g.buttons[4].pressed = true));
 		assert.equal(FP.readGamepadAction(gp), FP.ACTION_PREV_FILTER);
