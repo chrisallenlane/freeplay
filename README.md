@@ -76,6 +76,26 @@ cover art configuration.
 | [ARCHITECTURE.md](ARCHITECTURE.md)             | Understanding the internal design  |
 | [freeplay.example.toml](freeplay.example.toml) | Annotated configuration reference  |
 
+## Repository size
+
+This repo is larger than a typical Go project. The bulk lives in
+`emulatorjs/` — vendored EmulatorJS assets consisting of RetroArch cores
+compiled to WebAssembly (`.wasm` + `.data`) plus the EmulatorJS JS/CSS
+frontend.
+
+These are carried in the repo directly because the cores include custom
+patches for lightgun support (controller port device selection, Super Scope
+input handling) that have not yet been merged upstream.
+
+A git submodule pointing at a patched fork would work in principle, but
+would require maintaining a separate repo just to host this one directory.
+Rebuilding the cores from source requires a full EmulatorJS + emsdk
+toolchain, which is time-consuming to set up and run.
+
+This arrangement is temporary. Once the upstream PRs to [EmulatorJS][] and
+[RetroArch][] land, Freeplay can drop the vendored copy and consume stock
+EmulatorJS.
+
 ## Acknowledgements
 
 Freeplay is a thin wrapper around [EmulatorJS][], which does all of the heavy
@@ -88,3 +108,4 @@ MIT
 
 [EmulatorJS]: https://github.com/EmulatorJS/EmulatorJS
 [IGDB]: https://www.igdb.com/
+[RetroArch]: https://github.com/EmulatorJS/RetroArch
