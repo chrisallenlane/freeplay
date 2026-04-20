@@ -3,12 +3,36 @@ name: Docker
 on:
   push:
     branches: [master]
+    tags: ['v*']
 
 env:
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
+  test:
+    # Repo is mirrored from Gitea to GitHub. Only run on GitHub.
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Go linting tools
+        run: make setup
+
+      - name: Run checks
+        run: make check
+
   build-and-push:
+    needs: test
     # Repo is mirrored from Gitea to GitHub. Only run on GitHub.
     if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
@@ -19,6 +43,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
       - uses: docker/login-action@v4
         with:
@@ -32,4 +66,5 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ github.sha }}
-          tags: ${{ env.IMAGE }}:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

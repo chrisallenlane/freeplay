@@ -106,8 +106,8 @@ vendor-update:
 ## setup: install dev dependencies (gofumpt, golangci-lint)
 .PHONY: setup
 setup:
-	$(GO) install mvdan.cc/gofumpt@latest
-	$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+	$(GO) install mvdan.cc/gofumpt@v0.9.2
+	$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.3
 
 ## docker: build docker image
 .PHONY: docker
