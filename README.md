@@ -22,7 +22,9 @@ a TOML file, and you're done.
 - Shows a game details page with metadata, screenshots, and artwork from
   [IGDB][] (when configured)
 - Serves per-game PDF manuals when placed alongside ROMs
-- Filters games by console, search query, or favorites
+- Filters games by console, favorites, or search query — search matches
+  filename, IGDB title, developer, publisher, and release year; multi-word
+  queries AND across all fields
 - Runs as a single binary or a single Docker container with one volume mount
 - Switches between light and dark themes (auto-detects system preference,
   with manual toggle)

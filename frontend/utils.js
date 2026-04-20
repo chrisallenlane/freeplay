@@ -7,12 +7,27 @@
 	exports.favKey = (game) => `${game.console}/${game.filename}`;
 
 	exports.filterGames = (games, opts) => {
-		const query = (opts.query || "").toLowerCase();
+		const tokens = (opts.query || "")
+			.toLowerCase()
+			.split(/\s+/)
+			.filter((t) => t.length > 0);
 		return games.filter((g) => {
 			if (opts.favoritesOnly && !opts.favorites.has(exports.favKey(g)))
 				return false;
 			if (opts.console && g.console !== opts.console) return false;
-			if (query && !g.filename.toLowerCase().includes(query)) return false;
+			if (tokens.length > 0) {
+				const parts = [g.filename.toLowerCase()];
+				if (g.igdbName) parts.push(g.igdbName.toLowerCase());
+				if (g.developers) {
+					for (const d of g.developers) parts.push(d.toLowerCase());
+				}
+				if (g.publishers) {
+					for (const p of g.publishers) parts.push(p.toLowerCase());
+				}
+				if (g.year) parts.push(String(g.year));
+				const corpus = parts.join(" ");
+				if (!tokens.every((t) => corpus.includes(t))) return false;
+			}
 			return true;
 		});
 	};

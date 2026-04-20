@@ -52,12 +52,18 @@ func main() {
 		fatal(err)
 	}
 
-	// nameLookup returns the IGDB name for a game from the details cache.
-	nameLookup := func(console, romFilename string) string {
-		if d := detailsCache.Get(console, romFilename); d != nil {
-			return d.Name
+	// metaLookup returns cached IGDB metadata for a game.
+	metaLookup := func(console, romFilename string) *scanner.GameMeta {
+		d := detailsCache.Get(console, romFilename)
+		if d == nil {
+			return nil
 		}
-		return ""
+		return &scanner.GameMeta{
+			Name:             d.Name,
+			Developers:       d.Developers,
+			Publishers:       d.Publishers,
+			FirstReleaseDate: d.FirstReleaseDate,
+		}
 	}
 
 	// Wire details cache population to run after each scan
@@ -70,7 +76,7 @@ func main() {
 				IGDBPlatformIDs: g.IGDBPlatformIDs,
 			}
 		}
-		srv.Scanner().EnrichNames(nameLookup)
+		srv.Scanner().EnrichMetadata(metaLookup)
 		go func() {
 			if detailsCache.FetchAll(entries) > 0 {
 				// Rescan so the catalog picks up newly fetched IGDB data

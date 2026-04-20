@@ -312,12 +312,12 @@ func TestScanReturnsTrue(t *testing.T) {
 	}
 }
 
-func TestEnrichNames(t *testing.T) {
+func TestEnrichMetadata(t *testing.T) {
 	dir, cfg := setupTestDir(t)
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	// Pre-scan: verify games have no IGDBName yet.
+	// Pre-scan: verify games have no metadata yet.
 	for _, g := range getCatalog(s).Games {
 		if g.IGDBName != "" {
 			t.Errorf(
@@ -327,14 +327,19 @@ func TestEnrichNames(t *testing.T) {
 		}
 	}
 
-	// EnrichNames with a lookup that matches "Mega Man.zip" only.
-	lookup := func(console, romFilename string) string {
+	// Lookup that returns full metadata for "Mega Man.zip" only.
+	lookup := func(console, romFilename string) *GameMeta {
 		if console == "NES" && romFilename == "Mega Man.zip" {
-			return "Mega Man"
+			return &GameMeta{
+				Name:             "Mega Man",
+				Developers:       []string{"Capcom"},
+				Publishers:       []string{"Capcom"},
+				FirstReleaseDate: "1987-12-17",
+			}
 		}
-		return ""
+		return nil
 	}
-	s.EnrichNames(lookup)
+	s.EnrichMetadata(lookup)
 
 	cat := getCatalog(s)
 	if len(cat.Games) != 3 {
@@ -346,21 +351,45 @@ func TestEnrichNames(t *testing.T) {
 		if g.Console == "NES" && g.Filename == "Mega Man.zip" {
 			found = true
 			if g.IGDBName != "Mega Man" {
-				t.Errorf(
-					"Mega Man.zip IGDBName = %q, want %q",
-					g.IGDBName, "Mega Man",
-				)
+				t.Errorf("IGDBName = %q, want %q", g.IGDBName, "Mega Man")
+			}
+			if len(g.Developers) != 1 || g.Developers[0] != "Capcom" {
+				t.Errorf("Developers = %v, want [Capcom]", g.Developers)
+			}
+			if len(g.Publishers) != 1 || g.Publishers[0] != "Capcom" {
+				t.Errorf("Publishers = %v, want [Capcom]", g.Publishers)
+			}
+			if g.Year != 1987 {
+				t.Errorf("Year = %d, want 1987", g.Year)
 			}
 			// Other fields must be preserved.
 			if g.Core != "fceumm" {
 				t.Errorf("Core = %q, want %q", g.Core, "fceumm")
 			}
 		} else {
-			// All other games must still have empty IGDBName.
+			// All other games must still have empty metadata.
 			if g.IGDBName != "" {
 				t.Errorf(
 					"game %q / %q should have empty IGDBName, got %q",
 					g.Console, g.Filename, g.IGDBName,
+				)
+			}
+			if len(g.Developers) != 0 {
+				t.Errorf(
+					"game %q / %q should have empty Developers, got %v",
+					g.Console, g.Filename, g.Developers,
+				)
+			}
+			if len(g.Publishers) != 0 {
+				t.Errorf(
+					"game %q / %q should have empty Publishers, got %v",
+					g.Console, g.Filename, g.Publishers,
+				)
+			}
+			if g.Year != 0 {
+				t.Errorf(
+					"game %q / %q Year = %d, want 0",
+					g.Console, g.Filename, g.Year,
 				)
 			}
 		}
@@ -387,5 +416,108 @@ func TestEnrichNames(t *testing.T) {
 				)
 			}
 		}
+	}
+}
+
+func TestEnrichMetadataMissingEntry(t *testing.T) {
+	dir, cfg := setupTestDir(t)
+	s := New(cfg, dir)
+	s.ScanBlocking()
+
+	// Lookup that never finds anything — all fields must stay zero.
+	s.EnrichMetadata(func(_, _ string) *GameMeta { return nil })
+
+	for _, g := range getCatalog(s).Games {
+		if g.IGDBName != "" || len(g.Developers) != 0 ||
+			len(g.Publishers) != 0 || g.Year != 0 {
+			t.Errorf(
+				"game %q / %q: expected all metadata empty, got %+v",
+				g.Console, g.Filename, g,
+			)
+		}
+	}
+}
+
+func TestCatalogJSONOmitempty(t *testing.T) {
+	dir, cfg := setupTestDir(t)
+	s := New(cfg, dir)
+	s.ScanBlocking()
+
+	// Enrich only one game so the rest have empty optional fields.
+	s.EnrichMetadata(func(console, romFilename string) *GameMeta {
+		if console == "NES" && romFilename == "Mega Man.zip" {
+			return &GameMeta{
+				Name:             "Mega Man",
+				Developers:       []string{"Capcom"},
+				Publishers:       []string{"Capcom"},
+				FirstReleaseDate: "1987-12-17",
+			}
+		}
+		return nil
+	})
+
+	data, err := s.CatalogJSON()
+	if err != nil {
+		t.Fatalf("CatalogJSON error: %v", err)
+	}
+
+	// Parse into a generic structure so we can inspect raw JSON keys.
+	type rawCatalog struct {
+		Games []map[string]any `json:"games"`
+	}
+	var raw rawCatalog
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	for _, gm := range raw.Games {
+		console, _ := gm["console"].(string)
+		filename, _ := gm["filename"].(string)
+		if console == "NES" && filename == "Mega Man.zip" {
+			// Enriched game must carry the new fields.
+			if _, ok := gm["developers"]; !ok {
+				t.Error("Mega Man.zip missing 'developers' key in JSON")
+			}
+			if _, ok := gm["publishers"]; !ok {
+				t.Error("Mega Man.zip missing 'publishers' key in JSON")
+			}
+			if _, ok := gm["year"]; !ok {
+				t.Error("Mega Man.zip missing 'year' key in JSON")
+			}
+		} else {
+			// Un-enriched games must NOT carry the new fields (omitempty).
+			if _, ok := gm["developers"]; ok {
+				t.Errorf("%s/%s has unexpected 'developers' key", console, filename)
+			}
+			if _, ok := gm["publishers"]; ok {
+				t.Errorf("%s/%s has unexpected 'publishers' key", console, filename)
+			}
+			if _, ok := gm["year"]; ok {
+				t.Errorf("%s/%s has unexpected 'year' key", console, filename)
+			}
+		}
+	}
+}
+
+func TestParseYear(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  int
+	}{
+		{"full ISO 8601", "2020-12-10", 2020},
+		{"year only", "1985", 1985},
+		{"empty string", "", 0},
+		{"garbage input", "abcd-12-10", 0},
+		{"too short", "199", 0},
+		{"partial garbage", "20xx", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseYear(tt.input)
+			if got != tt.want {
+				t.Errorf("parseYear(%q) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
 	}
 }
