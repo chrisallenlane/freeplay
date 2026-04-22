@@ -8,17 +8,9 @@
 	}
 	const { consoleName, rom, gameName } = subpage;
 
-	fetch("/api/games")
-		.then((res) => res.json())
-		.then((catalog) => {
-			const game = FP.findGame(catalog.games, consoleName, rom);
-			if (!game) {
-				FP.showError(
-					"game",
-					"Game not found. It may have been removed from the library.",
-				);
-				return;
-			}
+	FP.loadGame(consoleName, rom, "game")
+		.then((game) => {
+			if (!game) return;
 			const toggle = document.getElementById("theme-toggle");
 
 			// Update page title with IGDB name if available

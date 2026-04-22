@@ -190,6 +190,30 @@
 		return node;
 	};
 
+	/**
+	 * Fetches the game catalog, finds a game by console and filename, and returns
+	 * it. Returns null (and renders an error into errorContainerId) if the game is
+	 * not in the catalog. Throws on network or parse failure so the caller's catch
+	 * handler still fires.
+	 * @param {string} consoleName
+	 * @param {string} gameName
+	 * @param {string} errorContainerId
+	 * @returns {Promise<object|null>}
+	 */
+	exports.loadGame = async (consoleName, gameName, errorContainerId) => {
+		const res = await fetch("/api/games");
+		const catalog = await res.json();
+		const game = exports.findGame(catalog.games, consoleName, gameName);
+		if (!game) {
+			exports.showError(
+				errorContainerId,
+				"Game not found. It may have been removed from the library.",
+			);
+			return null;
+		}
+		return game;
+	};
+
 	exports.showError = (containerId, msg) => {
 		document.getElementById(containerId).style.display = "none";
 		const el = document.getElementById("error");

@@ -8,7 +8,7 @@
 	}
 	const { consoleName, rom, gameName } = subpage;
 
-	const catalogPromise = fetch("/api/games").then((res) => res.json());
+	const gamePromise = FP.loadGame(consoleName, rom, "content");
 	const detailsPromise = fetch(FP.gameDetailsUrl(consoleName, rom))
 		.then((res) => {
 			if (!res.ok) return null;
@@ -16,16 +16,9 @@
 		})
 		.catch(() => null);
 
-	Promise.all([catalogPromise, detailsPromise])
-		.then(([catalog, details]) => {
-			const game = FP.findGame(catalog.games, consoleName, rom);
-			if (!game) {
-				FP.showError(
-					"content",
-					"Game not found. It may have been removed from the library.",
-				);
-				return;
-			}
+	Promise.all([gamePromise, detailsPromise])
+		.then(([game, details]) => {
+			if (!game) return;
 			render(game, details);
 
 			const navItems = [
@@ -86,10 +79,9 @@
 		const hero = FP.el("div", "details-hero");
 
 		if (game.hasCover) {
-			const img = document.createElement("img");
+			const img = FP.el("img", "details-cover");
 			img.src = FP.coverUrl(game);
 			img.alt = `${gameName} cover art`;
-			img.className = "details-cover";
 			hero.appendChild(img);
 		}
 
@@ -102,21 +94,14 @@
 		);
 		meta.appendChild(title);
 
-		const rows = [];
-		if (details) {
-			rows.push(["Console", consoleName]);
-			if (details.firstReleaseDate)
-				rows.push(["Year", details.firstReleaseDate.substring(0, 4)]);
-			if (details.developers?.length)
-				rows.push(["Developer", details.developers.join(", ")]);
-			if (details.publishers?.length)
-				rows.push(["Publisher", details.publishers.join(", ")]);
-			if (details.platforms?.length)
-				rows.push(["Platforms", details.platforms.join(", ")]);
-			if (details.collection) rows.push(["Series", details.collection]);
-		} else {
-			rows.push(["Console", consoleName]);
-		}
+		const rows = [
+			["Console", consoleName],
+			["Year", details?.firstReleaseDate?.substring(0, 4)],
+			["Developer", details?.developers?.join(", ")],
+			["Publisher", details?.publishers?.join(", ")],
+			["Platforms", details?.platforms?.join(", ")],
+			["Series", details?.collection],
+		].filter(([, v]) => v);
 
 		const table = FP.el("table", "details-meta-table");
 		for (const [label, value] of rows) {
@@ -168,12 +153,11 @@
 		}
 
 		if (details.coverUrl) {
-			const link = document.createElement("a");
+			const link = FP.el("a");
 			link.href = details.coverUrl;
-			const img = document.createElement("img");
+			const img = FP.el("img", "details-cover-full");
 			img.src = details.coverUrl;
 			img.alt = `${details.name} cover art`;
-			img.className = "details-cover-full";
 			link.appendChild(img);
 			appendSection(content, "Cover Art", link);
 		}
@@ -213,16 +197,16 @@
 	function buildGallery(heading, urls, galleryClass) {
 		const gallery = FP.el("div", galleryClass || "details-gallery");
 		for (let i = 0; i < urls.length; i++) {
-			const link = document.createElement("a");
+			const link = FP.el("a");
 			link.href = urls[i];
-			const img = document.createElement("img");
-			img.src = urls[i];
-			img.loading = "lazy";
-			img.alt = `${heading} ${i + 1} of ${urls.length}`;
 			link.setAttribute(
 				"aria-label",
 				`View full image: ${heading} ${i + 1} of ${urls.length}`,
 			);
+			const img = FP.el("img");
+			img.src = urls[i];
+			img.loading = "lazy";
+			img.alt = `${heading} ${i + 1} of ${urls.length}`;
 			link.appendChild(img);
 			gallery.appendChild(link);
 		}
