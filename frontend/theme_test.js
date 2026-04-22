@@ -1,6 +1,6 @@
 var { describe, it } = require("node:test");
 var assert = require("node:assert/strict");
-var FP = require("./utils.js");
+var FP = require("./theme.js");
 
 describe("initThemeToggle", () => {
 	function withThemeMocks(theme, hasButton, fn) {
@@ -35,14 +35,14 @@ describe("initThemeToggle", () => {
 	it("sets sun icon for dark theme", () => {
 		withThemeMocks("dark", true, ({ btn }) => {
 			FP.initThemeToggle();
-			assert.equal(btn.textContent, "\u2600");
+			assert.equal(btn.textContent, "☀");
 		});
 	});
 
 	it("sets moon icon for light theme", () => {
 		withThemeMocks("light", true, ({ btn }) => {
 			FP.initThemeToggle();
-			assert.equal(btn.textContent, "\u263D");
+			assert.equal(btn.textContent, "☽");
 		});
 	});
 
@@ -56,17 +56,17 @@ describe("initThemeToggle", () => {
 	it("toggles theme on click", () => {
 		withThemeMocks("dark", true, ({ btn, dataset, storage, click }) => {
 			FP.initThemeToggle();
-			assert.equal(btn.textContent, "\u2600");
+			assert.equal(btn.textContent, "☀");
 
 			click();
 			assert.equal(dataset.theme, "light");
 			assert.equal(storage["freeplay-theme"], "light");
-			assert.equal(btn.textContent, "\u263D");
+			assert.equal(btn.textContent, "☽");
 
 			click();
 			assert.equal(dataset.theme, "dark");
 			assert.equal(storage["freeplay-theme"], "dark");
-			assert.equal(btn.textContent, "\u2600");
+			assert.equal(btn.textContent, "☀");
 		});
 	});
 });

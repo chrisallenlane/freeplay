@@ -1,5 +1,6 @@
 if (typeof module !== "undefined") {
 	require("./urls.js");
+	require("./theme.js");
 }
 
 ((exports) => {
@@ -12,26 +13,6 @@ if (typeof module !== "undefined") {
 		document.title = `Freeplay - ${gameName}`;
 		exports.initThemeToggle();
 		return { consoleName, rom, gameName };
-	};
-
-	exports.initThemeToggle = () => {
-		const btn = document.getElementById("theme-toggle");
-		if (!btn) return;
-
-		const update = () => {
-			btn.textContent =
-				document.documentElement.dataset.theme === "light" ? "☽" : "☀";
-		};
-
-		btn.addEventListener("click", () => {
-			const next =
-				document.documentElement.dataset.theme === "light" ? "dark" : "light";
-			document.documentElement.dataset.theme = next;
-			localStorage.setItem("freeplay-theme", next);
-			update();
-		});
-
-		update();
 	};
 })(
 	typeof module !== "undefined"
