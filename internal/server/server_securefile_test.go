@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
+	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
 // TestServeSecureFile_EmptyFilename verifies that requesting an empty filename
@@ -113,7 +114,8 @@ func TestServeSecureFile_TrailingSeparatorInBaseDir(t *testing.T) {
 		},
 	}
 
-	srv, err := New(cfg, dir, testFrontendFS, testEmulatorjsFS, nil)
+	scn := scanner.New(cfg, dir)
+	srv, err := New(cfg, dir, testFrontendFS, testEmulatorjsFS, nil, scn, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

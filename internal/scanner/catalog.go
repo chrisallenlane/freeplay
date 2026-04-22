@@ -40,6 +40,11 @@ type GameMeta struct {
 	FirstReleaseDate string // ISO 8601, e.g. "2020-12-10"
 }
 
+// Catalog returns the current catalog snapshot.
+func (s *Scanner) Catalog() *Catalog {
+	return s.catalog.Load()
+}
+
 // CatalogJSON returns the catalog as JSON bytes.
 func (s *Scanner) CatalogJSON() ([]byte, error) {
 	return json.Marshal(s.catalog.Load())

@@ -122,7 +122,15 @@ func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {
-	if !s.scanner.Scan() {
+	if s.rescanner == nil {
+		http.Error(
+			w,
+			`{"error":"rescan not available"}`,
+			http.StatusServiceUnavailable,
+		)
+		return
+	}
+	if !s.rescanner.TriggerRescan() {
 		http.Error(w, `{"error":"scan already in progress"}`, http.StatusConflict)
 		return
 	}

@@ -201,19 +201,10 @@ func TestScanConcurrentPrevention(t *testing.T) {
 	dir, cfg := setupTestDir(t)
 	s := New(cfg, dir)
 
-	// Use a callback to hold the scan in progress while we attempt a second.
-	started := make(chan struct{})
-	release := make(chan struct{})
-	s.SetOnScanComplete(func(_ []Game) {
-		close(started)
-		<-release
-	})
-
-	go s.ScanBlocking()
-	<-started
-
+	// Hold the scanner's mutex directly to simulate an in-progress scan.
+	s.mu.Lock()
 	ran := s.Scan()
-	close(release)
+	s.mu.Unlock()
 
 	if ran {
 		t.Error("Scan should have returned false when another scan is in progress")
@@ -274,22 +265,6 @@ func TestScanBIOSDetection(t *testing.T) {
 		if g.Console == "Genesis" && g.HasBios {
 			t.Errorf("Genesis game %s should have HasBios=false", g.Filename)
 		}
-	}
-}
-
-func TestScanCallback(t *testing.T) {
-	dir, cfg := setupTestDir(t)
-	s := New(cfg, dir)
-
-	var callbackGames []Game
-	s.SetOnScanComplete(func(games []Game) {
-		callbackGames = games
-	})
-
-	s.ScanBlocking()
-
-	if len(callbackGames) != 3 {
-		t.Errorf("callback got %d games, want 3", len(callbackGames))
 	}
 }
 

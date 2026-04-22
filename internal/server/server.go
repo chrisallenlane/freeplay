@@ -20,11 +20,19 @@ type DetailsCache interface {
 	Fetching() bool
 }
 
+// Rescanner triggers the scan/enrich/fetch pipeline in response to an
+// HTTP /api/rescan request. TriggerRescan returns false if a pipeline is
+// already running; the server maps that to HTTP 409.
+type Rescanner interface {
+	TriggerRescan() bool
+}
+
 // Server is the Freeplay HTTP server.
 type Server struct {
 	cfg           *config.Config
 	dataDir       string
 	scanner       *scanner.Scanner
+	rescanner     Rescanner
 	saves         *saves.Manager
 	detailsCache  DetailsCache
 	frontendSub   fs.FS
@@ -33,13 +41,16 @@ type Server struct {
 	handler       http.Handler
 }
 
-// New creates a configured Server ready to listen.
-// detailsCache may be nil if IGDB is not configured.
+// New creates a configured Server ready to listen. detailsCache may be
+// nil if IGDB is not configured. rescanner may be nil, in which case
+// POST /api/rescan returns 503.
 func New(
 	cfg *config.Config,
 	dataDir string,
 	frontendFS, emulatorjsFS fs.FS,
 	detailsCache DetailsCache,
+	scn *scanner.Scanner,
+	rescanner Rescanner,
 ) (*Server, error) {
 	frontendSub, err := fs.Sub(frontendFS, "frontend")
 	if err != nil {
@@ -53,7 +64,8 @@ func New(
 	s := &Server{
 		cfg:           cfg,
 		dataDir:       dataDir,
-		scanner:       scanner.New(cfg, dataDir),
+		scanner:       scn,
+		rescanner:     rescanner,
 		saves:         saves.New(dataDir),
 		detailsCache:  detailsCache,
 		frontendSub:   frontendSub,
@@ -63,11 +75,6 @@ func New(
 	s.routes()
 	s.handler = securityHeaders(s.mux)
 	return s, nil
-}
-
-// Scanner returns the server's scanner for triggering async scans.
-func (s *Server) Scanner() *scanner.Scanner {
-	return s.scanner
 }
 
 // ListenAndServe starts the HTTP server.

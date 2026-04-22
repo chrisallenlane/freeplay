@@ -73,7 +73,11 @@ func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
 		cache = dc[0]
 	}
 
-	srv, err := New(cfg, dir, testFrontendFS, testEmulatorjsFS, cache)
+	scn := scanner.New(cfg, dir)
+	srv, err := New(
+		cfg, dir, testFrontendFS, testEmulatorjsFS,
+		cache, scn, &stubRescanner{},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -622,25 +626,41 @@ func FuzzParseSaveParams(f *testing.F) {
 	})
 }
 
+// stubRescanner lets tests exercise /api/rescan without the real pipeline.
+type stubRescanner struct{ busy bool }
+
+func (s *stubRescanner) TriggerRescan() bool { return !s.busy }
+
 func TestRescanConflict(t *testing.T) {
 	srv, _ := testServer(t)
-
-	started := make(chan struct{})
-	release := make(chan struct{})
-	srv.scanner.SetOnScanComplete(func(_ []scanner.Game) {
-		close(started)
-		<-release
-	})
-
-	go srv.scanner.ScanBlocking()
-	<-started
+	srv.rescanner = &stubRescanner{busy: true}
 
 	w := doRequest(t, srv, http.MethodPost, "/api/rescan", nil)
 
-	close(release)
-
 	if w.Code != http.StatusConflict {
 		t.Errorf("got status %d, want 409", w.Code)
+	}
+}
+
+func TestRescanUnavailableWithoutRescanner(t *testing.T) {
+	srv, _ := testServer(t)
+	srv.rescanner = nil
+
+	w := doRequest(t, srv, http.MethodPost, "/api/rescan", nil)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("got status %d, want 503", w.Code)
+	}
+}
+
+func TestRescanSucceeds(t *testing.T) {
+	srv, _ := testServer(t)
+	srv.rescanner = &stubRescanner{busy: false}
+
+	w := doRequest(t, srv, http.MethodPost, "/api/rescan", nil)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("got status %d, want 200", w.Code)
 	}
 }
 

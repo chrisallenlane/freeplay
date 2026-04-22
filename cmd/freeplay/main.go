@@ -11,6 +11,7 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/config"
 	"github.com/chrisallenlane/freeplay/internal/details"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
+	"github.com/chrisallenlane/freeplay/internal/library"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 	"github.com/chrisallenlane/freeplay/internal/server"
 )
@@ -40,53 +41,22 @@ func main() {
 	if cfg.CoverArtAPI == "igdb" {
 		igdbFetcher = igdb.NewFetcher(cfg.CoverArtKey)
 	}
-
 	detailsCache := details.New(*dataDir, igdbFetcher)
+
+	scn := scanner.New(cfg, *dataDir)
+	lib := library.New(scn, detailsCache)
 
 	srv, err := server.New(
 		cfg, *dataDir,
 		freeplay.FrontendFS, freeplay.EmulatorjsFS,
-		detailsCache,
+		detailsCache, scn, lib,
 	)
 	if err != nil {
 		fatal(err)
 	}
 
-	// metaLookup returns cached IGDB metadata for a game.
-	metaLookup := func(console, romFilename string) *scanner.GameMeta {
-		d := detailsCache.Get(console, romFilename)
-		if d == nil {
-			return nil
-		}
-		return &scanner.GameMeta{
-			Name:             d.Name,
-			Developers:       d.Developers,
-			Publishers:       d.Publishers,
-			FirstReleaseDate: d.FirstReleaseDate,
-		}
-	}
-
-	// Wire details cache population to run after each scan
-	srv.Scanner().SetOnScanComplete(func(games []scanner.Game) {
-		entries := make([]igdb.GameEntry, len(games))
-		for i, g := range games {
-			entries[i] = igdb.GameEntry{
-				Console:         g.Console,
-				Filename:        g.Filename,
-				IGDBPlatformIDs: g.IGDBPlatformIDs,
-			}
-		}
-		srv.Scanner().EnrichMetadata(metaLookup)
-		go func() {
-			if detailsCache.FetchAll(entries) > 0 {
-				// Rescan so the catalog picks up newly fetched IGDB data
-				srv.Scanner().ScanBlocking()
-			}
-		}()
-	})
-
-	// Trigger initial ROM scan asynchronously
-	go srv.Scanner().ScanBlocking()
+	// Kick off the initial scan/enrich/fetch pipeline in the background.
+	lib.Start()
 
 	slog.Info("starting freeplay", "port", cfg.Port, "data", *dataDir)
 	if err := srv.ListenAndServe(); err != nil {
