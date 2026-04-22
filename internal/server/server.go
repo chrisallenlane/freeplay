@@ -206,9 +206,9 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	consoleName := r.URL.Query().Get("console")
+	console := r.URL.Query().Get("console")
 	rom := r.URL.Query().Get("rom")
-	if consoleName == "" || rom == "" {
+	if console == "" || rom == "" {
 		http.Error(
 			w,
 			`{"error":"console and rom parameters required"}`,
@@ -217,7 +217,7 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d := s.detailsCache.Get(consoleName, rom)
+	d := s.detailsCache.Get(console, rom)
 	if d == nil {
 		http.Error(w, `{"error":"game not found"}`, http.StatusNotFound)
 		return
@@ -258,13 +258,13 @@ func parseSaveParams(r *http.Request) (string, string, string, bool) {
 }
 
 func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
-	consoleName, game, saveType, ok := parseSaveParams(r)
+	console, game, saveType, ok := parseSaveParams(r)
 	if !ok {
 		http.Error(w, "invalid save parameters", http.StatusBadRequest)
 		return
 	}
 
-	data := s.saves.Get(consoleName, game, saveType)
+	data := s.saves.Get(console, game, saveType)
 	if data == nil {
 		http.NotFound(w, r)
 		return
@@ -274,14 +274,14 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
-	consoleName, game, saveType, ok := parseSaveParams(r)
+	console, game, saveType, ok := parseSaveParams(r)
 	if !ok {
 		http.Error(w, "invalid save parameters", http.StatusBadRequest)
 		return
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 64<<20) // 64 MB
-	if err := s.saves.Put(consoleName, game, saveType, r.Body); err != nil {
+	if err := s.saves.Put(console, game, saveType, r.Body); err != nil {
 		http.Error(w, "save failed", http.StatusInternalServerError)
 		return
 	}

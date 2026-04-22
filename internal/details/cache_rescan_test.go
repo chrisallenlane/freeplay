@@ -3,7 +3,6 @@ package details
 import (
 	"os"
 	"path/filepath"
-	"sync/atomic"
 	"testing"
 
 	"github.com/chrisallenlane/freeplay/internal/igdb"
@@ -53,13 +52,11 @@ func TestFetchAllAfterCacheCorruption(t *testing.T) {
 	imgServer := startFakeImageServer(t)
 	coverURL := imgServer.URL + "/cover.jpg"
 
-	var fetchCount atomic.Int32
-	fetcher := &countingMockFetcher{
+	fetcher := &mockIGDBFetcher{
 		searchResults: map[string]int{"Mega Man": 17},
 		detailsResults: map[int]*igdb.GameDetails{
 			17: {Name: "Mega Man", CoverURL: coverURL},
 		},
-		fetchCount: &fetchCount,
 	}
 
 	dir := t.TempDir()
@@ -102,7 +99,7 @@ func TestFetchAllAfterCacheCorruption(t *testing.T) {
 		"INFO: Cache corruption causes FetchAll to return saved > 0 again, "+
 			"which would trigger another re-scan cycle in main.go. "+
 			"Total fetches: %d",
-		fetchCount.Load(),
+		fetcher.detailsCalls,
 	)
 }
 
@@ -315,29 +312,3 @@ var errTransient = errType("transient network error")
 type errType string
 
 func (e errType) Error() string { return string(e) }
-
-// countingMockFetcher wraps mockIGDBFetcher and counts fetches atomically.
-type countingMockFetcher struct {
-	searchResults  map[string]int
-	detailsResults map[int]*igdb.GameDetails
-	fetchCount     *atomic.Int32
-}
-
-func (m *countingMockFetcher) SearchGame(
-	gameName string, _ []int,
-) (int, error) {
-	if m.searchResults == nil {
-		return 0, nil
-	}
-	return m.searchResults[gameName], nil
-}
-
-func (m *countingMockFetcher) FetchDetailsByID(
-	gameID int,
-) (*igdb.GameDetails, error) {
-	m.fetchCount.Add(1)
-	if m.detailsResults == nil {
-		return nil, nil
-	}
-	return m.detailsResults[gameID], nil
-}
