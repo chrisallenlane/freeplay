@@ -52,15 +52,8 @@
 		renderGrid();
 	}
 
-	function el(tag, cls, text) {
-		const e = document.createElement(tag);
-		if (cls) e.className = cls;
-		if (text) e.textContent = text;
-		return e;
-	}
-
 	function addFilterBtn(label, isActive, onClick) {
-		const btn = el(
+		const btn = FP.el(
 			"button",
 			`btn filter-btn${isActive ? " active" : ""}`,
 			label,
@@ -98,13 +91,13 @@
 		const key = FP.favKey(game);
 		const displayName = game.igdbName || FP.stripExt(game.filename);
 
-		const card = el("a", "game-card");
+		const card = FP.el("a", "game-card");
 		card.href = FP.detailsUrl(game);
 		card.dataset.key = key;
 
 		// Favorite button
 		const isFav = favorites.has(key);
-		const fav = el(
+		const fav = FP.el(
 			"button",
 			`fav-btn${isFav ? " favorited" : ""}`,
 			isFav ? "\u2605" : "\u2606",
@@ -135,25 +128,25 @@
 		// Cover art or placeholder
 		let coverEl;
 		if (game.hasCover) {
-			coverEl = el("img", "cover");
+			coverEl = FP.el("img", "cover");
 			coverEl.src = FP.coverUrl(game);
 			coverEl.alt = displayName;
 			coverEl.loading = "lazy";
 			coverEl.width = 180;
 			coverEl.height = 240;
 		} else {
-			coverEl = el("div", "placeholder-cover");
+			coverEl = FP.el("div", "placeholder-cover");
 			coverEl.append(
-				el("div", "placeholder-name", displayName),
-				el("div", "placeholder-console", game.console),
+				FP.el("div", "placeholder-name", displayName),
+				FP.el("div", "placeholder-console", game.console),
 			);
 		}
 
 		// Card info
-		const info = el("div", "card-info");
+		const info = FP.el("div", "card-info");
 		info.append(
-			el("div", "card-title", displayName),
-			el("div", "card-console", game.console),
+			FP.el("div", "card-title", displayName),
+			FP.el("div", "card-console", game.console),
 		);
 
 		card.append(fav, coverEl, info);
@@ -171,7 +164,7 @@
 		const games = getFilteredGames();
 
 		if (games.length === 0) {
-			const msg = el("div", "message");
+			const msg = FP.el("div", "message");
 			if (allGames.length === 0) {
 				msg.textContent =
 					"No games found. Add ROMs to your library and check your freeplay.toml configuration.";
@@ -212,12 +205,12 @@
 			})
 			.catch(() => {
 				grid.innerHTML = "";
-				const msg = el(
+				const msg = FP.el(
 					"div",
 					"message",
 					"Could not load game library. Check that Freeplay is running.",
 				);
-				const retry = el("button", null, "Retry");
+				const retry = FP.el("button", null, "Retry");
 				retry.addEventListener("click", loadCatalog);
 				msg.appendChild(retry);
 				grid.appendChild(msg);

@@ -183,6 +183,13 @@
 		});
 	};
 
+	exports.el = (tag, cls, text) => {
+		const node = document.createElement(tag);
+		if (cls) node.className = cls;
+		if (text !== undefined) node.textContent = text;
+		return node;
+	};
+
 	exports.showError = (containerId, msg) => {
 		document.getElementById(containerId).style.display = "none";
 		const el = document.getElementById("error");

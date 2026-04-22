@@ -30,11 +30,9 @@
 				.catch(() => {});
 
 			if (game.hasManual) {
-				const manualLink = document.createElement("a");
+				const manualLink = FP.el("a", "btn header-btn", "Manual");
 				manualLink.href = FP.manualUrl(game);
-				manualLink.className = "btn header-btn";
 				manualLink.title = "View the manual";
-				manualLink.textContent = "Manual";
 				toggle.parentNode.insertBefore(manualLink, toggle);
 			}
 			startEmulator(game);

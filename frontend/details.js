@@ -83,8 +83,7 @@
 		const content = document.getElementById("content");
 		content.innerHTML = "";
 
-		const hero = document.createElement("div");
-		hero.className = "details-hero";
+		const hero = FP.el("div", "details-hero");
 
 		if (game.hasCover) {
 			const img = document.createElement("img");
@@ -94,12 +93,13 @@
 			hero.appendChild(img);
 		}
 
-		const meta = document.createElement("div");
-		meta.className = "details-meta";
+		const meta = FP.el("div", "details-meta");
 
-		const title = document.createElement("h2");
-		title.className = "details-title";
-		title.textContent = details ? details.name : gameName;
+		const title = FP.el(
+			"h2",
+			"details-title",
+			details ? details.name : gameName,
+		);
 		meta.appendChild(title);
 
 		const rows = [];
@@ -118,45 +118,40 @@
 			rows.push(["Console", consoleName]);
 		}
 
-		const table = document.createElement("table");
-		table.className = "details-meta-table";
+		const table = FP.el("table", "details-meta-table");
 		for (const [label, value] of rows) {
-			const tr = document.createElement("tr");
-			const th = document.createElement("th");
-			th.textContent = label;
-			const td = document.createElement("td");
-			td.textContent = value;
-			tr.appendChild(th);
-			tr.appendChild(td);
+			const tr = FP.el("tr");
+			tr.append(FP.el("th", null, label), FP.el("td", null, value));
 			table.appendChild(tr);
 		}
 		meta.appendChild(table);
 
 		if (details?.igdbUrl) {
-			const a = document.createElement("a");
+			const a = FP.el("a", "details-link", "View on IGDB");
 			a.href = details.igdbUrl;
-			a.textContent = "View on IGDB";
-			a.className = "details-link";
 			meta.appendChild(a);
 		}
 
 		hero.appendChild(meta);
 		content.appendChild(hero);
 
-		const actions = document.createElement("div");
-		actions.className = "details-actions";
+		const actions = FP.el("div", "details-actions");
 
-		const playLink = document.createElement("a");
+		const playLink = FP.el(
+			"a",
+			"btn details-action-btn details-play-btn",
+			"Play",
+		);
 		playLink.href = FP.playUrl(game);
-		playLink.className = "btn details-action-btn details-play-btn";
-		playLink.textContent = "Play";
 		actions.appendChild(playLink);
 
 		if (game.hasManual) {
-			const manualLink = document.createElement("a");
+			const manualLink = FP.el(
+				"a",
+				"btn details-action-btn details-manual-btn",
+				"View Manual",
+			);
 			manualLink.href = FP.manualUrl(game);
-			manualLink.className = "btn details-action-btn details-manual-btn";
-			manualLink.textContent = "View Manual";
 			actions.appendChild(manualLink);
 		}
 
@@ -201,18 +196,13 @@
 	}
 
 	function appendSection(parent, heading, content) {
-		const section = document.createElement("section");
-		section.className = "details-section";
-		const h3 = document.createElement("h3");
-		h3.textContent = heading;
-		section.appendChild(h3);
+		const section = FP.el("section", "details-section");
+		section.appendChild(FP.el("h3", null, heading));
 		if (typeof content === "string") {
 			for (const para of content.split(/\n\n+/)) {
 				const text = para.trim();
 				if (!text) continue;
-				const p = document.createElement("p");
-				p.textContent = text;
-				section.appendChild(p);
+				section.appendChild(FP.el("p", null, text));
 			}
 		} else {
 			section.appendChild(content);
@@ -221,8 +211,7 @@
 	}
 
 	function buildGallery(heading, urls, galleryClass) {
-		const gallery = document.createElement("div");
-		gallery.className = galleryClass || "details-gallery";
+		const gallery = FP.el("div", galleryClass || "details-gallery");
 		for (let i = 0; i < urls.length; i++) {
 			const link = document.createElement("a");
 			link.href = urls[i];
