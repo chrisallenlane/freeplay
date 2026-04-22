@@ -78,24 +78,6 @@ cover art configuration.
 | [ARCHITECTURE.md](ARCHITECTURE.md)             | Understanding the internal design  |
 | [freeplay.example.toml](freeplay.example.toml) | Annotated configuration reference  |
 
-## EmulatorJS assets
-
-The `emulatorjs/` directory is not committed. It contains RetroArch cores
-compiled to WebAssembly (`.wasm` + `.data`) plus the EmulatorJS JS/CSS
-frontend — ~297 MiB of build-time input, not authored source.
-
-These assets are fetched on first build from a pinned GitHub release on the
-[patched EmulatorJS fork][EmulatorJS-fork]. SHA-256 verified, then extracted
-into `emulatorjs/` and embedded into the binary via `//go:embed`. Running
-`make build` or `make check` auto-invokes `make fetch-emulatorjs`; you don't
-need to run it yourself.
-
-The fork exists because the cores include custom patches for lightgun
-support (controller port device selection, Super Scope input handling) that
-have not yet been merged upstream. Once the upstream PRs to [EmulatorJS][]
-and [RetroArch][] land, Freeplay can drop the fork and consume stock
-releases directly.
-
 ## Acknowledgements
 
 Freeplay is a thin wrapper around [EmulatorJS][], which does all of the heavy
@@ -107,6 +89,4 @@ possible.
 MIT
 
 [EmulatorJS]: https://github.com/EmulatorJS/EmulatorJS
-[EmulatorJS-fork]: https://github.com/chrisallenlane/EmulatorJS/releases
 [IGDB]: https://www.igdb.com/
-[RetroArch]: https://github.com/EmulatorJS/RetroArch
