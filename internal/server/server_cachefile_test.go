@@ -2,8 +2,6 @@ package server
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -22,19 +20,8 @@ func TestCacheFileHTMLContent_ExtensionMitigatesXSS(t *testing.T) {
 	srv, dir := testServer(t)
 
 	// Simulate a cached "image" file that actually contains HTML.
-	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "EvilGame")
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
 	htmlPayload := `<html><body><script>alert('XSS')</script></body></html>`
-	if err := os.WriteFile(
-		filepath.Join(cacheDir, "cover.jpg"),
-		[]byte(htmlPayload),
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
+	writeCacheFile(t, dir, "NES", "EvilGame", "cover.jpg", []byte(htmlPayload))
 
 	w := doRequest(
 		t, srv, http.MethodGet,
@@ -72,22 +59,11 @@ func TestCacheFileHTMLContent_ExtensionMitigatesXSS(t *testing.T) {
 func TestCacheFileSVGSniffing(t *testing.T) {
 	srv, dir := testServer(t)
 
-	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "SvgGame")
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
 	svgPayload := `<?xml version="1.0"?>
 <svg xmlns="http://www.w3.org/2000/svg">
   <script>alert('XSS via SVG')</script>
 </svg>`
-	if err := os.WriteFile(
-		filepath.Join(cacheDir, "cover.jpg"),
-		[]byte(svgPayload),
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
+	writeCacheFile(t, dir, "NES", "SvgGame", "cover.jpg", []byte(svgPayload))
 
 	w := doRequest(
 		t, srv, http.MethodGet,
@@ -116,20 +92,9 @@ func TestCacheFileSVGSniffing(t *testing.T) {
 func TestCacheFileJPEGContent(t *testing.T) {
 	srv, dir := testServer(t)
 
-	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "GoodGame")
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
 	// JPEG magic bytes (SOI marker)
 	jpegData := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F'}
-	if err := os.WriteFile(
-		filepath.Join(cacheDir, "cover.jpg"),
-		jpegData,
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
+	writeCacheFile(t, dir, "NES", "GoodGame", "cover.jpg", jpegData)
 
 	w := doRequest(
 		t, srv, http.MethodGet,
@@ -153,20 +118,8 @@ func TestCacheFileJPEGContent(t *testing.T) {
 func TestCacheFileNosniffHeaderPresent(t *testing.T) {
 	srv, dir := testServer(t)
 
-	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "TestGame")
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
 	// JPEG magic bytes
-	jpegData := []byte{0xFF, 0xD8, 0xFF, 0xE0}
-	if err := os.WriteFile(
-		filepath.Join(cacheDir, "cover.jpg"),
-		jpegData,
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
+	writeCacheFile(t, dir, "NES", "TestGame", "cover.jpg", []byte{0xFF, 0xD8, 0xFF, 0xE0})
 
 	w := doRequest(
 		t, srv, http.MethodGet,
@@ -190,17 +143,10 @@ func TestCacheFileNosniffHeaderPresent(t *testing.T) {
 func TestCacheFileLongCacheHeader(t *testing.T) {
 	srv, dir := testServer(t)
 
-	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "CacheTest")
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(cacheDir, "screenshot_0.jpg"),
+	writeCacheFile(
+		t, dir, "NES", "CacheTest", "screenshot_0.jpg",
 		[]byte{0xFF, 0xD8, 0xFF, 0xE0},
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
+	)
 
 	w := doRequest(
 		t, srv, http.MethodGet,

@@ -80,6 +80,25 @@ func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
 	return srv, dir
 }
 
+// writeCacheFile creates a cache/igdb/<console>/<game>/<filename> file inside
+// dataDir, creating all parent directories. It fails the test on any error.
+func writeCacheFile(
+	t *testing.T,
+	dataDir, console, game, filename string,
+	content []byte,
+) {
+	t.Helper()
+	cacheDir := filepath.Join(dataDir, "cache", "igdb", console, game)
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(cacheDir, filename), content, 0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // doRequest issues method+path against srv.handler and returns the recorder.
 // For non-GET/HEAD methods it automatically sets X-Requested-With: freeplay.
 // Use this helper only when the test does not need to control request headers.
@@ -484,17 +503,8 @@ func FuzzServeSecureFile(f *testing.F) {
 
 		// Place a known file inside the cache/igdb subtree so a valid path
 		// can return 200.
-		cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Mega Man")
-		if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-			t.Fatal(err)
-		}
 		const knownContent = "jpgdata"
-		if err := os.WriteFile(
-			filepath.Join(cacheDir, "cover.jpg"),
-			[]byte(knownContent), 0o644,
-		); err != nil {
-			t.Fatal(err)
-		}
+		writeCacheFile(t, dir, "NES", "Mega Man", "cover.jpg", []byte(knownContent))
 
 		// Construct the URL. The mux pattern GET /cache/igdb/{rest...}
 		// passes the raw path remainder to serveSecureFile, so we just
@@ -756,15 +766,7 @@ func TestGameDetailsFromCache(t *testing.T) {
 func TestCacheFilesServing(t *testing.T) {
 	srv, dir := testServer(t)
 
-	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Mega Man")
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(cacheDir, "cover.jpg"), []byte("jpgdata"), 0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
+	writeCacheFile(t, dir, "NES", "Mega Man", "cover.jpg", []byte("jpgdata"))
 
 	w := doRequest(
 		t, srv, http.MethodGet,

@@ -16,12 +16,9 @@ func TestFetchAllIdempotent(t *testing.T) {
 	imgServer := startFakeImageServer(t)
 	coverURL := imgServer.URL + "/cover.jpg"
 
-	fetcher := &mockIGDBFetcher{
-		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*igdb.GameDetails{
-			17: {Name: "Mega Man", CoverURL: coverURL},
-		},
-	}
+	fetcher := newGameFetcher("Mega Man", 17, igdb.GameDetails{
+		Name: "Mega Man", CoverURL: coverURL,
+	})
 
 	dir := t.TempDir()
 	c := New(dir, fetcher)
@@ -52,12 +49,9 @@ func TestFetchAllAfterCacheCorruption(t *testing.T) {
 	imgServer := startFakeImageServer(t)
 	coverURL := imgServer.URL + "/cover.jpg"
 
-	fetcher := &mockIGDBFetcher{
-		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*igdb.GameDetails{
-			17: {Name: "Mega Man", CoverURL: coverURL},
-		},
-	}
+	fetcher := newGameFetcher("Mega Man", 17, igdb.GameDetails{
+		Name: "Mega Man", CoverURL: coverURL,
+	})
 
 	dir := t.TempDir()
 	c := New(dir, fetcher)
@@ -152,12 +146,9 @@ func TestIsCachedConsistencyAfterSaveDetails(t *testing.T) {
 	imgServer := startFakeImageServer(t)
 	coverURL := imgServer.URL + "/cover.jpg"
 
-	fetcher := &mockIGDBFetcher{
-		searchResults: map[string]int{"Mega Man": 17},
-		detailsResults: map[int]*igdb.GameDetails{
-			17: {Name: "Mega Man", CoverURL: coverURL},
-		},
-	}
+	fetcher := newGameFetcher("Mega Man", 17, igdb.GameDetails{
+		Name: "Mega Man", CoverURL: coverURL,
+	})
 
 	dir := t.TempDir()
 	c := New(dir, fetcher)
