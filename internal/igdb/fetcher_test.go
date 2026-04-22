@@ -49,6 +49,32 @@ func newTestFetcher(t *testing.T, handler http.HandlerFunc) *Fetcher {
 	return f
 }
 
+// newIGDBFetcher creates a Fetcher wired to a test server that routes
+// /oauth2/token to writeTokenResponse, /v4/games to gamesHandler, and
+// returns 404 for everything else.
+func newIGDBFetcher(t *testing.T, gamesHandler http.HandlerFunc) *Fetcher {
+	t.Helper()
+	return newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			gamesHandler(w, r)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+}
+
+// newIGDBFetcherStatic creates a Fetcher whose /v4/games endpoint always
+// writes body verbatim. Use for tests that only need a fixed JSON response.
+func newIGDBFetcherStatic(t *testing.T, body []byte) *Fetcher {
+	t.Helper()
+	return newIGDBFetcher(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(body)
+	})
+}
+
 func FuzzTransformImageURL(f *testing.F) {
 	f.Add("//images.igdb.com/igdb/image/upload/t_thumb/abc.jpg", "t_original")
 	f.Add("https://images.igdb.com/igdb/image/upload/t_thumb/abc.jpg", "t_cover_big")
@@ -145,14 +171,7 @@ func TestSearchGameExactMatch(t *testing.T) {
 		{"id": 17, "name": "Mega Man"},
 		{"id": 99, "name": "Mega Man 2"},
 	})
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_, _ = w.Write(searchResp)
-		}
-	})
+	f := newIGDBFetcherStatic(t, searchResp)
 
 	id, err := f.SearchGame("Mega Man", nil)
 	if err != nil {
@@ -167,14 +186,7 @@ func TestSearchGameNoMatch(t *testing.T) {
 	searchResp, _ := json.Marshal([]map[string]any{
 		{"id": 42, "name": "Mega Man X"},
 	})
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_, _ = w.Write(searchResp)
-		}
-	})
+	f := newIGDBFetcherStatic(t, searchResp)
 
 	id, err := f.SearchGame("Mega Man", nil)
 	if err != nil {
@@ -213,14 +225,7 @@ func TestSearchGameDiacriticsMatch(t *testing.T) {
 	searchResp, _ := json.Marshal([]map[string]any{
 		{"id": 55, "name": "Déjà Vu"},
 	})
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_, _ = w.Write(searchResp)
-		}
-	})
+	f := newIGDBFetcherStatic(t, searchResp)
 
 	id, err := f.SearchGame("Deja Vu", nil)
 	if err != nil {
@@ -235,14 +240,7 @@ func TestSearchGamePlatformFallback(t *testing.T) {
 	searchResp, _ := json.Marshal([]map[string]any{
 		{"id": 77, "name": "Completely Different Title"},
 	})
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_, _ = w.Write(searchResp)
-		}
-	})
+	f := newIGDBFetcherStatic(t, searchResp)
 
 	// With platform IDs: falls back to first result
 	id, err := f.SearchGame("Some Game", []int{18})
@@ -258,14 +256,7 @@ func TestSearchGameNoPlatformNoFallback(t *testing.T) {
 	searchResp, _ := json.Marshal([]map[string]any{
 		{"id": 77, "name": "Completely Different Title"},
 	})
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_, _ = w.Write(searchResp)
-		}
-	})
+	f := newIGDBFetcherStatic(t, searchResp)
 
 	// Without platform IDs: no fallback, returns 0
 	id, err := f.SearchGame("Some Game", nil)
@@ -279,19 +270,12 @@ func TestSearchGameNoPlatformNoFallback(t *testing.T) {
 
 func TestSearchGameWithPlatformFilter(t *testing.T) {
 	var capturedQuery string
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			body := make([]byte, r.ContentLength)
-			_, _ = r.Body.Read(body)
-			capturedQuery = string(body)
-			resp, _ := json.Marshal([]map[string]any{
-				{"id": 18, "name": "Metroid"},
-			})
-			_, _ = w.Write(resp)
-		}
+	resp, _ := json.Marshal([]map[string]any{{"id": 18, "name": "Metroid"}})
+	f := newIGDBFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		body := make([]byte, r.ContentLength)
+		_, _ = r.Body.Read(body)
+		capturedQuery = string(body)
+		_, _ = w.Write(resp)
 	})
 
 	_, err := f.SearchGame("Metroid", []int{18, 99})
@@ -326,14 +310,7 @@ func TestFetchDetailsByID(t *testing.T) {
 			"artworks":    []map[string]any{{"url": "//images.igdb.com/t_thumb/art1.jpg"}},
 		},
 	})
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_, _ = w.Write(detailsResp)
-		}
-	})
+	f := newIGDBFetcherStatic(t, detailsResp)
 
 	details, err := f.FetchDetailsByID(17)
 	if err != nil {
@@ -393,14 +370,7 @@ func TestFetchDetailsByID(t *testing.T) {
 }
 
 func TestFetchDetailsByIDNotFound(t *testing.T) {
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_, _ = w.Write([]byte("[]"))
-		}
-	})
+	f := newIGDBFetcherStatic(t, []byte("[]"))
 
 	details, err := f.FetchDetailsByID(999)
 	if err != nil {
@@ -448,13 +418,8 @@ func TestAPIRequestRetryOn401(t *testing.T) {
 // TestAPIRequestNon200Error verifies that a non-200, non-401 response from
 // the games endpoint is surfaced as an error containing the status code.
 func TestAPIRequestNon200Error(t *testing.T) {
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			w.WriteHeader(http.StatusInternalServerError)
-		}
+	f := newIGDBFetcher(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
 	})
 
 	_, err := f.SearchGame("Contra", nil)
@@ -532,13 +497,8 @@ func TestGetTokenMalformedJSON(t *testing.T) {
 // TestSearchGameAPIError verifies that a 500 from the games endpoint
 // propagates as an error from SearchGame.
 func TestSearchGameAPIError(t *testing.T) {
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			w.WriteHeader(http.StatusInternalServerError)
-		}
+	f := newIGDBFetcher(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
 	})
 
 	_, err := f.SearchGame("Tetris", nil)
@@ -550,14 +510,7 @@ func TestSearchGameAPIError(t *testing.T) {
 // TestSearchGameMalformedJSON verifies that malformed JSON from the games
 // endpoint propagates as a parse error from SearchGame.
 func TestSearchGameMalformedJSON(t *testing.T) {
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_, _ = w.Write([]byte(`{invalid`))
-		}
-	})
+	f := newIGDBFetcherStatic(t, []byte(`{invalid`))
 
 	_, err := f.SearchGame("Tetris", nil)
 	if err == nil {
@@ -568,13 +521,8 @@ func TestSearchGameMalformedJSON(t *testing.T) {
 // TestFetchDetailsByIDAPIError verifies that a 500 from the games endpoint
 // propagates as an error from FetchDetailsByID.
 func TestFetchDetailsByIDAPIError(t *testing.T) {
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			w.WriteHeader(http.StatusInternalServerError)
-		}
+	f := newIGDBFetcher(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
 	})
 
 	_, err := f.FetchDetailsByID(17)
@@ -586,14 +534,7 @@ func TestFetchDetailsByIDAPIError(t *testing.T) {
 // TestFetchDetailsByIDMalformedJSON verifies that malformed JSON from the
 // games endpoint propagates as a parse error from FetchDetailsByID.
 func TestFetchDetailsByIDMalformedJSON(t *testing.T) {
-	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-			writeTokenResponse(w)
-		case strings.HasSuffix(r.URL.Path, "/v4/games"):
-			_, _ = w.Write([]byte(`{invalid`))
-		}
-	})
+	f := newIGDBFetcherStatic(t, []byte(`{invalid`))
 
 	_, err := f.FetchDetailsByID(17)
 	if err == nil {
@@ -692,14 +633,7 @@ func FuzzSearchGame(f *testing.F) {
 			}
 		}()
 
-		fetcher := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-			switch {
-			case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
-				writeTokenResponse(w)
-			case strings.HasSuffix(r.URL.Path, "/v4/games"):
-				_, _ = w.Write([]byte("[]"))
-			}
-		})
+		fetcher := newIGDBFetcherStatic(t, []byte("[]"))
 
 		_, _ = fetcher.SearchGame(gameName, nil)
 	})
