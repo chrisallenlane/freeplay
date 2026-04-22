@@ -249,12 +249,12 @@ func safeName(s string) bool {
 		!strings.ContainsRune(s, 0)
 }
 
-func parseSaveParams(r *http.Request) (console, game, saveType string, ok bool) {
-	console = r.PathValue("console")
-	game = r.PathValue("game")
-	saveType = r.PathValue("type")
-	ok = safeName(console) && safeName(game) && saves.ValidType(saveType)
-	return
+func parseSaveParams(r *http.Request) (string, string, string, bool) {
+	console := r.PathValue("console")
+	game := r.PathValue("game")
+	saveType := r.PathValue("type")
+	ok := safeName(console) && safeName(game) && saves.ValidType(saveType)
+	return console, game, saveType, ok
 }
 
 func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {

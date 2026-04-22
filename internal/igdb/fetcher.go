@@ -85,45 +85,58 @@ func (f *Fetcher) getToken() (string, error) {
 }
 
 func (f *Fetcher) apiRequest(endpoint, body string) ([]byte, error) {
-	for attempt := range 2 {
-		token, err := f.getToken()
-		if err != nil {
-			return nil, err
-		}
-
-		req, err := http.NewRequest("POST", "https://api.igdb.com/v4/"+endpoint, strings.NewReader(body))
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Client-ID", f.clientID)
-		req.Header.Set("Authorization", "Bearer "+token)
-
-		resp, err := f.client.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("IGDB request failed: %w", err)
-		}
-
-		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 {
-			_ = resp.Body.Close()
-			// Token expired, clear and retry once
-			f.mu.Lock()
-			f.token = ""
-			f.mu.Unlock()
-			continue
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			respBody, _ := io.ReadAll(resp.Body)
-			_ = resp.Body.Close()
-			return nil, fmt.Errorf("IGDB returned %d: %s", resp.StatusCode, string(respBody))
-		}
-
-		data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		_ = resp.Body.Close()
-		return data, err
+	resp, err := f.doRequest(endpoint, body)
+	if err != nil {
+		return nil, err
 	}
-	// Unreachable: loop always returns or continues
-	return nil, fmt.Errorf("IGDB request failed after retry")
+
+	// On 401, clear the cached token and retry once.
+	if resp.StatusCode == http.StatusUnauthorized {
+		_ = resp.Body.Close()
+		f.mu.Lock()
+		f.token = ""
+		f.mu.Unlock()
+
+		resp, err = f.doRequest(endpoint, body)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("IGDB returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	_ = resp.Body.Close()
+	return data, err
+}
+
+// doRequest performs a single authenticated POST to the IGDB API.
+func (f *Fetcher) doRequest(endpoint, body string) (*http.Response, error) {
+	token, err := f.getToken()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(
+		"POST",
+		"https://api.igdb.com/v4/"+endpoint,
+		strings.NewReader(body),
+	)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Client-ID", f.clientID)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := f.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("IGDB request failed: %w", err)
+	}
+	return resp, nil
 }
 
 // GameDetails holds metadata fetched from IGDB for a game.

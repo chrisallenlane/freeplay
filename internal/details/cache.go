@@ -301,9 +301,11 @@ func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
 
 // isCached reports whether details.json or .notfound exists for the game.
 func (c *Cache) isCached(console, cleanName string) bool {
-	base := c.cacheDir(console, cleanName)
-	for _, name := range []string{"details.json", ".notfound"} {
-		if _, err := os.Stat(filepath.Join(base, name)); err == nil {
+	for _, path := range []string{
+		c.detailsPath(console, cleanName),
+		c.notFoundPath(console, cleanName),
+	} {
+		if _, err := os.Stat(path); err == nil {
 			return true
 		}
 	}
@@ -312,8 +314,7 @@ func (c *Cache) isCached(console, cleanName string) bool {
 
 // writeNotFound writes a .notfound marker so the game is not retried.
 func (c *Cache) writeNotFound(console, cleanName string) {
-	path := filepath.Join(c.cacheDir(console, cleanName), ".notfound")
-	_ = atomicfile.Write(path, func(_ io.Writer) error {
+	_ = atomicfile.Write(c.notFoundPath(console, cleanName), func(_ io.Writer) error {
 		return nil
 	})
 }
@@ -321,6 +322,11 @@ func (c *Cache) writeNotFound(console, cleanName string) {
 // detailsPath returns the filesystem path for the game's details.json.
 func (c *Cache) detailsPath(console, cleanName string) string {
 	return filepath.Join(c.cacheDir(console, cleanName), "details.json")
+}
+
+// notFoundPath returns the filesystem path for the game's .notfound marker.
+func (c *Cache) notFoundPath(console, cleanName string) string {
+	return filepath.Join(c.cacheDir(console, cleanName), ".notfound")
 }
 
 // coverPath returns the expected filesystem path for a game's cover art.
