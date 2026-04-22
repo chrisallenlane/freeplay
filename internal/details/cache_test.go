@@ -15,24 +15,37 @@ import (
 
 // mockIGDBFetcher is a test double for igdbFetcher.
 type mockIGDBFetcher struct {
-	// searchResults maps gameName -> gameID (0 = not found)
+	// searchResults maps gameName -> gameID (0 = not found). Used when
+	// neither constrainedResults nor unconstrainedResults applies.
 	searchResults map[string]int
+	// constrainedResults maps gameName -> gameID for calls where
+	// platformIDs is non-nil (platform-constrained search). When nil,
+	// falls through to searchResults.
+	constrainedResults map[string]int
+	// unconstrainedResults maps gameName -> gameID for calls where
+	// platformIDs is nil (unconstrained search). When nil, falls through
+	// to searchResults.
+	unconstrainedResults map[string]int
 	// detailsResults maps gameID -> GameDetails (nil = not found)
 	detailsResults map[int]*igdb.GameDetails
 	searchCalls    int
 	detailsCalls   int
 
-	// searchErr, if non-nil, is returned by every SearchGame call.
+	// searchErr, if non-nil, is returned by every SearchGame call (unless
+	// overridden by searchErrOn for that call index).
 	searchErr error
+	// searchErrOn maps call index (0-based) -> error. When a call index is
+	// present, that specific call returns the mapped error.
+	searchErrOn map[int]error
 	// detailsErr, if non-nil, is returned by every FetchDetailsByID call.
 	detailsErr error
 	// searchPlatformArgs records the platformIDs slice from each SearchGame
 	// call, in call order.
 	searchPlatformArgs [][]int
 
-	// blockSearch, if non-nil, is used to synchronise the fetching-flag
-	// test. SearchGame signals entered by closing (or sending on) the
-	// channel, then blocks until release is closed.
+	// entered and release are used to synchronise the fetching-flag test.
+	// SearchGame signals entry by closing entered, then blocks until
+	// release is closed.
 	entered chan struct{}
 	release chan struct{}
 }
@@ -40,7 +53,9 @@ type mockIGDBFetcher struct {
 func (m *mockIGDBFetcher) SearchGame(
 	gameName string, platformIDs []int,
 ) (int, error) {
+	callIdx := m.searchCalls
 	m.searchCalls++
+
 	// Record a copy of platformIDs for later inspection.
 	var ids []int
 	if platformIDs != nil {
@@ -54,8 +69,27 @@ func (m *mockIGDBFetcher) SearchGame(
 		<-m.release
 	}
 
+	// Per-call error injection takes priority.
+	if m.searchErrOn != nil {
+		if err, ok := m.searchErrOn[callIdx]; ok {
+			return 0, err
+		}
+	}
+
+	// Fixed error applies to all remaining calls.
 	if m.searchErr != nil {
 		return 0, m.searchErr
+	}
+
+	// Dispatch to constrained/unconstrained/default result maps.
+	if platformIDs != nil {
+		if m.constrainedResults != nil {
+			return m.constrainedResults[gameName], nil
+		}
+	} else {
+		if m.unconstrainedResults != nil {
+			return m.unconstrainedResults[gameName], nil
+		}
 	}
 	if m.searchResults == nil {
 		return 0, nil

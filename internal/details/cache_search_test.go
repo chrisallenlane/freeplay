@@ -9,67 +9,6 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
-// platformAwareMockFetcher extends mockIGDBFetcher to make SearchGame
-// results dependent on whether platformIDs is nil (unconstrained) or
-// non-nil (constrained). This is needed to test the two-phase search
-// logic in cache.search().
-type platformAwareMockFetcher struct {
-	// constrainedResults maps gameName -> gameID for constrained searches
-	constrainedResults map[string]int
-	// unconstrainedResults maps gameName -> gameID for unconstrained searches
-	unconstrainedResults map[string]int
-	// detailsResults maps gameID -> GameDetails
-	detailsResults map[int]*igdb.GameDetails
-
-	searchCalls        int
-	detailsCalls       int
-	searchPlatformArgs [][]int
-
-	// searchErrOn, if non-nil, maps call index (0-based) -> error.
-	// If a call index is present, that call returns the mapped error.
-	searchErrOn map[int]error
-}
-
-func (m *platformAwareMockFetcher) SearchGame(
-	gameName string, platformIDs []int,
-) (int, error) {
-	callIdx := m.searchCalls
-	m.searchCalls++
-
-	var ids []int
-	if platformIDs != nil {
-		ids = append([]int(nil), platformIDs...)
-	}
-	m.searchPlatformArgs = append(m.searchPlatformArgs, ids)
-
-	if m.searchErrOn != nil {
-		if err, ok := m.searchErrOn[callIdx]; ok {
-			return 0, err
-		}
-	}
-
-	if platformIDs != nil {
-		if m.constrainedResults != nil {
-			return m.constrainedResults[gameName], nil
-		}
-	} else {
-		if m.unconstrainedResults != nil {
-			return m.unconstrainedResults[gameName], nil
-		}
-	}
-	return 0, nil
-}
-
-func (m *platformAwareMockFetcher) FetchDetailsByID(
-	gameID int,
-) (*igdb.GameDetails, error) {
-	m.detailsCalls++
-	if m.detailsResults == nil {
-		return nil, nil
-	}
-	return m.detailsResults[gameID], nil
-}
-
 // TestSearch_ConstrainedMatchSkipsUnconstrained verifies that when the
 // platform-constrained search finds a match, the unconstrained search
 // is not attempted. This is the early-return path at line 169 of
@@ -79,7 +18,7 @@ func TestSearch_ConstrainedMatchSkipsUnconstrained(t *testing.T) {
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
-	fetcher := &platformAwareMockFetcher{
+	fetcher := &mockIGDBFetcher{
 		constrainedResults: map[string]int{"Mega Man": 17},
 		// unconstrainedResults deliberately has a different ID. If the
 		// unconstrained path is reached, FetchDetailsByID would get a
@@ -139,7 +78,7 @@ func TestSearch_ConstrainedMatchOnSecondVariant(t *testing.T) {
 
 	// "Game - Subtitle" (first variant) returns 0 in constrained search.
 	// "Game: Subtitle" (second variant) returns 42 in constrained search.
-	fetcher := &platformAwareMockFetcher{
+	fetcher := &mockIGDBFetcher{
 		constrainedResults: map[string]int{
 			"Game: Subtitle": 42,
 		},
@@ -195,7 +134,7 @@ func TestSearch_ConstrainedMatchOnSecondVariant(t *testing.T) {
 // unconstrained search. The caller (fetchOne) must not write .notfound
 // in this case.
 func TestSearch_ErrorOnConstrainedAbortsSearch(t *testing.T) {
-	fetcher := &platformAwareMockFetcher{
+	fetcher := &mockIGDBFetcher{
 		// The first call (constrained, first variant) errors.
 		searchErrOn: map[int]error{
 			0: errors.New("network timeout"),
@@ -254,7 +193,7 @@ func TestSearch_NoPlatformIDs_OnlyUnconstrainedCalls(t *testing.T) {
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
-	fetcher := &platformAwareMockFetcher{
+	fetcher := &mockIGDBFetcher{
 		constrainedResults:   map[string]int{"Mega Man": 99},
 		unconstrainedResults: map[string]int{"Mega Man": 17},
 		detailsResults: map[int]*igdb.GameDetails{
@@ -297,7 +236,7 @@ func TestSearch_ConstrainedMiss_UnconstrainedHit(t *testing.T) {
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
-	fetcher := &platformAwareMockFetcher{
+	fetcher := &mockIGDBFetcher{
 		// Constrained search finds nothing
 		constrainedResults: map[string]int{},
 		// Unconstrained search finds the game
@@ -345,7 +284,7 @@ func TestSearch_ConstrainedMiss_UnconstrainedHit(t *testing.T) {
 // constrained variant returns an error, the search aborts with error.
 // This tests that errors on non-first variants are properly handled.
 func TestSearch_ConstrainedErrorOnSecondVariant(t *testing.T) {
-	fetcher := &platformAwareMockFetcher{
+	fetcher := &mockIGDBFetcher{
 		// First call (constrained, first variant) returns 0 (not found).
 		// Second call (constrained, second variant) returns error.
 		searchErrOn: map[int]error{
@@ -388,7 +327,7 @@ func TestSearch_ConstrainedErrorOnSecondVariant(t *testing.T) {
 // marker is written and the total number of API calls equals
 // variants * 2 (constrained + unconstrained).
 func TestSearch_AllVariantsNotFound_WritesNotFound(t *testing.T) {
-	fetcher := &platformAwareMockFetcher{
+	fetcher := &mockIGDBFetcher{
 		constrainedResults:   map[string]int{},
 		unconstrainedResults: map[string]int{},
 	}
@@ -439,7 +378,7 @@ func TestSearch_EmptyPlatformIDsSlice(t *testing.T) {
 
 	coverURL := imgServer.URL + "/cover.jpg"
 
-	fetcher := &platformAwareMockFetcher{
+	fetcher := &mockIGDBFetcher{
 		constrainedResults:   map[string]int{"Mega Man": 99},
 		unconstrainedResults: map[string]int{"Mega Man": 17},
 		detailsResults: map[int]*igdb.GameDetails{
@@ -483,7 +422,7 @@ func TestSearch_ErrorOnUnconstrainedAfterConstrainedMiss(t *testing.T) {
 	// "Metroid" produces 1 variant. With platformIDs=[18]:
 	// Call 0: constrained "Metroid" -> returns 0 (miss)
 	// Call 1: unconstrained "Metroid" -> errors
-	fetcher := &platformAwareMockFetcher{
+	fetcher := &mockIGDBFetcher{
 		constrainedResults: map[string]int{},
 		searchErrOn: map[int]error{
 			1: errors.New("connection reset"),
