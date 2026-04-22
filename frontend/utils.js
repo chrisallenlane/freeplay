@@ -1,11 +1,8 @@
+if (typeof module !== "undefined") {
+	require("./urls.js");
+}
+
 ((exports) => {
-	exports.stripExt = (filename) => {
-		const dot = filename.lastIndexOf(".");
-		return dot > 0 ? filename.substring(0, dot) : filename;
-	};
-
-	exports.favKey = (game) => `${game.console}/${game.filename}`;
-
 	exports.filterGames = (games, opts) => {
 		const tokens = (opts.query || "")
 			.toLowerCase()
@@ -35,29 +32,6 @@
 	exports.findGame = (games, consoleName, filename) =>
 		games.find((g) => g.console === consoleName && g.filename === filename) ??
 		null;
-
-	exports.coverUrl = (game) =>
-		`/covers/${encodeURIComponent(game.console)}/${encodeURIComponent(exports.stripExt(game.filename))}.png`;
-
-	exports.manualUrl = (game) =>
-		`/manuals/${encodeURIComponent(game.console)}/${encodeURIComponent(exports.stripExt(game.filename))}.pdf`;
-
-	exports.playUrl = (game) =>
-		`/play?console=${encodeURIComponent(game.console)}&rom=${encodeURIComponent(game.filename)}`;
-
-	exports.detailsUrl = (game) =>
-		`/details?console=${encodeURIComponent(game.console)}&rom=${encodeURIComponent(game.filename)}`;
-
-	exports.romUrl = (consoleName, rom) =>
-		`/roms/${encodeURIComponent(consoleName)}/${encodeURIComponent(rom)}`;
-
-	exports.saveBasePath = (consoleName, gameSlug) =>
-		`/api/saves/${encodeURIComponent(consoleName)}/${encodeURIComponent(gameSlug)}`;
-
-	exports.biosUrl = (consoleName) => `/bios/${encodeURIComponent(consoleName)}`;
-
-	exports.gameDetailsUrl = (consoleName, rom) =>
-		`/api/game-details?console=${encodeURIComponent(consoleName)}&rom=${encodeURIComponent(rom)}`;
 
 	// Logical actions for directional navigation (shared by keyboard and gamepad).
 	exports.ACTION_LEFT = "left";
@@ -250,9 +224,7 @@
 
 		const update = () => {
 			btn.textContent =
-				document.documentElement.dataset.theme === "light"
-					? "\u263D"
-					: "\u2600";
+				document.documentElement.dataset.theme === "light" ? "☽" : "☀";
 		};
 
 		btn.addEventListener("click", () => {
@@ -265,4 +237,8 @@
 
 		update();
 	};
-})(typeof module !== "undefined" ? module.exports : (window.Freeplay = {}));
+})(
+	typeof module !== "undefined"
+		? (module.exports = globalThis.Freeplay = globalThis.Freeplay || {})
+		: (window.Freeplay = window.Freeplay || {}),
+);

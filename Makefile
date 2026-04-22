@@ -56,7 +56,7 @@ vet: $(EMULATORJS_SENTINEL)
 .PHONY: test
 test: $(EMULATORJS_SENTINEL)
 	$(GO) test ./...
-	node --test frontend/utils_test.js
+	node --test frontend/*_test.js
 
 ## coverage: generate a test coverage report
 .PHONY: coverage
