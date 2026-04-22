@@ -30,10 +30,10 @@ var testEmulatorjsFS = fstest.MapFS{
 	"emulatorjs/data/loader.js": &fstest.MapFile{Data: []byte("loader")},
 }
 
-// newTestServer creates a Server wired with a temp ROM dir, a BIOS file, and
-// an optional DetailsCache. It is the single server-construction helper for
-// all tests in this package.
-func newTestServer(t *testing.T, dc DetailsCache) (*Server, string) {
+// testServer creates a Server wired with a temp ROM dir, a BIOS file, and an
+// optional DetailsCache. It is the single server-construction helper for all
+// tests in this package.
+func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -68,22 +68,16 @@ func newTestServer(t *testing.T, dc DetailsCache) (*Server, string) {
 		},
 	}
 
-	srv, err := New(cfg, dir, testFrontendFS, testEmulatorjsFS, dc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return srv, dir
-}
-
-// testServer is a convenience wrapper around newTestServer for tests that do
-// not need a DetailsCache.
-func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
-	t.Helper()
 	var cache DetailsCache
 	if len(dc) > 0 {
 		cache = dc[0]
 	}
-	return newTestServer(t, cache)
+
+	srv, err := New(cfg, dir, testFrontendFS, testEmulatorjsFS, cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return srv, dir
 }
 
 // doRequest issues method+path against srv.handler and returns the recorder.
@@ -271,10 +265,7 @@ func TestSaveInvalidType(t *testing.T) {
 func TestRescanEndpoint(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("POST", "/api/rescan", nil)
-	req.Header.Set("X-Requested-With", "freeplay")
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
+	w := doRequest(t, srv, http.MethodPost, "/api/rescan", nil)
 
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
@@ -634,10 +625,7 @@ func TestRescanConflict(t *testing.T) {
 	go srv.scanner.ScanBlocking()
 	<-started
 
-	req := httptest.NewRequest("POST", "/api/rescan", nil)
-	req.Header.Set("X-Requested-With", "freeplay")
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
+	w := doRequest(t, srv, http.MethodPost, "/api/rescan", nil)
 
 	close(release)
 
@@ -855,13 +843,10 @@ func TestCSRFHeaderValidation(t *testing.T) {
 func TestPostSaveInvalidType(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest(
-		"POST", "/api/saves/NES/game1/badtype",
-		strings.NewReader("data"),
+	w := doRequest(
+		t, srv, http.MethodPost,
+		"/api/saves/NES/game1/badtype", strings.NewReader("data"),
 	)
-	req.Header.Set("X-Requested-With", "freeplay")
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("got status %d, want 400", w.Code)
@@ -906,14 +891,10 @@ func TestPostSavePutError(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(savesDir, 0o755) })
 
-	req := httptest.NewRequest(
-		"POST",
-		"/api/saves/NES/game1/state",
-		bytes.NewReader([]byte("data")),
+	w := doRequest(
+		t, srv, http.MethodPost,
+		"/api/saves/NES/game1/state", bytes.NewReader([]byte("data")),
 	)
-	req.Header.Set("X-Requested-With", "freeplay")
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("got status %d, want 500", w.Code)

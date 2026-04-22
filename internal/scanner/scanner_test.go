@@ -9,11 +9,6 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/config"
 )
 
-// getCatalog is a test helper that returns the current catalog.
-func getCatalog(s *Scanner) *Catalog {
-	return s.catalog.Load()
-}
-
 func setupTestDir(t *testing.T) (string, *config.Config) {
 	t.Helper()
 	dir := t.TempDir()
@@ -62,7 +57,7 @@ func TestScanFindsGames(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := getCatalog(s)
+	cat := s.catalog.Load()
 	if len(cat.Games) != 3 {
 		t.Fatalf("got %d games, want 3", len(cat.Games))
 	}
@@ -76,7 +71,7 @@ func TestScanSortOrder(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := getCatalog(s)
+	cat := s.catalog.Load()
 	// Consoles should be alphabetical
 	if cat.Consoles[0] != "Genesis" || cat.Consoles[1] != "NES" {
 		t.Errorf("consoles not sorted: %v", cat.Consoles)
@@ -101,7 +96,7 @@ func TestScanSkipsSubdirectories(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := getCatalog(s)
+	cat := s.catalog.Load()
 	for _, g := range cat.Games {
 		if g.Filename == "subdir" {
 			t.Error("subdirectory should be skipped")
@@ -114,7 +109,7 @@ func TestScanCoverDetection(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := getCatalog(s)
+	cat := s.catalog.Load()
 	foundSonic := false
 	foundNES := false
 	for _, g := range cat.Games {
@@ -154,7 +149,7 @@ func TestScanManualDetection(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := getCatalog(s)
+	cat := s.catalog.Load()
 	for _, g := range cat.Games {
 		if g.Console == "NES" && g.Filename == "Mega Man.zip" {
 			if !g.HasManual {
@@ -178,7 +173,7 @@ func TestScanEmptyBeforeFirstScan(t *testing.T) {
 	_, cfg := setupTestDir(t)
 	s := New(cfg, "")
 
-	cat := getCatalog(s)
+	cat := s.catalog.Load()
 	if len(cat.Games) != 0 {
 		t.Errorf("expected empty games before scan, got %d", len(cat.Games))
 	}
@@ -196,7 +191,7 @@ func TestScanMissingDirectory(t *testing.T) {
 	s := New(cfg, "")
 	s.ScanBlocking()
 
-	cat := getCatalog(s)
+	cat := s.catalog.Load()
 	if len(cat.Games) != 0 {
 		t.Errorf("expected no games for missing dir, got %d", len(cat.Games))
 	}
@@ -271,7 +266,7 @@ func TestScanBIOSDetection(t *testing.T) {
 	s := New(cfg, dir)
 	s.ScanBlocking()
 
-	cat := getCatalog(s)
+	cat := s.catalog.Load()
 	for _, g := range cat.Games {
 		if g.Console == "NES" && !g.HasBios {
 			t.Errorf("NES game %s should have HasBios=true", g.Filename)
@@ -306,7 +301,7 @@ func TestScanReturnsTrue(t *testing.T) {
 		t.Error("Scan should return true when no scan is in progress")
 	}
 
-	cat := getCatalog(s)
+	cat := s.catalog.Load()
 	if len(cat.Games) != 3 {
 		t.Errorf("got %d games, want 3", len(cat.Games))
 	}
@@ -318,7 +313,7 @@ func TestEnrichMetadata(t *testing.T) {
 	s.ScanBlocking()
 
 	// Pre-scan: verify games have no metadata yet.
-	for _, g := range getCatalog(s).Games {
+	for _, g := range s.catalog.Load().Games {
 		if g.IGDBName != "" {
 			t.Errorf(
 				"expected empty IGDBName before enrichment for %q, got %q",
@@ -341,7 +336,7 @@ func TestEnrichMetadata(t *testing.T) {
 	}
 	s.EnrichMetadata(lookup)
 
-	cat := getCatalog(s)
+	cat := s.catalog.Load()
 	if len(cat.Games) != 3 {
 		t.Fatalf("expected 3 games after enrichment, got %d", len(cat.Games))
 	}
@@ -427,7 +422,7 @@ func TestEnrichMetadataMissingEntry(t *testing.T) {
 	// Lookup that never finds anything — all fields must stay zero.
 	s.EnrichMetadata(func(_, _ string) *GameMeta { return nil })
 
-	for _, g := range getCatalog(s).Games {
+	for _, g := range s.catalog.Load().Games {
 		if g.IGDBName != "" || len(g.Developers) != 0 ||
 			len(g.Publishers) != 0 || g.Year != 0 {
 			t.Errorf(

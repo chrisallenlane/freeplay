@@ -123,7 +123,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /manuals/{rest...}", s.handleManuals)
 
 	// Embedded EmulatorJS — immutable cache; assets are embedded at build time
-	s.mux.Handle("/emulatorjs/", longCache(http.StripPrefix("/emulatorjs/", http.FileServerFS(s.emulatorjsSub))))
+	s.mux.Handle("/emulatorjs/", cacheControl(longCacheValue, http.StripPrefix("/emulatorjs/", http.FileServerFS(s.emulatorjsSub))))
 
 	// Game details
 	s.mux.HandleFunc("GET /api/game-details", s.handleGameDetails)
@@ -133,7 +133,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /play", s.handlePlay)
 
 	// Embedded frontend (catch-all) — no-cache so deploys are picked up immediately
-	s.mux.Handle("/", noCache(http.FileServerFS(s.frontendSub)))
+	s.mux.Handle("/", cacheControl("no-cache", http.FileServerFS(s.frontendSub)))
 }
 
 func writeJSONOK(w http.ResponseWriter) {
@@ -227,16 +227,9 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(d)
 }
 
-func noCache(next http.Handler) http.Handler {
+func cacheControl(value string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		next.ServeHTTP(w, r)
-	})
-}
-
-func longCache(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", longCacheValue)
+		w.Header().Set("Cache-Control", value)
 		next.ServeHTTP(w, r)
 	})
 }
