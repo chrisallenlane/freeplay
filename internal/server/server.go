@@ -123,10 +123,10 @@ func (s *Server) routes() {
 
 	// Game details
 	s.mux.HandleFunc("GET /api/game-details", s.handleGameDetails)
-	s.mux.HandleFunc("GET /details", s.handleDetailsPage)
+	s.mux.HandleFunc("GET /details", s.servePage("details.html"))
 
 	// Player page (explicit route before catch-all)
-	s.mux.HandleFunc("GET /play", s.handlePlay)
+	s.mux.HandleFunc("GET /play", s.servePage("play.html"))
 
 	// Embedded frontend (catch-all) — no-cache so deploys are picked up immediately
 	s.mux.Handle("/", cacheControl("no-cache", http.FileServerFS(s.frontendSub)))

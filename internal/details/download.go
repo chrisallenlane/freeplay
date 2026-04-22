@@ -1,6 +1,7 @@
 package details
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -98,6 +99,32 @@ func (c *Cache) downloadImage(
 	}
 
 	return localPath, urlBase + "/" + url.PathEscape(filename), nil
+}
+
+// saveDetails downloads all images for details, rewrites URLs to local
+// paths, and writes details.json.
+func (c *Cache) saveDetails(
+	console, cleanName string,
+	details *igdb.GameDetails,
+) error {
+	cacheDir := c.cacheDir(console, cleanName)
+	urlBase := "/cache/igdb/" +
+		url.PathEscape(console) + "/" +
+		url.PathEscape(cleanName)
+
+	c.downloadCoverPair(details, cacheDir, urlBase, cleanName)
+	details.Screenshots = c.downloadImageSet(
+		details.Screenshots, cacheDir, urlBase, cleanName, "screenshot",
+	)
+	details.Artworks = c.downloadImageSet(
+		details.Artworks, cacheDir, urlBase, cleanName, "artwork",
+	)
+
+	// Write details.json
+	jsonPath := filepath.Join(cacheDir, "details.json")
+	return atomicfile.Write(jsonPath, func(w io.Writer) error {
+		return json.NewEncoder(w).Encode(details)
+	})
 }
 
 // ensureCoverThumbnail copies the cached cover image to the standard cover

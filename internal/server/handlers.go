@@ -64,14 +64,11 @@ func (s *Server) handleManuals(w http.ResponseWriter, r *http.Request) {
 	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "manuals"), r.PathValue("rest"))
 }
 
-func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFileFS(w, r, s.frontendSub, "play.html")
-}
-
-func (s *Server) handleDetailsPage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFileFS(w, r, s.frontendSub, "details.html")
+func (s *Server) servePage(filename string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeFileFS(w, r, s.frontendSub, filename)
+	}
 }
 
 func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
