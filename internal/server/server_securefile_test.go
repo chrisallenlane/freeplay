@@ -86,12 +86,11 @@ func TestServeSecureFile_DotDotBlocked(t *testing.T) {
 	}
 }
 
-// TestServeSecureFile_TrailingSeparatorInBaseDir demonstrates that if baseDir
-// has a trailing path separator, the HasPrefix defense becomes
-// HasPrefix(path, "/base//") which rejects ALL valid files. This can happen
-// when a user specifies an absolute ROM path with a trailing slash in the
-// TOML config file (e.g., path = "/mnt/roms/NES/"), because resolvePaths
-// does not clean absolute paths.
+// TestServeSecureFile_TrailingSeparatorInBaseDir verifies that a ROM path
+// configured with a trailing path separator (e.g., path = "/mnt/roms/NES/"
+// in the TOML config) still serves valid files. filepath.Clean inside
+// serveSecureFile normalizes the trailing separator before the HasPrefix
+// check, so the prefix defense does not reject valid files.
 func TestServeSecureFile_TrailingSeparatorInBaseDir(t *testing.T) {
 	dir := t.TempDir()
 
@@ -104,7 +103,6 @@ func TestServeSecureFile_TrailingSeparatorInBaseDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Simulate a user config with a trailing slash on the path
 	cfg := &config.Config{
 		Port: 8080,
 		ROMs: map[string]config.ROM{
@@ -122,16 +120,8 @@ func TestServeSecureFile_TrailingSeparatorInBaseDir(t *testing.T) {
 
 	w := doRequest(t, srv, http.MethodGet, "/roms/NES/MegaMan.nes", nil)
 
-	// BUG: When baseDir has a trailing slash, the HasPrefix check becomes
-	// HasPrefix("/path/to/NES/MegaMan.nes", "/path/to/NES//") which is
-	// always false. This causes valid ROM requests to return 404.
 	if w.Code != http.StatusOK {
-		t.Errorf(
-			"trailing separator in baseDir: got status %d, want 200; "+
-				"the HasPrefix defense incorrectly rejects valid files when "+
-				"baseDir ends with a path separator",
-			w.Code,
-		)
+		t.Errorf("trailing separator in baseDir: got status %d, want 200", w.Code)
 	}
 }
 

@@ -52,7 +52,6 @@ func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCacheFiles(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", longCacheValue)
 	s.serveSecureFile(
 		w, r,
 		filepath.Join(s.dataDir, "cache", "igdb"),

@@ -202,6 +202,9 @@
 	 */
 	exports.loadGame = async (consoleName, gameName, errorContainerId) => {
 		const res = await fetch("/api/games");
+		if (!res.ok) {
+			throw new Error(`HTTP ${res.status}`);
+		}
 		const catalog = await res.json();
 		const game = exports.findGame(catalog.games, consoleName, gameName);
 		if (!game) {
