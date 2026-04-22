@@ -191,24 +191,7 @@ func (c *Cache) saveDetails(
 		url.PathEscape(console) + "/" +
 		url.PathEscape(cleanName)
 
-	// Cover image (full-res for details page)
-	if details.CoverURL != "" {
-		_, localURL, err := c.downloadImage(
-			details.CoverURL, cacheDir, urlBase, "cover.jpg",
-		)
-		if err != nil {
-			slog.Warn("downloading cover failed", "game", cleanName, "error", err)
-			details.CoverURL = ""
-		} else {
-			// Also download t_cover_big for library grid thumbnails
-			thumbURL := strings.Replace(
-				details.CoverURL, "t_original", "t_cover_big", 1,
-			)
-			_, _, _ = c.downloadImage(thumbURL, cacheDir, urlBase, "cover_thumb.jpg")
-			details.CoverURL = localURL
-		}
-	}
-
+	c.downloadCoverPair(details, cacheDir, urlBase, cleanName)
 	details.Screenshots = c.downloadImageSet(
 		details.Screenshots, cacheDir, urlBase, cleanName, "screenshot",
 	)
@@ -221,6 +204,36 @@ func (c *Cache) saveDetails(
 	return atomicfile.Write(jsonPath, func(w io.Writer) error {
 		return json.NewEncoder(w).Encode(details)
 	})
+}
+
+// downloadCoverPair downloads the full-res cover image and its thumbnail
+// variant, then rewrites details.CoverURL to the local serving path.
+// A failed main-cover download is logged as a warning and clears CoverURL;
+// a failed thumbnail download is silently ignored.
+func (c *Cache) downloadCoverPair(
+	details *igdb.GameDetails,
+	cacheDir, urlBase, cleanName string,
+) {
+	if details.CoverURL == "" {
+		return
+	}
+
+	_, localURL, err := c.downloadImage(
+		details.CoverURL, cacheDir, urlBase, "cover.jpg",
+	)
+	if err != nil {
+		slog.Warn("downloading cover failed", "game", cleanName, "error", err)
+		details.CoverURL = ""
+		return
+	}
+
+	// Derive thumbnail from the original IGDB URL before rewriting.
+	// Also download t_cover_big for library grid thumbnails.
+	thumbURL := strings.Replace(
+		details.CoverURL, "t_original", "t_cover_big", 1,
+	)
+	_, _, _ = c.downloadImage(thumbURL, cacheDir, urlBase, "cover_thumb.jpg")
+	details.CoverURL = localURL
 }
 
 // downloadImageSet downloads a batch of images (screenshots or artworks),
