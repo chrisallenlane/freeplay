@@ -2,66 +2,6 @@ var { describe, it } = require("node:test");
 var assert = require("node:assert/strict");
 var FP = require("./utils.js");
 
-describe("gridColumns", () => {
-	it("returns 1 for empty list", () => {
-		assert.equal(FP.gridColumns([]), 1);
-	});
-
-	it("counts cards sharing the same offsetTop", () => {
-		var cards = [
-			{ offsetTop: 0 },
-			{ offsetTop: 0 },
-			{ offsetTop: 0 },
-			{ offsetTop: 100 },
-			{ offsetTop: 100 },
-		];
-		assert.equal(FP.gridColumns(cards), 3);
-	});
-
-	it("returns total count when all cards are on one row", () => {
-		var cards = [{ offsetTop: 0 }, { offsetTop: 0 }];
-		assert.equal(FP.gridColumns(cards), 2);
-	});
-
-	it("returns 1 when each card is on its own row", () => {
-		var cards = [{ offsetTop: 0 }, { offsetTop: 50 }, { offsetTop: 100 }];
-		assert.equal(FP.gridColumns(cards), 1);
-	});
-});
-
-describe("findCardIndex", () => {
-	var items = ["a", "b", "c", "d"];
-
-	it("returns index of first match", () => {
-		assert.equal(
-			FP.findCardIndex(items, (x) => x === "c"),
-			2,
-		);
-	});
-
-	it("returns -1 when nothing matches", () => {
-		assert.equal(
-			FP.findCardIndex(items, (x) => x === "z"),
-			-1,
-		);
-	});
-
-	it("returns first match when multiple exist", () => {
-		var dupes = ["x", "y", "x"];
-		assert.equal(
-			FP.findCardIndex(dupes, (x) => x === "x"),
-			0,
-		);
-	});
-
-	it("works with empty list", () => {
-		assert.equal(
-			FP.findCardIndex([], () => true),
-			-1,
-		);
-	});
-});
-
 describe("initThemeToggle", () => {
 	function withThemeMocks(theme, hasButton, fn) {
 		var clickHandler;

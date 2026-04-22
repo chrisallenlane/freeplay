@@ -3,24 +3,6 @@ if (typeof module !== "undefined") {
 }
 
 ((exports) => {
-	exports.gridColumns = (cards) => {
-		if (cards.length === 0) return 1;
-		const firstTop = cards[0].offsetTop;
-		let cols = 0;
-		for (const card of cards) {
-			if (card.offsetTop !== firstTop) break;
-			cols++;
-		}
-		return cols;
-	};
-
-	exports.findCardIndex = (cards, predicate) => {
-		for (let i = 0; i < cards.length; i++) {
-			if (predicate(cards[i])) return i;
-		}
-		return -1;
-	};
-
 	exports.initSubpage = () => {
 		const params = new URLSearchParams(window.location.search);
 		const consoleName = params.get("console");
