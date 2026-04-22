@@ -120,9 +120,7 @@ func TestServeSecureFile_TrailingSeparatorInBaseDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest("GET", "/roms/NES/MegaMan.nes", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
+	w := doRequest(t, srv, http.MethodGet, "/roms/NES/MegaMan.nes", nil)
 
 	// BUG: When baseDir has a trailing slash, the HasPrefix check becomes
 	// HasPrefix("/path/to/NES/MegaMan.nes", "/path/to/NES//") which is

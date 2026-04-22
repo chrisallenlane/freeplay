@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,12 +36,10 @@ func TestCacheFileHTMLContent_ExtensionMitigatesXSS(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(
-		"GET", "/cache/igdb/NES/EvilGame/cover.jpg", nil,
+	w := doRequest(
+		t, srv, http.MethodGet,
+		"/cache/igdb/NES/EvilGame/cover.jpg", nil,
 	)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
 	if w.Code != http.StatusOK {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -92,12 +89,10 @@ func TestCacheFileSVGSniffing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(
-		"GET", "/cache/igdb/NES/SvgGame/cover.jpg", nil,
+	w := doRequest(
+		t, srv, http.MethodGet,
+		"/cache/igdb/NES/SvgGame/cover.jpg", nil,
 	)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
 	if w.Code != http.StatusOK {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -136,12 +131,10 @@ func TestCacheFileJPEGContent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(
-		"GET", "/cache/igdb/NES/GoodGame/cover.jpg", nil,
+	w := doRequest(
+		t, srv, http.MethodGet,
+		"/cache/igdb/NES/GoodGame/cover.jpg", nil,
 	)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
 	if w.Code != http.StatusOK {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -175,12 +168,10 @@ func TestCacheFileNosniffHeaderPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(
-		"GET", "/cache/igdb/NES/TestGame/cover.jpg", nil,
+	w := doRequest(
+		t, srv, http.MethodGet,
+		"/cache/igdb/NES/TestGame/cover.jpg", nil,
 	)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
 	if w.Code != http.StatusOK {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -211,12 +202,10 @@ func TestCacheFileLongCacheHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(
-		"GET", "/cache/igdb/NES/CacheTest/screenshot_0.jpg", nil,
+	w := doRequest(
+		t, srv, http.MethodGet,
+		"/cache/igdb/NES/CacheTest/screenshot_0.jpg", nil,
 	)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
 	if w.Code != http.StatusOK {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}

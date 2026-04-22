@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -85,13 +86,29 @@ func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
 	return newTestServer(t, cache)
 }
 
+// doRequest issues method+path against srv.handler and returns the recorder.
+// For non-GET/HEAD methods it automatically sets X-Requested-With: freeplay.
+// Use this helper only when the test does not need to control request headers.
+func doRequest(
+	t *testing.T,
+	srv *Server,
+	method, path string,
+	body io.Reader,
+) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, path, body)
+	if method != http.MethodGet && method != http.MethodHead {
+		req.Header.Set("X-Requested-With", "freeplay")
+	}
+	w := httptest.NewRecorder()
+	srv.handler.ServeHTTP(w, req)
+	return w
+}
+
 func TestHealthEndpoint(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/api/health", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/api/health", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -114,10 +131,7 @@ func TestGamesEndpoint(t *testing.T) {
 	srv, _ := testServer(t)
 	srv.scanner.ScanBlocking()
 
-	req := httptest.NewRequest("GET", "/api/games", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/api/games", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -134,10 +148,7 @@ func TestGamesEndpoint(t *testing.T) {
 func TestROMServing(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/roms/NES/Mega%20Man.nes", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/roms/NES/Mega%20Man.nes", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -152,10 +163,7 @@ func TestROMServing(t *testing.T) {
 func TestROMServingUnknownConsole(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/roms/SNES/game.sfc", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/roms/SNES/game.sfc", nil)
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
 	}
@@ -164,10 +172,7 @@ func TestROMServingUnknownConsole(t *testing.T) {
 func TestBIOSServing(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/bios/NES", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/bios/NES", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -182,10 +187,7 @@ func TestBIOSServing(t *testing.T) {
 func TestBIOSServingNoConfig(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/bios/SNES", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/bios/SNES", nil)
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
 	}
@@ -200,10 +202,7 @@ func TestPathTraversalBlocked(t *testing.T) {
 	}
 
 	for _, path := range tests {
-		req := httptest.NewRequest("GET", path, nil)
-		w := httptest.NewRecorder()
-		srv.handler.ServeHTTP(w, req)
-
+		w := doRequest(t, srv, http.MethodGet, path, nil)
 		if w.Code == 200 {
 			t.Errorf("path %q should not return 200", path)
 		}
@@ -219,10 +218,7 @@ func TestServeSecureFileBlocksDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest("GET", "/roms/NES/subdir", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/roms/NES/subdir", nil)
 	if w.Code != 404 {
 		t.Errorf("directory request got status %d, want 404", w.Code)
 	}
@@ -233,20 +229,16 @@ func TestSaveRoundtrip(t *testing.T) {
 	saveData := []byte("my save state data")
 
 	// POST save
-	postReq := httptest.NewRequest("POST", "/api/saves/NES/game1/state", bytes.NewReader(saveData))
-	postReq.Header.Set("X-Requested-With", "freeplay")
-	postW := httptest.NewRecorder()
-	srv.handler.ServeHTTP(postW, postReq)
-
+	postW := doRequest(
+		t, srv, http.MethodPost,
+		"/api/saves/NES/game1/state", bytes.NewReader(saveData),
+	)
 	if postW.Code != 200 {
 		t.Fatalf("POST save got status %d, want 200", postW.Code)
 	}
 
 	// GET save
-	getReq := httptest.NewRequest("GET", "/api/saves/NES/game1/state", nil)
-	getW := httptest.NewRecorder()
-	srv.handler.ServeHTTP(getW, getReq)
-
+	getW := doRequest(t, srv, http.MethodGet, "/api/saves/NES/game1/state", nil)
 	if getW.Code != 200 {
 		t.Fatalf("GET save got status %d, want 200", getW.Code)
 	}
@@ -261,10 +253,7 @@ func TestSaveRoundtrip(t *testing.T) {
 func TestGetSaveNotFound(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/api/saves/NES/noexist/state", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/api/saves/NES/noexist/state", nil)
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
 	}
@@ -273,10 +262,7 @@ func TestGetSaveNotFound(t *testing.T) {
 func TestSaveInvalidType(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/api/saves/NES/game/badtype", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/api/saves/NES/game/badtype", nil)
 	if w.Code != 400 {
 		t.Errorf("got status %d, want 400", w.Code)
 	}
@@ -319,10 +305,7 @@ func TestCoversServing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest("GET", "/covers/NES/Mega%20Man.png", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/covers/NES/Mega%20Man.png", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -345,10 +328,7 @@ func TestManualsServing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest("GET", "/manuals/NES/Mega%20Man.pdf", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/manuals/NES/Mega%20Man.pdf", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -363,10 +343,7 @@ func TestManualsServing(t *testing.T) {
 func TestManualsNotFound(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/manuals/NES/noexist.pdf", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/manuals/NES/noexist.pdf", nil)
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
 	}
@@ -375,10 +352,7 @@ func TestManualsNotFound(t *testing.T) {
 func TestDetailsPage(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/details?console=NES&rom=Mega+Man.nes", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/details?console=NES&rom=Mega+Man.nes", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -387,10 +361,7 @@ func TestDetailsPage(t *testing.T) {
 func TestGameDetailsNoCache(t *testing.T) {
 	srv, _ := testServer(t) // detailsCache is nil
 
-	req := httptest.NewRequest("GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/api/game-details?console=NES&rom=Mega+Man.nes", nil)
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
 	}
@@ -399,10 +370,7 @@ func TestGameDetailsNoCache(t *testing.T) {
 func TestGameDetailsMissingParams(t *testing.T) {
 	srv, _ := testServer(t, &mockDetailsCache{})
 
-	req := httptest.NewRequest("GET", "/api/game-details", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/api/game-details", nil)
 	if w.Code != 400 {
 		t.Errorf("got status %d, want 400", w.Code)
 	}
@@ -411,10 +379,7 @@ func TestGameDetailsMissingParams(t *testing.T) {
 func TestGameDetailsCacheMiss404(t *testing.T) {
 	srv, _ := testServer(t, &mockDetailsCache{}) // cache returns nil for all Gets
 
-	req := httptest.NewRequest("GET", "/api/game-details?console=NES&rom=Unknown.nes", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/api/game-details?console=NES&rom=Unknown.nes", nil)
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
 	}
@@ -423,10 +388,7 @@ func TestGameDetailsCacheMiss404(t *testing.T) {
 func TestCoversNotFound(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/covers/NES/noexist.png", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/covers/NES/noexist.png", nil)
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
 	}
@@ -435,10 +397,7 @@ func TestCoversNotFound(t *testing.T) {
 func TestEmulatorJSCacheHeaders(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/emulatorjs/data/loader.js", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/emulatorjs/data/loader.js", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -450,10 +409,7 @@ func TestEmulatorJSCacheHeaders(t *testing.T) {
 func TestPlayPage(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/play", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/play", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -501,9 +457,7 @@ func TestSavePathTraversalBlocked(t *testing.T) {
 func TestSecurityHeaders(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest("GET", "/api/health", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
+	w := doRequest(t, srv, http.MethodGet, "/api/health", nil)
 
 	headers := map[string]string{
 		"X-Content-Type-Options": "nosniff",
@@ -728,10 +682,7 @@ func (m *mockDetailsCache) Get(console, rom string) *igdb.GameDetails {
 func TestStatusEndpointNilCover(t *testing.T) {
 	srv, _ := testServer(t) // detailsCache is nil
 
-	req := httptest.NewRequest("GET", "/api/status", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/api/status", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -751,10 +702,7 @@ func TestStatusEndpointNilCover(t *testing.T) {
 func TestStatusEndpointFetching(t *testing.T) {
 	srv, _ := testServer(t, &mockDetailsCache{fetching: true})
 
-	req := httptest.NewRequest("GET", "/api/status", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/api/status", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -771,10 +719,7 @@ func TestStatusEndpointFetching(t *testing.T) {
 func TestStatusEndpointIGDBConfigured(t *testing.T) {
 	srv, _ := testServer(t, &mockDetailsCache{})
 
-	req := httptest.NewRequest("GET", "/api/status", nil)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
+	w := doRequest(t, srv, http.MethodGet, "/api/status", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -800,12 +745,10 @@ func TestGameDetailsFromCache(t *testing.T) {
 	}
 	srv, _ := testServer(t, cache)
 
-	req := httptest.NewRequest(
-		"GET", "/api/game-details?console=NES&rom=Mega+Man.nes", nil,
+	w := doRequest(
+		t, srv, http.MethodGet,
+		"/api/game-details?console=NES&rom=Mega+Man.nes", nil,
 	)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -835,12 +778,10 @@ func TestCacheFilesServing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(
-		"GET", "/cache/igdb/NES/Mega%20Man/cover.jpg", nil,
+	w := doRequest(
+		t, srv, http.MethodGet,
+		"/cache/igdb/NES/Mega%20Man/cover.jpg", nil,
 	)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
@@ -855,12 +796,10 @@ func TestCacheFilesServing(t *testing.T) {
 func TestCacheFilesNotFound(t *testing.T) {
 	srv, _ := testServer(t)
 
-	req := httptest.NewRequest(
-		"GET", "/cache/igdb/NES/Mega%20Man/cover.jpg", nil,
+	w := doRequest(
+		t, srv, http.MethodGet,
+		"/cache/igdb/NES/Mega%20Man/cover.jpg", nil,
 	)
-	w := httptest.NewRecorder()
-	srv.handler.ServeHTTP(w, req)
-
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
 	}
@@ -943,10 +882,7 @@ func TestNoCacheMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", tt.path, nil)
-			w := httptest.NewRecorder()
-			srv.handler.ServeHTTP(w, req)
-
+			w := doRequest(t, srv, http.MethodGet, tt.path, nil)
 			cc := w.Header().Get("Cache-Control")
 			if cc != "no-cache" {
 				t.Errorf(
