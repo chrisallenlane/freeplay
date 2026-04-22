@@ -19,6 +19,7 @@ internal/
   config/           TOML config loading and validation
   details/          IGDB details caching and fetch orchestration
   igdb/             IGDB API client, name cleaning, and variant generation
+  library/          Scan → enrich → fetch pipeline coordinator
   saves/            Save-state persistence
   scanner/          ROM directory scanning and catalog building
   server/           HTTP server and API routes
