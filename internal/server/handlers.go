@@ -3,17 +3,8 @@ package server
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 	"path/filepath"
-	"strings"
-
-	"github.com/chrisallenlane/freeplay/internal/saves"
 )
-
-func writeJSONOK(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-}
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSONOK(w)
@@ -63,13 +54,6 @@ func (s *Server) handleManuals(w http.ResponseWriter, r *http.Request) {
 	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "manuals"), r.PathValue("rest"))
 }
 
-func (s *Server) servePage(filename string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		http.ServeFileFS(w, r, s.frontendSub, filename)
-	}
-}
-
 func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 	if s.detailsCache == nil {
 		http.Error(w, `{"error":"IGDB not configured"}`, http.StatusNotFound)
@@ -95,22 +79,6 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(d)
-}
-
-func safeName(s string) bool {
-	return s != "" &&
-		!strings.Contains(s, "..") &&
-		!strings.Contains(s, "/") &&
-		!strings.Contains(s, "\\") &&
-		!strings.ContainsRune(s, 0)
-}
-
-func parseSaveParams(r *http.Request) (string, string, string, bool) {
-	console := r.PathValue("console")
-	game := r.PathValue("game")
-	saveType := r.PathValue("type")
-	ok := safeName(console) && safeName(game) && saves.ValidType(saveType)
-	return console, game, saveType, ok
 }
 
 func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
@@ -161,34 +129,4 @@ func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSONOK(w)
-}
-
-func serveFile(w http.ResponseWriter, r *http.Request, path string) {
-	info, err := os.Stat(path)
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Cache-Control", longCacheValue)
-	http.ServeFile(w, r, path)
-}
-
-func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir, file string) {
-	baseDir = filepath.Clean(baseDir)
-
-	clean := filepath.Clean(file)
-	if strings.Contains(clean, "..") {
-		http.NotFound(w, r)
-		return
-	}
-
-	fullPath := filepath.Join(baseDir, clean)
-
-	// Verify cleaned path is within base directory
-	if !strings.HasPrefix(fullPath, baseDir+string(filepath.Separator)) && fullPath != baseDir {
-		http.NotFound(w, r)
-		return
-	}
-
-	serveFile(w, r, fullPath)
 }
