@@ -3,6 +3,13 @@ makefile := $(realpath $(lastword $(MAKEFILE_LIST)))
 cmd_dir  := ./cmd/freeplay
 dist_dir := ./dist
 
+# EmulatorJS vendored asset release (fetched at build time, not committed)
+EMULATORJS_VERSION  := v4.2.3-freeplay1
+EMULATORJS_TARBALL  := emulatorjs-assets-$(EMULATORJS_VERSION).tar.gz
+EMULATORJS_URL      := https://github.com/chrisallenlane/EmulatorJS/releases/download/$(EMULATORJS_VERSION)/$(EMULATORJS_TARBALL)
+EMULATORJS_SHA256   := 765803f22ea2c0459d9b443a1659c92af349e425243e48642ae8aa412c56cd7c
+EMULATORJS_SENTINEL := emulatorjs/data/version.json
+
 # executables
 GO   := go
 FMT  := gofumpt
@@ -15,7 +22,7 @@ BUILD_FLAGS := -ldflags="-s -w -X github.com/chrisallenlane/freeplay.Version=$(V
 
 ## build: build the freeplay binary
 .PHONY: build
-build: | $(dist_dir)
+build: $(EMULATORJS_SENTINEL) | $(dist_dir)
 	$(GO) build $(BUILD_FLAGS) -o $(dist_dir)/freeplay $(cmd_dir)
 
 ## run: build and run with test data
@@ -35,25 +42,25 @@ fmt:
 
 ## lint: lint source files
 .PHONY: lint
-lint:
+lint: $(EMULATORJS_SENTINEL)
 	$(LINT) run ./...
 	npx --yes @biomejs/biome check frontend/*.js
 	npx --yes html-validate frontend/*.html
 
 ## vet: vet go source files
 .PHONY: vet
-vet:
+vet: $(EMULATORJS_SENTINEL)
 	$(GO) vet ./...
 
 ## test: run unit tests
 .PHONY: test
-test:
+test: $(EMULATORJS_SENTINEL)
 	$(GO) test ./...
 	node --test frontend/utils_test.js
 
 ## coverage: generate a test coverage report
 .PHONY: coverage
-coverage: .tmp
+coverage: $(EMULATORJS_SENTINEL) .tmp
 	$(GO) test ./... -coverprofile=.tmp/coverage.out && \
 	$(GO) tool cover -html=.tmp/coverage.out -o .tmp/coverage.html && \
 	echo "Coverage report generated: .tmp/coverage.html" && \
@@ -64,18 +71,18 @@ coverage: .tmp
 
 ## coverage-text: show test coverage by function in terminal
 .PHONY: coverage-text
-coverage-text: .tmp
+coverage-text: $(EMULATORJS_SENTINEL) .tmp
 	$(GO) test ./... -coverprofile=.tmp/coverage.out && \
 	$(GO) tool cover -func=.tmp/coverage.out | sort -k3 -n
 
 ## fuzz: run quick fuzz tests (15s each)
 .PHONY: fuzz
-fuzz:
+fuzz: $(EMULATORJS_SENTINEL)
 	@./test/fuzz.sh 15s
 
 ## fuzz-long: run extended fuzz tests (10m each)
 .PHONY: fuzz-long
-fuzz-long:
+fuzz-long: $(EMULATORJS_SENTINEL)
 	@./test/fuzz.sh 10m
 
 ## a11y: run accessibility audit against live server
@@ -111,8 +118,20 @@ setup:
 
 ## docker: build docker image
 .PHONY: docker
-docker:
+docker: $(EMULATORJS_SENTINEL)
 	docker build --build-arg VERSION=$(VERSION) -t freeplay .
+
+## fetch-emulatorjs: download and verify pinned EmulatorJS assets
+.PHONY: fetch-emulatorjs
+fetch-emulatorjs: $(EMULATORJS_SENTINEL)
+
+$(EMULATORJS_SENTINEL): | .tmp
+	@echo "Fetching EmulatorJS assets $(EMULATORJS_VERSION)..."
+	@curl -fsSL -o .tmp/$(EMULATORJS_TARBALL) $(EMULATORJS_URL)
+	@echo "$(EMULATORJS_SHA256)  .tmp/$(EMULATORJS_TARBALL)" | sha256sum -c -
+	@tar -xzf .tmp/$(EMULATORJS_TARBALL) -C .
+	@rm -f .tmp/$(EMULATORJS_TARBALL)
+	@echo "EmulatorJS assets ready at ./emulatorjs/"
 
 # .tmp
 .tmp:

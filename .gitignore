@@ -1,4 +1,5 @@
 dist/
+emulatorjs/
 testdata/
 .tickets/
 .playwright-mcp/

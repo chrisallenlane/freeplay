@@ -23,7 +23,7 @@ internal/
   scanner/          ROM directory scanning and catalog building
   server/           HTTP server and API routes
 frontend/           Static HTML/JS/CSS served by the app
-emulatorjs/         Vendored EmulatorJS assets (do not modify)
+emulatorjs/         EmulatorJS assets (gitignored, fetched at build time)
 vendor/             Go module vendor directory (do not modify)
 testdata/           Local test data directory (gitignored)
 ```
@@ -95,12 +95,16 @@ make build
 ./dist/freeplay -data /path/to/data
 ```
 
-## Vendored directories
+## External assets
 
-Two directories are vendored and must not be modified by hand:
+Two directories must not be modified or committed by hand:
 
-- **`emulatorjs/`** — EmulatorJS assets (JS, WASM, CSS), embedded at build
-  time via `//go:embed`. Do not reformat, lint, or refactor these files.
+- **`emulatorjs/`** — EmulatorJS assets (JS, WASM, CSS) fetched at build
+  time from a pinned GitHub release on the [patched
+  fork](https://github.com/chrisallenlane/EmulatorJS/releases). `make build`
+  and `make check` auto-invoke `make fetch-emulatorjs`, which downloads the
+  tarball, verifies the pinned SHA-256, and extracts to `emulatorjs/`. The
+  pinned version and checksum live at the top of the `Makefile`. Gitignored.
 - **`vendor/`** — Go module dependencies managed by `go mod vendor`. Use
   `make vendor` or `make vendor-update` to modify.
 
@@ -108,7 +112,9 @@ Two directories are vendored and must not be modified by hand:
 
 The frontend and EmulatorJS assets are embedded into the binary at compile
 time using Go's `embed` package (see `embed.go`). Changes to files in
-`frontend/` or `emulatorjs/` take effect on the next `make build`.
+`frontend/` take effect on the next `make build`. To change the pinned
+EmulatorJS version, update `EMULATORJS_VERSION` and `EMULATORJS_SHA256` in
+the `Makefile`, then delete `emulatorjs/` and run `make fetch-emulatorjs`.
 
 ## Docker
 

@@ -78,25 +78,23 @@ cover art configuration.
 | [ARCHITECTURE.md](ARCHITECTURE.md)             | Understanding the internal design  |
 | [freeplay.example.toml](freeplay.example.toml) | Annotated configuration reference  |
 
-## Repository size
+## EmulatorJS assets
 
-This repo is larger than a typical Go project. The bulk lives in
-`emulatorjs/` — vendored EmulatorJS assets consisting of RetroArch cores
+The `emulatorjs/` directory is not committed. It contains RetroArch cores
 compiled to WebAssembly (`.wasm` + `.data`) plus the EmulatorJS JS/CSS
-frontend.
+frontend — ~297 MiB of build-time input, not authored source.
 
-These are carried in the repo directly because the cores include custom
-patches for lightgun support (controller port device selection, Super Scope
-input handling) that have not yet been merged upstream.
+These assets are fetched on first build from a pinned GitHub release on the
+[patched EmulatorJS fork][EmulatorJS-fork]. SHA-256 verified, then extracted
+into `emulatorjs/` and embedded into the binary via `//go:embed`. Running
+`make build` or `make check` auto-invokes `make fetch-emulatorjs`; you don't
+need to run it yourself.
 
-A git submodule pointing at a patched fork would work in principle, but
-would require maintaining a separate repo just to host this one directory.
-Rebuilding the cores from source requires a full EmulatorJS + emsdk
-toolchain, which is time-consuming to set up and run.
-
-This arrangement is temporary. Once the upstream PRs to [EmulatorJS][] and
-[RetroArch][] land, Freeplay can drop the vendored copy and consume stock
-EmulatorJS.
+The fork exists because the cores include custom patches for lightgun
+support (controller port device selection, Super Scope input handling) that
+have not yet been merged upstream. Once the upstream PRs to [EmulatorJS][]
+and [RetroArch][] land, Freeplay can drop the fork and consume stock
+releases directly.
 
 ## Acknowledgements
 
@@ -109,5 +107,6 @@ possible.
 MIT
 
 [EmulatorJS]: https://github.com/EmulatorJS/EmulatorJS
+[EmulatorJS-fork]: https://github.com/chrisallenlane/EmulatorJS/releases
 [IGDB]: https://www.igdb.com/
 [RetroArch]: https://github.com/EmulatorJS/RetroArch

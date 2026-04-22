@@ -25,6 +25,15 @@ jobs:
         with:
           node-version: '20'
 
+      - id: emulatorjs
+        run: echo "sha=$(grep '^EMULATORJS_SHA256' Makefile | awk '{print $3}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache EmulatorJS assets
+        uses: actions/cache@v4
+        with:
+          path: emulatorjs
+          key: emulatorjs-${{ steps.emulatorjs.outputs.sha }}
+
       - name: Install Go linting tools
         run: make setup
 
@@ -43,6 +52,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      - id: emulatorjs
+        run: echo "sha=$(grep '^EMULATORJS_SHA256' Makefile | awk '{print $3}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache EmulatorJS assets
+        uses: actions/cache@v4
+        with:
+          path: emulatorjs
+          key: emulatorjs-${{ steps.emulatorjs.outputs.sha }}
+
+      - name: Fetch EmulatorJS assets
+        run: make fetch-emulatorjs
 
       - id: meta
         uses: docker/metadata-action@v5
