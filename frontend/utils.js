@@ -214,6 +214,15 @@
 		return game;
 	};
 
+	exports.loadGameDetails = async (consoleName, rom) => {
+		try {
+			const res = await fetch(exports.gameDetailsUrl(consoleName, rom));
+			return res.ok ? await res.json() : null;
+		} catch {
+			return null;
+		}
+	};
+
 	exports.showError = (containerId, msg) => {
 		document.getElementById(containerId).style.display = "none";
 		const el = document.getElementById("error");

@@ -9,12 +9,7 @@
 	const { consoleName, rom, gameName } = subpage;
 
 	const gamePromise = FP.loadGame(consoleName, rom, "content");
-	const detailsPromise = fetch(FP.gameDetailsUrl(consoleName, rom))
-		.then((res) => {
-			if (!res.ok) return null;
-			return res.json();
-		})
-		.catch(() => null);
+	const detailsPromise = FP.loadGameDetails(consoleName, rom);
 
 	Promise.all([gamePromise, detailsPromise])
 		.then(([game, details]) => {
@@ -87,11 +82,7 @@
 
 		const meta = FP.el("div", "details-meta");
 
-		const title = FP.el(
-			"h2",
-			"details-title",
-			details ? details.name : gameName,
-		);
+		const title = FP.el("h2", "details-title", displayName);
 		meta.appendChild(title);
 
 		const rows = [
@@ -157,7 +148,7 @@
 			link.href = details.coverUrl;
 			const img = FP.el("img", "details-cover-full");
 			img.src = details.coverUrl;
-			img.alt = `${details.name} cover art`;
+			img.alt = `${displayName} cover art`;
 			link.appendChild(img);
 			appendSection(content, "Cover Art", link);
 		}

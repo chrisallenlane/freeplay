@@ -14,12 +14,9 @@
 			const toggle = document.getElementById("theme-toggle");
 
 			// Update page title with IGDB name if available
-			fetch(FP.gameDetailsUrl(consoleName, rom))
-				.then((res) => (res.ok ? res.json() : null))
-				.then((details) => {
-					if (details?.name) document.title = `Freeplay - ${details.name}`;
-				})
-				.catch(() => {});
+			FP.loadGameDetails(consoleName, rom).then((details) => {
+				if (details?.name) document.title = `Freeplay - ${details.name}`;
+			});
 
 			if (game.hasManual) {
 				const manualLink = FP.el("a", "btn header-btn", "Manual");
