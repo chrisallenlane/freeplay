@@ -118,7 +118,7 @@ Implementation: `igdb.Fetcher.SearchGame()`, `details.Cache.search()`
   next scan.
 - **Regional variants:** Multiple ROM files that clean to the same name
   (e.g., `Mega Man (USA)` and `Mega Man (Japan)`) share a single cache entry
-  but each gets its own cover thumbnail symlink.
+  but each gets its own cover thumbnail copy at `covers/<Console>/<nameNoExt>.png`.
 
 ### Rate Limiting
 
