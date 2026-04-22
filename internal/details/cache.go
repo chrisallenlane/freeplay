@@ -41,9 +41,17 @@ func (c *Cache) Fetching() bool {
 	return c.fetching.Load() > 0
 }
 
+// CacheDir returns the top-level directory that holds the on-disk IGDB
+// cache rooted under dataDir. Callers outside this package (e.g. the HTTP
+// handler that serves cache files) use this helper to avoid duplicating
+// the path layout.
+func CacheDir(dataDir string) string {
+	return filepath.Join(dataDir, "cache", "igdb")
+}
+
 // cacheDir returns the filesystem directory for a game's cached IGDB data.
 func (c *Cache) cacheDir(console, cleanName string) string {
-	return filepath.Join(c.dataDir, "cache", "igdb", console, cleanName)
+	return filepath.Join(CacheDir(c.dataDir), console, cleanName)
 }
 
 // Get returns cached GameDetails for the given console and ROM filename,
