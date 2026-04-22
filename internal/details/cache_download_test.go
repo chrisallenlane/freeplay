@@ -3,7 +3,6 @@ package details
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,13 +17,10 @@ import (
 // HTML content at an image URL (e.g., a CDN error page), downloadImage should
 // return an error rather than saving the content as a .jpg file.
 func TestDownloadImage_HTMLContentRejected(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "text/html")
-			_, _ = w.Write([]byte(`<html><body>error</body></html>`))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body>error</body></html>`))
+	})
 
 	dir := t.TempDir()
 	c := New(dir, nil)
@@ -63,22 +59,13 @@ func TestDownloadImage_NonOKStatusCode(t *testing.T) {
 
 	for _, code := range codes {
 		t.Run(fmt.Sprintf("status_%d", code), func(t *testing.T) {
-			imgServer := httptest.NewServer(
-				http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-					http.Error(w, "error", code)
-				}),
-			)
-			defer imgServer.Close()
+			imgServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
+				http.Error(w, "error", code)
+			})
 
-			dir := t.TempDir()
-			c := New(dir, nil)
+			c := New(t.TempDir(), nil)
 
-			_, _, err := c.downloadImage(
-				imgServer.URL+"/cover.jpg",
-				filepath.Join(dir, "cache"),
-				"/cache/igdb/NES/Game",
-				"cover.jpg",
-			)
+			_, _, err := downloadTestImage(t, c, imgServer.URL+"/cover.jpg")
 			if err == nil {
 				t.Errorf("downloadImage should return error for status %d", code)
 			}
@@ -92,16 +79,10 @@ func TestDownloadImage_NonOKStatusCode(t *testing.T) {
 // TestDownloadImage_ConnectionError verifies that downloadImage returns an
 // error when the connection fails.
 func TestDownloadImage_ConnectionError(t *testing.T) {
-	dir := t.TempDir()
-	c := New(dir, nil)
+	c := New(t.TempDir(), nil)
 	c.client = &http.Client{Timeout: 200 * time.Millisecond}
 
-	_, _, err := c.downloadImage(
-		"http://192.0.2.1:1/cover.jpg", // RFC 5737 TEST-NET, unreachable
-		filepath.Join(dir, "cache"),
-		"/cache/igdb/NES/Game",
-		"cover.jpg",
-	)
+	_, _, err := downloadTestImage(t, c, "http://192.0.2.1:1/cover.jpg") // RFC 5737 TEST-NET, unreachable
 	if err == nil {
 		t.Error("downloadImage should return error for unreachable host")
 	}
@@ -110,23 +91,14 @@ func TestDownloadImage_ConnectionError(t *testing.T) {
 // TestDownloadImage_EmptyBody verifies behavior when the server returns
 // 200 OK with an empty body and no Content-Type header.
 func TestDownloadImage_EmptyBody(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			// No body written, no Content-Type set
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// No body written, no Content-Type set
+	})
 
-	dir := t.TempDir()
-	c := New(dir, nil)
+	c := New(t.TempDir(), nil)
 
-	_, _, err := c.downloadImage(
-		imgServer.URL+"/cover.jpg",
-		filepath.Join(dir, "cache"),
-		"/cache/igdb/NES/Game",
-		"cover.jpg",
-	)
+	_, _, err := downloadTestImage(t, c, imgServer.URL+"/cover.jpg")
 	// Empty body with no Content-Type should be rejected
 	if err == nil {
 		t.Fatal("downloadImage should reject response without image/* Content-Type")
@@ -141,27 +113,18 @@ func TestDownloadImage_LimitReader(t *testing.T) {
 	const limitBytes = 20 << 20 // 20 MiB
 	const overSize = limitBytes + 1024
 
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			data := make([]byte, overSize)
-			for i := range data {
-				data[i] = 0xFF
-			}
-			_, _ = w.Write(data)
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		data := make([]byte, overSize)
+		for i := range data {
+			data[i] = 0xFF
+		}
+		_, _ = w.Write(data)
+	})
 
-	dir := t.TempDir()
-	c := New(dir, nil)
+	c := New(t.TempDir(), nil)
 
-	localPath, _, err := c.downloadImage(
-		imgServer.URL+"/cover.jpg",
-		filepath.Join(dir, "cache"),
-		"/cache/igdb/NES/Game",
-		"cover.jpg",
-	)
+	localPath, _, err := downloadTestImage(t, c, imgServer.URL+"/cover.jpg")
 	if err != nil {
 		t.Fatalf("downloadImage returned error: %v", err)
 	}
@@ -192,31 +155,19 @@ func TestDownloadImage_LimitReader(t *testing.T) {
 // by default).
 func TestDownloadImage_RedirectFollowed(t *testing.T) {
 	// Final destination server
-	finalServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte{0xFF, 0xD8, 0xFF, 0xE0}) // JPEG header
-		}),
-	)
-	defer finalServer.Close()
+	finalServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte{0xFF, 0xD8, 0xFF, 0xE0}) // JPEG header
+	})
 
 	// Redirect server
-	redirectServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, finalServer.URL+"/final.jpg", http.StatusMovedPermanently)
-		}),
-	)
-	defer redirectServer.Close()
+	redirectServer := startImageServerWith(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, finalServer.URL+"/final.jpg", http.StatusMovedPermanently)
+	})
 
-	dir := t.TempDir()
-	c := New(dir, nil)
+	c := New(t.TempDir(), nil)
 
-	localPath, _, err := c.downloadImage(
-		redirectServer.URL+"/cover.jpg",
-		filepath.Join(dir, "cache"),
-		"/cache/igdb/NES/Game",
-		"cover.jpg",
-	)
+	localPath, _, err := downloadTestImage(t, c, redirectServer.URL+"/cover.jpg")
 	if err != nil {
 		t.Fatalf("downloadImage should follow redirects, got error: %v", err)
 	}
@@ -235,13 +186,7 @@ func TestDownloadImage_RedirectFollowed(t *testing.T) {
 // TestDownloadImage_URLPath verifies that the returned local URL path
 // is properly constructed with URL-escaped components.
 func TestDownloadImage_URLPath(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write([]byte("data"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startFakeImageServer(t)
 
 	dir := t.TempDir()
 	c := New(dir, nil)
@@ -268,13 +213,10 @@ func TestDownloadImage_URLPath(t *testing.T) {
 // not save the HTML as cover.jpg. The cover download should fail due to
 // content-type validation, and CoverURL should be cleared.
 func TestSaveDetails_HTMLCoverRejected(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, _ = w.Write([]byte(`<!DOCTYPE html><html><body>error</body></html>`))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<!DOCTYPE html><html><body>error</body></html>`))
+	})
 
 	dir := t.TempDir()
 	c := New(dir, nil)
@@ -307,30 +249,21 @@ func TestSaveDetails_HTMLCoverRejected(t *testing.T) {
 // client timeout. The default client has a 30-second timeout; we create
 // a cache with a shorter timeout for testing.
 func TestDownloadImage_SlowServer(t *testing.T) {
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			w.WriteHeader(http.StatusOK)
-			if f, ok := w.(http.Flusher); ok {
-				f.Flush()
-			}
-			time.Sleep(2 * time.Second)
-			_, _ = w.Write([]byte("delayed data"))
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.WriteHeader(http.StatusOK)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		time.Sleep(2 * time.Second)
+		_, _ = w.Write([]byte("delayed data"))
+	})
 
-	dir := t.TempDir()
-	c := New(dir, nil)
+	c := New(t.TempDir(), nil)
 	// Override with a very short timeout
 	c.client = &http.Client{Timeout: 100 * time.Millisecond}
 
-	_, _, err := c.downloadImage(
-		imgServer.URL+"/cover.jpg",
-		filepath.Join(dir, "cache"),
-		"/cache/igdb/NES/Game",
-		"cover.jpg",
-	)
+	_, _, err := downloadTestImage(t, c, imgServer.URL+"/cover.jpg")
 	// Should fail due to timeout during body read
 	if err == nil {
 		t.Error("downloadImage should return error for slow server with short timeout")
@@ -342,12 +275,9 @@ func TestDownloadImage_SlowServer(t *testing.T) {
 // from the details (not left as remote URLs).
 func TestSaveDetails_ScreenshotAndArtworkImageErrors(t *testing.T) {
 	// Server that returns 500 for all requests
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			http.Error(w, "server error", http.StatusInternalServerError)
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "server error", http.StatusInternalServerError)
+	})
 
 	dir := t.TempDir()
 	c := New(dir, nil)
@@ -388,18 +318,15 @@ func TestSaveDetails_ScreenshotAndArtworkImageErrors(t *testing.T) {
 // are kept in the details.
 func TestSaveDetails_PartialScreenshotDownloads(t *testing.T) {
 	requestCount := 0
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			requestCount++
-			if requestCount%2 == 0 {
-				http.Error(w, "error", http.StatusInternalServerError)
-			} else {
-				w.Header().Set("Content-Type", "image/jpeg")
-				_, _ = w.Write([]byte("imagedata"))
-			}
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		if requestCount%2 == 0 {
+			http.Error(w, "error", http.StatusInternalServerError)
+		} else {
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("imagedata"))
+		}
+	})
 
 	dir := t.TempDir()
 	c := New(dir, nil)
@@ -442,19 +369,16 @@ func TestSaveDetails_PartialScreenshotDownloads(t *testing.T) {
 // gets its local URL assigned).
 func TestSaveDetails_CoverThumbDownloadIgnored(t *testing.T) {
 	requestCount := 0
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestCount++
-			if strings.Contains(r.URL.Path, "t_cover_big") {
-				// Thumbnail request fails
-				http.Error(w, "not found", http.StatusNotFound)
-			} else {
-				w.Header().Set("Content-Type", "image/jpeg")
-				_, _ = w.Write([]byte("coverdata"))
-			}
-		}),
-	)
-	defer imgServer.Close()
+	imgServer := startImageServerWith(t, func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if strings.Contains(r.URL.Path, "t_cover_big") {
+			// Thumbnail request fails
+			http.Error(w, "not found", http.StatusNotFound)
+		} else {
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("coverdata"))
+		}
+	})
 
 	dir := t.TempDir()
 	c := New(dir, nil)
@@ -491,22 +415,19 @@ func TestSaveDetails_CoverThumbDownloadIgnored(t *testing.T) {
 // a temp file + rename pattern).
 func TestDownloadImage_AtomicWriteConsistency(t *testing.T) {
 	// Serve a body that errors partway through
-	imgServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "image/jpeg")
-			w.Header().Set("Content-Length", "1000")
-			w.WriteHeader(http.StatusOK)
-			// Write partial data then close connection
-			_, _ = w.Write([]byte("partial"))
-			if hj, ok := w.(http.Hijacker); ok {
-				conn, _, _ := hj.Hijack()
-				if conn != nil {
-					_ = conn.Close()
-				}
+	imgServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("Content-Length", "1000")
+		w.WriteHeader(http.StatusOK)
+		// Write partial data then close connection
+		_, _ = w.Write([]byte("partial"))
+		if hj, ok := w.(http.Hijacker); ok {
+			conn, _, _ := hj.Hijack()
+			if conn != nil {
+				_ = conn.Close()
 			}
-		}),
-	)
-	defer imgServer.Close()
+		}
+	})
 
 	dir := t.TempDir()
 	c := New(dir, nil)
@@ -570,15 +491,9 @@ func TestSaveDetails_WritesDetailsJSON(t *testing.T) {
 // TestDownloadImage_InvalidURL verifies that downloadImage returns an
 // error for an invalid URL.
 func TestDownloadImage_InvalidURL(t *testing.T) {
-	dir := t.TempDir()
-	c := New(dir, nil)
+	c := New(t.TempDir(), nil)
 
-	_, _, err := c.downloadImage(
-		"://invalid-url",
-		filepath.Join(dir, "cache"),
-		"/cache/igdb/NES/Game",
-		"cover.jpg",
-	)
+	_, _, err := downloadTestImage(t, c, "://invalid-url")
 	if err == nil {
 		t.Error("downloadImage should return error for invalid URL")
 	}
