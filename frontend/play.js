@@ -1,4 +1,4 @@
-(() => {
+(async () => {
 	const FP = window.Freeplay;
 
 	const subpage = FP.initSubpage();
@@ -8,29 +8,32 @@
 	}
 	const { consoleName, rom, gameName } = subpage;
 
-	FP.loadGame(consoleName, rom, "game")
-		.then((game) => {
-			if (!game) return;
-			const toggle = document.getElementById("theme-toggle");
+	let game;
+	try {
+		game = await FP.loadGame(consoleName, rom, "game");
+	} catch {
+		FP.showError("game", "Could not load game catalog.");
+		return;
+	}
+	if (!game) return;
 
-			// Update page title with IGDB name if available
-			FP.loadGameDetails(consoleName, rom).then((details) => {
-				if (details?.name) document.title = `Freeplay - ${details.name}`;
-			});
+	const toggle = document.getElementById("theme-toggle");
 
-			if (game.hasManual) {
-				const manualLink = FP.el("a", "btn header-btn", "Manual");
-				manualLink.href = FP.manualUrl(game);
-				manualLink.title = "View the manual";
-				toggle.parentNode.insertBefore(manualLink, toggle);
-			}
-			startEmulator(game);
-		})
-		.catch(() => {
-			FP.showError("game", "Could not load game catalog.");
-		});
+	// Update page title with IGDB name if available
+	FP.loadGameDetails(consoleName, rom).then((details) => {
+		if (details?.name) document.title = `Freeplay - ${details.name}`;
+	});
 
-	function startEmulator(game) {
+	if (game.hasManual) {
+		const manualLink = FP.el("a", "btn header-btn", "Manual");
+		manualLink.href = FP.manualUrl(game);
+		manualLink.title = "View the manual";
+		toggle.parentNode.insertBefore(manualLink, toggle);
+	}
+
+	await startEmulator(game);
+
+	async function startEmulator(game) {
 		const saveBase = FP.saveBasePath(consoleName, gameName);
 
 		window.EJS_player = "#game";
@@ -64,19 +67,16 @@
 		window.EJS_onSaveState = (data) => {
 			postSave("state", data.state);
 		};
+
 		// Load SRAM save from server (if exists), then register periodic saves
 		let sramHandlerRegistered = false;
-		window.EJS_onGameStart = () => {
+		window.EJS_onGameStart = async () => {
 			if (!window.EJS_emulator) return;
 
-			// Load existing SRAM save from server
-			fetch(`${saveBase}/sram`)
-				.then((res) => {
-					if (!res.ok) return;
-					return res.arrayBuffer();
-				})
-				.then((buf) => {
-					if (!buf) return;
+			try {
+				const res = await fetch(`${saveBase}/sram`);
+				if (res.ok) {
+					const buf = await res.arrayBuffer();
 					const gm = window.EJS_emulator.gameManager;
 					const path = gm.getSaveFilePath();
 					const parts = path.split("/");
@@ -89,8 +89,10 @@
 					if (gm.FS.analyzePath(path).exists) gm.FS.unlink(path);
 					gm.FS.writeFile(path, new Uint8Array(buf));
 					gm.loadSaveFiles();
-				})
-				.catch((err) => console.error("SRAM restore failed:", err));
+				}
+			} catch (err) {
+				console.error("SRAM restore failed:", err);
+			}
 
 			// Register periodic SRAM save (once only)
 			if (!sramHandlerRegistered) {
@@ -102,17 +104,17 @@
 		};
 
 		// Load save state if one exists, then start the emulator
-		fetch(`${saveBase}/state`, { method: "HEAD" })
-			.then((res) => {
-				if (res.ok) {
-					window.EJS_loadStateURL = `${saveBase}/state`;
-				}
-			})
-			.catch(() => {})
-			.finally(() => {
-				const script = document.createElement("script");
-				script.src = "/emulatorjs/data/loader.js";
-				document.body.appendChild(script);
-			});
+		try {
+			const res = await fetch(`${saveBase}/state`, { method: "HEAD" });
+			if (res.ok) {
+				window.EJS_loadStateURL = `${saveBase}/state`;
+			}
+		} catch {
+			// Ignore — save state is optional.
+		}
+
+		const script = document.createElement("script");
+		script.src = "/emulatorjs/data/loader.js";
+		document.body.appendChild(script);
 	}
 })();
