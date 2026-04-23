@@ -476,8 +476,26 @@
       ]
     },
     "internal/server/serve.go": {
-      "status": "pending",
-      "covering_tests": ["internal/server/server_test.go", "internal/server/server_securefile_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/server/server_test.go", "internal/server/server_securefile_test.go"],
+      "last_tested": "2026-04-23T18:55:00Z",
+      "mutations_applied": 25,
+      "killed": 22,
+      "survived_accepted": 1,
+      "mutation_score": 88.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "TestDetailsPage / TestPlayPage now assert response body contains HTML (kills http.ServeFileFS removal in servePage)",
+        "TestSaveInvalidType now asserts application/json Content-Type and {error: ...} body (kills Content-Type + Encode removals in writeJSONError)"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 31,
+          "mutation": "filepath.Join(baseDir, filepath.Clean(file)) -> filepath.Join(baseDir, file)",
+          "category": "equivalent mutant",
+          "reason": "filepath.Join internally calls filepath.Clean on the resulting joined path. Explicit Clean(file) before Join is redundant — Join's post-join Clean collapses '/base/../etc' to '/etc' regardless of whether the input was pre-cleaned. Path traversal is then rejected by the subsequent PathInside check."
+        }
+      ]
     },
     "internal/server/server.go": {
       "status": "pending",

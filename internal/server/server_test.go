@@ -296,6 +296,17 @@ func TestSaveInvalidType(t *testing.T) {
 	if w.Code != 400 {
 		t.Errorf("got status %d, want 400", w.Code)
 	}
+	// Kills mutations that remove Content-Type or the JSON body in
+	// writeJSONError — error responses on /api/* must stay JSON-shaped.
+	if ct := w.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Errorf("error body not valid JSON: %v (body: %q)", err, w.Body.String())
+	} else if body["error"] == "" {
+		t.Errorf("error body missing 'error' key: %v", body)
+	}
 }
 
 func TestRescanEndpoint(t *testing.T) {
@@ -370,6 +381,13 @@ func TestDetailsPage(t *testing.T) {
 	w := doRequest(t, srv, http.MethodGet, "/details?console=NES&rom=Mega+Man.nes", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
+	}
+	// Body must contain HTML from details.html. Kills a mutation that
+	// removes the http.ServeFileFS call in servePage().
+	if !strings.Contains(w.Body.String(), "<html") &&
+		!strings.Contains(w.Body.String(), "<!DOCTYPE") {
+		t.Errorf("/details body not HTML (first 80 bytes: %q)",
+			w.Body.String()[:min(80, w.Body.Len())])
 	}
 }
 
@@ -488,6 +506,11 @@ func TestPlayPage(t *testing.T) {
 	w := doRequest(t, srv, http.MethodGet, "/play", nil)
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "<html") &&
+		!strings.Contains(w.Body.String(), "<!DOCTYPE") {
+		t.Errorf("/play body not HTML (first 80 bytes: %q)",
+			w.Body.String()[:min(80, w.Body.Len())])
 	}
 }
 
