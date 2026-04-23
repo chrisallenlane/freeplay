@@ -141,11 +141,9 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	fetching := s.detailsCache != nil && s.detailsCache.Fetching()
-	igdbConfigured := s.detailsCache != nil
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"fetchingDetails": fetching,
-		"igdbConfigured":  igdbConfigured,
 	})
 }
 

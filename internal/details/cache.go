@@ -142,10 +142,9 @@ func (c *Cache) load(console, cleanName string) (*igdb.GameDetails, bool) {
 	return nil, false
 }
 
-// store memoizes a resolved lookup. Pass non-nil details after a
-// successful write, or nil to record a negative cache entry
-// (.notfound marker). Callers must pass a copy of the details so
-// later mutations by the caller don't race with cache readers.
+// store memoizes a resolved lookup; pass nil d for a negative
+// cache entry (.notfound marker). Callers must pass an owned copy
+// of the details so later mutations don't race with cache readers.
 func (c *Cache) store(console, cleanName string, d *igdb.GameDetails) {
 	c.mu.Lock()
 	c.mem[memKey(console, cleanName)] = d

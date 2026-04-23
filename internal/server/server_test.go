@@ -760,9 +760,6 @@ func TestStatusEndpointNilCover(t *testing.T) {
 	if body["fetchingDetails"] != false {
 		t.Error("expected fetchingDetails=false with nil detailsCache")
 	}
-	if body["igdbConfigured"] != false {
-		t.Error("expected igdbConfigured=false with nil detailsCache")
-	}
 }
 
 func TestStatusEndpointFetching(t *testing.T) {
@@ -779,23 +776,6 @@ func TestStatusEndpointFetching(t *testing.T) {
 	}
 	if body["fetchingDetails"] != true {
 		t.Error("expected fetchingDetails=true when cache is active")
-	}
-}
-
-func TestStatusEndpointIGDBConfigured(t *testing.T) {
-	srv, _ := testServer(t, &mockDetailsCache{})
-
-	w := doRequest(t, srv, http.MethodGet, "/api/status", nil)
-	if w.Code != 200 {
-		t.Fatalf("got status %d, want 200", w.Code)
-	}
-
-	var body map[string]any
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("invalid JSON: %v", err)
-	}
-	if body["igdbConfigured"] != true {
-		t.Error("expected igdbConfigured=true when detailsCache is set")
 	}
 }
 
