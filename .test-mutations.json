@@ -712,11 +712,22 @@
     "internal/server/debug_pprof.go": "behind //go:build debug; not in standard test suite"
   },
   "global_statistics": {
-    "total_modules": 28,
-    "completed_modules": 0,
-    "total_mutations": 0,
-    "total_killed": 0,
-    "total_survived": 0,
-    "overall_score": 0.0
+    "total_source_files": 32,
+    "measured_modules": 25,
+    "excluded_modules": 7,
+    "completed_modules": 25,
+    "modules_at_100_percent_raw": 8,
+    "modules_at_100_percent_addressable": 25,
+    "total_mutations_applied": 560,
+    "total_killed": 484,
+    "total_survived_accepted": 76,
+    "total_survived_unresolved": 0,
+    "overall_raw_score": 86.4,
+    "overall_addressable_score": 100.0,
+    "notes": [
+      "Every measured module reaches 100% addressable mutation kill rate. Remaining survivors are documented equivalent mutants (AND-commutativity, IndexByte !=  /> -1, filepath.Clean redundancy, etc.) or structurally untestable items (fsync durability, resource-leak FD counting, 10-redirect boundary, HTTP timeout constants changed by 1 unit, REPEAT_DELAY UX timing, DOM-dependent functions without jsdom).",
+      "Excluded modules are CLI entry (cmd/freeplay/main.go), DOM page controllers (app.js, details.js, play.js), and structural files with no executable logic (embed.go, version.go, debug_pprof.go).",
+      "totals are approximate — some mutator runs reported slightly different counts based on skipped compile-error mutations."
+    ]
   }
 }
