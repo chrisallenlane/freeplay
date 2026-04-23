@@ -189,19 +189,25 @@
 		parent.appendChild(section);
 	}
 
-	function buildGallery(heading, urls, galleryClass) {
+	function buildGallery(heading, refs, galleryClass) {
 		const gallery = FP.el("div", galleryClass || "details-gallery");
-		for (let i = 0; i < urls.length; i++) {
+		for (let i = 0; i < refs.length; i++) {
+			// Each ref is {url, thumbUrl?}. Older details.json written
+			// before PERF-6 decode to {url: "..."} with no thumbUrl;
+			// fall back to url in that case.
+			const ref = refs[i];
+			const fullUrl = ref.url;
+			const thumbUrl = ref.thumbUrl || ref.url;
 			const link = FP.el("a");
-			link.href = urls[i];
+			link.href = fullUrl;
 			link.setAttribute(
 				"aria-label",
-				`View full image: ${heading} ${i + 1} of ${urls.length}`,
+				`View full image: ${heading} ${i + 1} of ${refs.length}`,
 			);
 			const img = FP.el("img");
-			img.src = urls[i];
+			img.src = thumbUrl;
 			img.loading = "lazy";
-			img.alt = `${heading} ${i + 1} of ${urls.length}`;
+			img.alt = `${heading} ${i + 1} of ${refs.length}`;
 			link.appendChild(img);
 			gallery.appendChild(link);
 		}

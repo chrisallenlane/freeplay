@@ -137,6 +137,33 @@ func FuzzNewFetcher(f *testing.F) {
 	})
 }
 
+// TestImageRefUnmarshalLegacy exercises the backward-compat path that
+// lets older details.json files (where screenshots/artworks are plain
+// URL strings) deserialize into the new ImageRef shape.
+func TestImageRefUnmarshalLegacy(t *testing.T) {
+	var details GameDetails
+	payload := []byte(`{
+        "name": "Legacy Game",
+        "screenshots": ["https://images.igdb.com/igdb/image/upload/t_original/ss1.jpg"],
+        "artworks": [{"url": "https://images.igdb.com/igdb/image/upload/t_original/art1.jpg"}]
+    }`)
+	if err := json.Unmarshal(payload, &details); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	if len(details.Screenshots) != 1 || details.Screenshots[0].URL == "" {
+		t.Errorf("legacy screenshot string did not decode: %+v", details.Screenshots)
+	}
+	if details.Screenshots[0].ThumbURL != "" {
+		t.Errorf(
+			"legacy screenshot should have empty ThumbURL, got %q",
+			details.Screenshots[0].ThumbURL,
+		)
+	}
+	if len(details.Artworks) != 1 || details.Artworks[0].URL == "" {
+		t.Errorf("new-shape artwork did not decode: %+v", details.Artworks)
+	}
+}
+
 func TestIntsToStrings(t *testing.T) {
 	tests := []struct {
 		input []int
@@ -359,14 +386,26 @@ func TestFetchDetailsByID(t *testing.T) {
 	if len(details.Screenshots) != 1 {
 		t.Fatalf("Screenshots len = %d, want 1", len(details.Screenshots))
 	}
-	if !strings.Contains(details.Screenshots[0], "t_original") {
-		t.Errorf("Screenshot URL should use t_original, got %q", details.Screenshots[0])
+	if !strings.Contains(details.Screenshots[0].URL, "t_original") {
+		t.Errorf("Screenshot full URL should use t_original, got %q", details.Screenshots[0].URL)
+	}
+	if !strings.Contains(details.Screenshots[0].ThumbURL, "t_screenshot_huge") {
+		t.Errorf(
+			"Screenshot thumb URL should use t_screenshot_huge, got %q",
+			details.Screenshots[0].ThumbURL,
+		)
 	}
 	if len(details.Artworks) != 1 {
 		t.Fatalf("Artworks len = %d, want 1", len(details.Artworks))
 	}
-	if !strings.Contains(details.Artworks[0], "t_original") {
-		t.Errorf("Artwork URL should use t_original, got %q", details.Artworks[0])
+	if !strings.Contains(details.Artworks[0].URL, "t_original") {
+		t.Errorf("Artwork full URL should use t_original, got %q", details.Artworks[0].URL)
+	}
+	if !strings.Contains(details.Artworks[0].ThumbURL, "t_screenshot_huge") {
+		t.Errorf(
+			"Artwork thumb URL should use t_screenshot_huge, got %q",
+			details.Artworks[0].ThumbURL,
+		)
 	}
 }
 

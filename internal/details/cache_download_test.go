@@ -280,12 +280,12 @@ func TestSaveDetails_ScreenshotAndArtworkImageErrors(t *testing.T) {
 
 	details := &igdb.GameDetails{
 		Name: "Test Game",
-		Screenshots: []string{
-			imgServer.URL + "/ss0.jpg",
-			imgServer.URL + "/ss1.jpg",
+		Screenshots: []igdb.ImageRef{
+			{URL: imgServer.URL + "/ss0.jpg"},
+			{URL: imgServer.URL + "/ss1.jpg"},
 		},
-		Artworks: []string{
-			imgServer.URL + "/art0.jpg",
+		Artworks: []igdb.ImageRef{
+			{URL: imgServer.URL + "/art0.jpg"},
 		},
 	}
 
@@ -329,10 +329,10 @@ func TestSaveDetails_PartialScreenshotDownloads(t *testing.T) {
 
 	details := &igdb.GameDetails{
 		Name: "Test Game",
-		Screenshots: []string{
-			imgServer.URL + "/ss0.jpg", // request 1: succeeds
-			imgServer.URL + "/ss1.jpg", // request 2: fails (500)
-			imgServer.URL + "/ss2.jpg", // request 3: succeeds
+		Screenshots: []igdb.ImageRef{
+			{URL: imgServer.URL + "/ss0.jpg"}, // request 1: succeeds
+			{URL: imgServer.URL + "/ss1.jpg"}, // request 2: fails (500)
+			{URL: imgServer.URL + "/ss2.jpg"}, // request 3: succeeds
 		},
 	}
 
@@ -350,11 +350,11 @@ func TestSaveDetails_PartialScreenshotDownloads(t *testing.T) {
 	}
 
 	// All remaining URLs should be local paths
-	for i, url := range details.Screenshots {
-		if !strings.HasPrefix(url, "/cache/igdb/") {
+	for i, ref := range details.Screenshots {
+		if !strings.HasPrefix(ref.URL, "/cache/igdb/") {
 			t.Errorf(
-				"Screenshots[%d] = %q, want local /cache/igdb/ path",
-				i, url,
+				"Screenshots[%d].URL = %q, want local /cache/igdb/ path",
+				i, ref.URL,
 			)
 		}
 	}
@@ -462,8 +462,8 @@ func TestSaveDetails_WritesDetailsJSON(t *testing.T) {
 		Name:        "Test Game",
 		Summary:     "A test game.",
 		CoverURL:    imgServer.URL + "/t_original/cover.jpg",
-		Screenshots: []string{imgServer.URL + "/ss0.jpg"},
-		Artworks:    []string{imgServer.URL + "/art0.jpg"},
+		Screenshots: []igdb.ImageRef{{URL: imgServer.URL + "/ss0.jpg"}},
+		Artworks:    []igdb.ImageRef{{URL: imgServer.URL + "/art0.jpg"}},
 	}
 
 	err := c.saveDetails("NES", "Test Game", details)

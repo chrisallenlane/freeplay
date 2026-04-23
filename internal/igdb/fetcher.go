@@ -141,18 +141,48 @@ func (f *Fetcher) doRequest(endpoint, body string) (*http.Response, error) {
 
 // GameDetails holds metadata fetched from IGDB for a game.
 type GameDetails struct {
-	Name             string   `json:"name"`
-	Summary          string   `json:"summary,omitempty"`
-	Storyline        string   `json:"storyline,omitempty"`
-	FirstReleaseDate string   `json:"firstReleaseDate,omitempty"`
-	Developers       []string `json:"developers,omitempty"`
-	Publishers       []string `json:"publishers,omitempty"`
-	Platforms        []string `json:"platforms,omitempty"`
-	Collection       string   `json:"collection,omitempty"`
-	IGDBURL          string   `json:"igdbUrl,omitempty"`
-	CoverURL         string   `json:"coverUrl,omitempty"`
-	Screenshots      []string `json:"screenshots,omitempty"`
-	Artworks         []string `json:"artworks,omitempty"`
+	Name             string     `json:"name"`
+	Summary          string     `json:"summary,omitempty"`
+	Storyline        string     `json:"storyline,omitempty"`
+	FirstReleaseDate string     `json:"firstReleaseDate,omitempty"`
+	Developers       []string   `json:"developers,omitempty"`
+	Publishers       []string   `json:"publishers,omitempty"`
+	Platforms        []string   `json:"platforms,omitempty"`
+	Collection       string     `json:"collection,omitempty"`
+	IGDBURL          string     `json:"igdbUrl,omitempty"`
+	CoverURL         string     `json:"coverUrl,omitempty"`
+	Screenshots      []ImageRef `json:"screenshots,omitempty"`
+	Artworks         []ImageRef `json:"artworks,omitempty"`
+}
+
+// ImageRef pairs a full-size image URL with an optional gallery-sized
+// thumbnail URL. ThumbURL is empty when no variant is cached (e.g.
+// older details.json written before PERF-6); frontend callers should
+// fall back to URL in that case.
+type ImageRef struct {
+	URL      string `json:"url"`
+	ThumbURL string `json:"thumbUrl,omitempty"`
+}
+
+// UnmarshalJSON accepts either a bare string (legacy details.json
+// shape: just a URL) or the current object shape. Keeps pre-PERF-6
+// caches readable so a deploy doesn't force a full re-fetch.
+func (r *ImageRef) UnmarshalJSON(data []byte) error {
+	if len(data) > 0 && data[0] == '"' {
+		var u string
+		if err := json.Unmarshal(data, &u); err != nil {
+			return err
+		}
+		r.URL = u
+		return nil
+	}
+	type rawImageRef ImageRef
+	var raw rawImageRef
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*r = ImageRef(raw)
+	return nil
 }
 
 // SearchGame searches IGDB for a game by name and returns the IGDB game ID
@@ -303,18 +333,29 @@ func gameDetailsFromIGDB(g igdbGame) *GameDetails {
 	}
 
 	for _, s := range g.Screenshots {
-		if u := transformImageURL(s.URL, "t_original"); u != "" {
-			details.Screenshots = append(details.Screenshots, u)
+		if ref := imageRefFrom(s.URL, "t_screenshot_huge"); ref.URL != "" {
+			details.Screenshots = append(details.Screenshots, ref)
 		}
 	}
 
 	for _, a := range g.Artworks {
-		if u := transformImageURL(a.URL, "t_original"); u != "" {
-			details.Artworks = append(details.Artworks, u)
+		if ref := imageRefFrom(a.URL, "t_screenshot_huge"); ref.URL != "" {
+			details.Artworks = append(details.Artworks, ref)
 		}
 	}
 
 	return details
+}
+
+// imageRefFrom builds an ImageRef with the full-size (t_original) URL and
+// a gallery-sized thumbnail URL for inline rendering. Returns a zero
+// ImageRef if the source URL is not a valid images.igdb.com URL; callers
+// must check URL != "" before appending.
+func imageRefFrom(rawURL, thumbSize string) ImageRef {
+	return ImageRef{
+		URL:      transformImageURL(rawURL, "t_original"),
+		ThumbURL: transformImageURL(rawURL, thumbSize),
+	}
 }
 
 // IGDBImageHost is the only host we accept for image URLs returned by

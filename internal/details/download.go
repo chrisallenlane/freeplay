@@ -45,15 +45,20 @@ func (c *Cache) downloadCoverPair(
 	details.CoverURL = localURL
 }
 
-// downloadImageSet downloads a batch of images (screenshots or artworks),
-// logging warnings for individual failures and returning the local URLs.
+// downloadImageSet downloads a batch of images (screenshots or artworks)
+// in both full-size and gallery-thumbnail variants, logging warnings for
+// individual failures and returning the local URLs. A failure to fetch
+// the full-size image drops the entry entirely; a failure to fetch the
+// thumbnail leaves ThumbURL empty so the frontend falls back to URL.
 func (c *Cache) downloadImageSet(
-	urls []string, cacheDir, urlBase, cleanName, prefix string,
-) []string {
-	var out []string
-	for i, u := range urls {
-		filename := fmt.Sprintf("%s_%d.jpg", prefix, i)
-		_, localURL, err := c.downloadImage(u, cacheDir, urlBase, filename)
+	refs []igdb.ImageRef, cacheDir, urlBase, cleanName, prefix string,
+) []igdb.ImageRef {
+	var out []igdb.ImageRef
+	for i, ref := range refs {
+		fullFilename := fmt.Sprintf("%s_%d.jpg", prefix, i)
+		_, localFullURL, err := c.downloadImage(
+			ref.URL, cacheDir, urlBase, fullFilename,
+		)
 		if err != nil {
 			slog.Warn(
 				"downloading "+prefix+" failed",
@@ -61,7 +66,22 @@ func (c *Cache) downloadImageSet(
 			)
 			continue
 		}
-		out = append(out, localURL)
+
+		local := igdb.ImageRef{URL: localFullURL}
+		if ref.ThumbURL != "" {
+			thumbFilename := fmt.Sprintf("%s_%d_thumb.jpg", prefix, i)
+			if _, localThumbURL, err := c.downloadImage(
+				ref.ThumbURL, cacheDir, urlBase, thumbFilename,
+			); err == nil {
+				local.ThumbURL = localThumbURL
+			} else {
+				slog.Warn(
+					"downloading "+prefix+" thumbnail failed",
+					"game", cleanName, "index", i, "error", err,
+				)
+			}
+		}
+		out = append(out, local)
 	}
 	return out
 }
