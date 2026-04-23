@@ -55,15 +55,15 @@ device patches (lightgun support). The individual source files in
 All API routes are internal to the frontend. They are not versioned and may
 change without notice.
 
-| Method | Path                                 | Description                                              |
-|--------|--------------------------------------|----------------------------------------------------------|
-| `GET`  | `/api/health`                        | Health check -- returns `{"status":"ok"}`                |
-| `GET`  | `/api/games`                         | Full game catalog (consoles + games list)                |
-| `GET`  | `/api/status`                        | IGDB fetch status (`{"fetchingDetails":bool,"igdbConfigured":bool}`) |
-| `GET`  | `/api/game-details`                  | IGDB metadata for a single game (`?console=&rom=`)       |
-| `POST` | `/api/rescan`                        | Trigger a ROM directory rescan                           |
-| `GET`  | `/api/saves/{console}/{game}/{type}` | Download a save file (`type`: `state` or `sram`)         |
-| `POST` | `/api/saves/{console}/{game}/{type}` | Upload a save file (64 MiB max)                          |
+| Method | Path                                 | Cache-Control              | Description                                              |
+|--------|--------------------------------------|----------------------------|----------------------------------------------------------|
+| `GET`  | `/api/health`                        | `no-store`                 | Health check -- returns `{"status":"ok"}`                |
+| `GET`  | `/api/games`                         | `no-store`                 | Full game catalog (consoles + games list)                |
+| `GET`  | `/api/status`                        | `no-store`                 | IGDB fetch status (`{"fetchingDetails":bool,"igdbConfigured":bool}`) |
+| `GET`  | `/api/game-details`                  | `private, max-age=300`     | IGDB metadata for a single game (`?console=&rom=`)       |
+| `POST` | `/api/rescan`                        | `no-store`                 | Trigger a ROM directory rescan                           |
+| `GET`  | `/api/saves/{console}/{game}/{type}` | `no-store`                 | Download a save file (`type`: `state` or `sram`)         |
+| `POST` | `/api/saves/{console}/{game}/{type}` | `no-store`                 | Upload a save file (64 MiB max)                          |
 
 ## Static file routes
 
@@ -71,15 +71,18 @@ change without notice.
 |---------------------------|--------------------------------|--------------------------------------------|
 | `/roms/{console}/{file}`  | Configured ROM directory       | `public, max-age=31536000, immutable`      |
 | `/bios/{console}`         | Configured BIOS file           | `public, max-age=31536000, immutable`      |
-| `/covers/{rest...}`       | `<data>/covers/`               | `public, max-age=31536000, immutable`      |
-| `/cache/igdb/{rest...}`   | `<data>/cache/igdb/`           | `public, max-age=31536000, immutable`      |
-| `/manuals/{rest...}`      | `<data>/manuals/`              | `public, max-age=31536000, immutable`      |
+| `/covers/{rest...}`       | `<data>/covers/`               | `public, max-age=31536000`                 |
+| `/cache/igdb/{rest...}`   | `<data>/cache/igdb/`           | `public, max-age=31536000`                 |
+| `/manuals/{rest...}`      | `<data>/manuals/`              | `public, max-age=31536000`                 |
 | `/emulatorjs/...`         | Embedded EmulatorJS assets     | `public, max-age=31536000, immutable`      |
 | `/details`                | Embedded details page          | `no-cache`                                 |
 | `/play`                   | Embedded player page           | `no-cache`                                 |
 | `/`                       | Embedded frontend (catch-all)  | `no-cache`                                 |
 
-ROMs, BIOS files, covers, cached IGDB images, and EmulatorJS assets are
-immutable or change infrequently, so they use aggressive long-cache headers.
+ROMs, BIOS files, and EmulatorJS assets use `immutable` because their URLs
+are stable and the bytes never change behind a given path. Covers, cached
+IGDB images, and manuals use a long max-age without `immutable` so browsers
+revalidate via `If-Modified-Since` once the TTL expires — these files can be
+rewritten after an IGDB rescan or a manual update without changing their URLs.
 The frontend, details page, and player page use `no-cache` so that
 redeployments are picked up immediately.

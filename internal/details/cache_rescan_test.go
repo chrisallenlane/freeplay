@@ -40,11 +40,14 @@ func TestFetchAllIdempotent(t *testing.T) {
 	}
 }
 
-// TestFetchAllAfterCacheCorruption verifies behavior when the cache
-// directory exists but details.json is deleted between FetchAll calls.
-// This simulates a transient filesystem issue that could cause the
-// re-scan loop in main.go to spin: FetchAll saves, triggers re-scan,
-// but isCached returns false on the next pass.
+// TestFetchAllAfterCacheCorruption verifies that on-disk corruption
+// between FetchAll calls does NOT cause an infinite re-scan spin.
+// The in-memory layer (PERF-4) memoizes the post-saveDetails state,
+// so a subsequent FetchAll with the same entries returns saved=0
+// regardless of whether details.json is still on disk. This is the
+// invariant that lets the scan→fetch→rescan loop in internal/library
+// terminate. A fresh Cache instance (e.g. after restart) would
+// re-fetch — that path is covered by TestFetchAllIdempotent.
 func TestFetchAllAfterCacheCorruption(t *testing.T) {
 	imgServer := startFakeImageServer(t)
 	coverURL := imgServer.URL + "/cover.jpg"
@@ -66,7 +69,8 @@ func TestFetchAllAfterCacheCorruption(t *testing.T) {
 		t.Fatalf("first FetchAll() = %d, want 1", count1)
 	}
 
-	// Corrupt the cache: remove details.json
+	// Corrupt the cache: remove details.json from disk. The in-memory
+	// layer should still report the game as cached on the next pass.
 	jsonPath := filepath.Join(
 		dir, "cache", "igdb", "NES", "Mega Man", "details.json",
 	)
@@ -74,27 +78,15 @@ func TestFetchAllAfterCacheCorruption(t *testing.T) {
 		t.Fatalf("removing details.json: %v", err)
 	}
 
-	// Also remove .notfound if present
-	notFoundPath := filepath.Join(
-		dir, "cache", "igdb", "NES", "Mega Man", ".notfound",
-	)
-	_ = os.Remove(notFoundPath)
-
-	// Second call: isCached returns false, so FetchAll tries again
+	// Second call: in-memory cache treats the game as cached; no fetch.
 	count2 := c.FetchAll(entries)
-	if count2 != 1 {
+	if count2 != 0 {
 		t.Errorf(
-			"FetchAll after cache corruption = %d, want 1 (re-fetched)",
+			"FetchAll after on-disk corruption = %d, want 0 "+
+				"(in-memory cache prevents re-fetch until restart)",
 			count2,
 		)
 	}
-
-	t.Logf(
-		"INFO: Cache corruption causes FetchAll to return saved > 0 again, "+
-			"which would trigger another re-scan cycle in main.go. "+
-			"Total fetches: %d",
-		fetcher.detailsCalls,
-	)
 }
 
 // TestFetchAllEmptyEntries verifies that FetchAll with an empty slice

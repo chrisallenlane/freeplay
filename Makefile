@@ -25,6 +25,11 @@ BUILD_FLAGS := -ldflags="-s -w -X github.com/chrisallenlane/freeplay.Version=$(V
 build: $(EMULATORJS_SENTINEL) | $(dist_dir)
 	$(GO) build $(BUILD_FLAGS) -o $(dist_dir)/freeplay $(cmd_dir)
 
+## build-debug: build with pprof exposed on 127.0.0.1:6060
+.PHONY: build-debug
+build-debug: $(EMULATORJS_SENTINEL) | $(dist_dir)
+	$(GO) build -tags debug -ldflags="-X github.com/chrisallenlane/freeplay.Version=$(VERSION)-debug" -mod vendor -o $(dist_dir)/freeplay-debug $(cmd_dir)
+
 ## run: build and run with test data
 .PHONY: run
 run: build
@@ -84,6 +89,11 @@ fuzz: $(EMULATORJS_SENTINEL)
 .PHONY: fuzz-long
 fuzz-long: $(EMULATORJS_SENTINEL)
 	@./test/fuzz.sh 10m
+
+## bench: run Go benchmarks (count=5 for benchstat-friendly output)
+.PHONY: bench
+bench: $(EMULATORJS_SENTINEL)
+	$(GO) test -run=^$$ -bench=. -benchmem -count=5 ./...
 
 ## a11y: run accessibility audit against live server
 .PHONY: a11y

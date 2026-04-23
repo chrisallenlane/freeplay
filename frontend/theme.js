@@ -1,17 +1,8 @@
-// Pre-DOM theme attribute set. Runs synchronously at script load so the
-// correct theme is applied before CSS paints — prevents a flash of the
-// wrong theme when a user has saved a non-default preference.
-(() => {
-	var saved =
-		typeof localStorage !== "undefined"
-			? localStorage.getItem("freeplay-theme")
-			: null;
-	if (typeof document === "undefined") return;
-	document.documentElement.dataset.theme =
-		saved ||
-		(matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-})();
-
+// initThemeToggle wires up the header theme-switch button. The
+// data-theme attribute itself is set by a small inline <script> in
+// each page's <head> so the correct theme is applied before CSS paints
+// — see PERF-10. This module is loaded with `defer` and only runs
+// after the DOM is ready.
 ((exports) => {
 	exports.initThemeToggle = () => {
 		const btn = document.getElementById("theme-toggle");

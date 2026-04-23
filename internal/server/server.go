@@ -15,7 +15,15 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
-const longCacheValue = "public, max-age=31536000, immutable"
+// longCacheImmutable is for content-addressed assets (URL changes when
+// bytes change) — browsers skip revalidation entirely.
+const longCacheImmutable = "public, max-age=31536000, immutable"
+
+// longCacheMutable is for static-ish files whose bytes may change
+// behind a stable URL (covers re-downloaded after an IGDB rescan,
+// operator-updated manuals). Browsers still cache aggressively but
+// revalidate via If-Modified-Since once the max-age expires.
+const longCacheMutable = "public, max-age=31536000"
 
 // DetailsCache serves locally-cached game metadata.
 type DetailsCache interface {
@@ -76,7 +84,10 @@ func New(
 		mux:           http.NewServeMux(),
 	}
 	s.routes()
-	s.handler = securityHeaders(s.mux)
+	// gzip is outermost so it sees all responses (including those
+	// emitted by securityHeaders short-circuits); securityHeaders
+	// stays inside so its headers apply to both paths.
+	s.handler = gzipMiddleware(securityHeaders(s.mux))
 	return s, nil
 }
 
@@ -144,7 +155,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /manuals/{rest...}", s.handleManuals)
 
 	// Embedded EmulatorJS — immutable cache; assets are embedded at build time
-	s.mux.Handle("/emulatorjs/", cacheControl(longCacheValue, http.StripPrefix("/emulatorjs/", noDirListing(s.emulatorjsSub, http.FileServerFS(s.emulatorjsSub)))))
+	s.mux.Handle("/emulatorjs/", cacheControl(longCacheImmutable, http.StripPrefix("/emulatorjs/", noDirListing(s.emulatorjsSub, http.FileServerFS(s.emulatorjsSub)))))
 
 	// Game details
 	s.mux.HandleFunc("GET /api/game-details", s.handleGameDetails)

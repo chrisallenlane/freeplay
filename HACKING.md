@@ -47,6 +47,8 @@ Run `make help` for the full list. The most useful targets:
 | `make a11y`          | Run pa11y + axe-core accessibility audit against live server |
 | `make fuzz`          | Run fuzz tests (15s each)               |
 | `make fuzz-long`     | Run fuzz tests (10m each)               |
+| `make bench`         | Run Go benchmarks (count=5)             |
+| `make build-debug`   | Build with pprof on 127.0.0.1:6060      |
 | `make audit`         | Scan deps (govulncheck) and source (gosec) for security issues |
 | `make vendor`        | Tidy and re-vendor Go dependencies      |
 | `make vendor-update` | Update all dependencies then re-vendor  |
@@ -97,6 +99,46 @@ To run with a different data directory:
 make build
 ./dist/freeplay -data /path/to/data
 ```
+
+## Benchmarks
+
+`make bench` runs the Go benchmarks with allocation reporting and
+`-count=5` so the output is suitable for `benchstat`. Targets focus on
+the scan / enrich / catalog pipeline and the IGDB details cache — the
+hot paths on constrained hardware.
+
+To compare two variants:
+
+```bash
+# baseline (before changes)
+make bench > /tmp/bench-before.txt
+# ...make changes...
+make bench > /tmp/bench-after.txt
+benchstat /tmp/bench-before.txt /tmp/bench-after.txt
+```
+
+## Profiling (debug build)
+
+`make build-debug` produces `dist/freeplay-debug` with `net/http/pprof`
+registered on a separate listener bound to `127.0.0.1:6060`. The
+standard binary does not expose pprof — the `//go:build debug` tag
+gates the entire registration — so production deployments remain
+clean.
+
+To capture a CPU profile during a representative workload (e.g. a
+manual rescan of a large library):
+
+```bash
+make build-debug
+./dist/freeplay-debug -data /path/to/large/library
+# in another terminal, trigger the workload, then:
+go tool pprof -http :8081 http://localhost:6060/debug/pprof/profile?seconds=30
+# or for an allocation profile:
+go tool pprof -http :8081 http://localhost:6060/debug/pprof/allocs
+```
+
+The listener binds only to `127.0.0.1`, never `0.0.0.0`, so LAN
+clients cannot reach it.
 
 ## External assets
 
