@@ -862,6 +862,40 @@ func TestCSRFHeaderValidation(t *testing.T) {
 	}
 }
 
+func TestPostSaveTooLargeReturns413(t *testing.T) {
+	srv, _ := testServer(t)
+
+	// 65 MiB — one byte over the 64 MiB MaxBytesReader cap
+	payload := bytes.Repeat([]byte{'a'}, 65<<20)
+	w := doRequest(
+		t, srv, http.MethodPost,
+		"/api/saves/NES/game1/state", bytes.NewReader(payload),
+	)
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("got status %d, want 413", w.Code)
+	}
+}
+
+func TestNewHTTPServerHasTimeouts(t *testing.T) {
+	srv, _ := testServer(t)
+	h := srv.newHTTPServer()
+	if h.ReadHeaderTimeout == 0 {
+		t.Error("ReadHeaderTimeout must be set (slowloris defense)")
+	}
+	if h.ReadTimeout == 0 {
+		t.Error("ReadTimeout must be set (slow-body defense)")
+	}
+	if h.WriteTimeout == 0 {
+		t.Error("WriteTimeout must be set")
+	}
+	if h.IdleTimeout == 0 {
+		t.Error("IdleTimeout must be set")
+	}
+	if h.MaxHeaderBytes == 0 || h.MaxHeaderBytes > 1<<16 {
+		t.Errorf("MaxHeaderBytes = %d, want a bounded value", h.MaxHeaderBytes)
+	}
+}
+
 func TestPostSaveInvalidType(t *testing.T) {
 	srv, _ := testServer(t)
 

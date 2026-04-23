@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"path/filepath"
 
@@ -104,6 +105,11 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, 64<<20) // 64 MB
 	if err := s.saves.Put(console, game, saveType, r.Body); err != nil {
+		var mb *http.MaxBytesError
+		if errors.As(err, &mb) {
+			http.Error(w, "save too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "save failed", http.StatusInternalServerError)
 		return
 	}

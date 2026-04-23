@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"time"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
@@ -77,10 +78,25 @@ func New(
 	return s, nil
 }
 
-// ListenAndServe starts the HTTP server.
+// ListenAndServe starts the HTTP server with production timeouts.
 func (s *Server) ListenAndServe() error {
-	addr := fmt.Sprintf(":%d", s.cfg.Port)
-	return http.ListenAndServe(addr, s.handler)
+	return s.newHTTPServer().ListenAndServe()
+}
+
+// newHTTPServer constructs the http.Server with explicit timeouts.
+// Timeouts defeat slow-body drip attacks (see SEC-1) that otherwise
+// pin heap memory per idle connection. WriteTimeout of 60s is generous
+// enough for a 64 MiB save upload over LAN.
+func (s *Server) newHTTPServer() *http.Server {
+	return &http.Server{
+		Addr:              fmt.Sprintf(":%d", s.cfg.Port),
+		Handler:           s.handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 14,
+	}
 }
 
 func securityHeaders(next http.Handler) http.Handler {
