@@ -100,6 +100,8 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
+	// #nosec G705 -- opaque binary save blob served as octet-stream;
+	// X-Content-Type-Options: nosniff is set globally by securityHeaders.
 	_, _ = w.Write(data)
 }
 

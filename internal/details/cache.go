@@ -88,6 +88,7 @@ func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
 		return nil
 	}
 
+	// #nosec G304 -- path-boundary enforced above by pathInside (SEC-3).
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil

@@ -145,6 +145,7 @@ func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
 	}
 
 	srcPath := filepath.Join(c.cacheDir(console, cleanName), "cover_thumb.jpg")
+	// #nosec G304 -- safePathSegment on console/nameNoExt/cleanName above (SEC-5).
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
 		return // no cached cover yet
