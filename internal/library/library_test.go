@@ -15,10 +15,11 @@ import (
 
 // stubCache counts FetchAll calls and returns a configurable saved value.
 type stubCache struct {
-	mu       sync.Mutex
-	calls    atomic.Int32
-	savedSeq []int // saved returned per call; last value is reused if calls > len
-	details  map[string]*igdb.GameDetails
+	mu             sync.Mutex
+	calls          atomic.Int32
+	savedSeq       []int // saved returned per call; last value is reused if calls > len
+	details        map[string]*igdb.GameDetails
+	lastEntriesLen int // length of the last entries slice passed to FetchAll
 }
 
 func (c *stubCache) Get(console, rom string) *igdb.GameDetails {
@@ -28,9 +29,10 @@ func (c *stubCache) Get(console, rom string) *igdb.GameDetails {
 	return c.details[console+"/"+rom]
 }
 
-func (c *stubCache) FetchAll(_ []igdb.GameEntry) int {
+func (c *stubCache) FetchAll(entries []igdb.GameEntry) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.lastEntriesLen = len(entries)
 	idx := int(c.calls.Add(1)) - 1
 	if idx >= len(c.savedSeq) {
 		idx = len(c.savedSeq) - 1
@@ -103,6 +105,22 @@ func TestRunPipelineBoundedAtMaxIterations(t *testing.T) {
 		t.Errorf(
 			"FetchAll calls = %d, want %d (bounded loop)",
 			got, maxRescanIterations,
+		)
+	}
+	// Assert the concrete value of maxRescanIterations is 3. This pins
+	// the loop's worst-case runtime so bumping the constant is a
+	// deliberate choice rather than a silent regression.
+	if maxRescanIterations != 3 {
+		t.Errorf("maxRescanIterations = %d, want 3", maxRescanIterations)
+	}
+	// Also assert that FetchAll received exactly as many entries as
+	// the catalog has games — guards against make([]GameEntry, N+1)
+	// slip that would pass zero-value entries through the pipeline.
+	wantEntries := len(scn.Catalog().Games)
+	if cache.lastEntriesLen != wantEntries {
+		t.Errorf(
+			"FetchAll entries length = %d, want %d",
+			cache.lastEntriesLen, wantEntries,
 		)
 	}
 }

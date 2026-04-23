@@ -259,8 +259,26 @@
       ]
     },
     "internal/library/library.go": {
-      "status": "pending",
-      "covering_tests": ["internal/library/library_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/library/library_test.go"],
+      "last_tested": "2026-04-23T17:20:00Z",
+      "mutations_applied": 21,
+      "killed": 20,
+      "survived_accepted": 1,
+      "mutation_score": 95.2,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Extended TestRunPipelineBoundedAtMaxIterations: asserts maxRescanIterations == 3 literally (kills const bump to 4) and asserts FetchAll received exactly len(Catalog.Games) entries (kills make(..., +1))",
+        "stubCache now records lastEntriesLen for assertion"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 90,
+          "mutation": "saved := 0 -> saved := 1",
+          "category": "structurally untestable without scanner mocking",
+          "reason": "Mutation is only observable when l.cache == nil (otherwise line 92 overwrites saved). With nil cache, mutated saved stays at 1 so the loop runs maxRescanIterations times instead of returning early. Observing this requires counting scanner.ScanBlocking calls, but scanner.Scanner is a concrete type (not an interface) in library.Library. Refactoring to inject a counter would add an abstraction purely for this mutation. Accepted."
+        }
+      ]
     },
     "internal/saves/saves.go": {
       "status": "pending",
