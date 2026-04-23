@@ -59,7 +59,7 @@ change without notice.
 |--------|--------------------------------------|----------------------------|----------------------------------------------------------|
 | `GET`  | `/api/health`                        | `no-store`                 | Health check -- returns `{"status":"ok"}`                |
 | `GET`  | `/api/games`                         | `no-store`                 | Full game catalog (consoles + games list)                |
-| `GET`  | `/api/status`                        | `no-store`                 | IGDB fetch status (`{"fetchingDetails":bool,"igdbConfigured":bool}`) |
+| `GET`  | `/api/status`                        | `no-store`                 | IGDB fetch status (`{"fetchingDetails":bool}`)           |
 | `GET`  | `/api/game-details`                  | `private, max-age=300`     | IGDB metadata for a single game (`?console=&rom=`)       |
 | `POST` | `/api/rescan`                        | `no-store`                 | Trigger a ROM directory rescan                           |
 | `GET`  | `/api/saves/{console}/{game}/{type}` | `no-store`                 | Download a save file (`type`: `state` or `sram`)         |

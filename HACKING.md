@@ -18,12 +18,13 @@ cmd/freeplay/       CLI entrypoint
 internal/
   atomicfile/       Atomic file writes
   config/           TOML config loading and validation
+  datadir/          Data-directory layout and path-safety primitives
   details/          IGDB details caching and fetch orchestration
   igdb/             IGDB API client, name cleaning, and variant generation
   library/          Scan → enrich → fetch pipeline coordinator
   saves/            Save-state persistence
   scanner/          ROM directory scanning and catalog building
-  server/           HTTP server and API routes
+  server/           HTTP server, routes, and middleware
 frontend/           Static HTML/JS/CSS served by the app
 emulatorjs/         EmulatorJS assets (gitignored, fetched at build time)
 vendor/             Go module vendor directory (do not modify)
