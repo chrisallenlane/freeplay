@@ -368,8 +368,50 @@
       ]
     },
     "internal/server/gzip.go": {
-      "status": "pending",
-      "covering_tests": ["internal/server/gzip_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/server/gzip_test.go"],
+      "last_tested": "2026-04-23T18:10:00Z",
+      "mutations_applied": 30,
+      "killed": 26,
+      "survived_accepted": 4,
+      "mutation_score": 86.7,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "TestShouldCompress extended with text/css and whitespace-padded content-type cases",
+        "TestGzipStripsUpstreamContentLength added — wraps the middleware around a handler that sets Content-Length, asserts it's removed on gzip response"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 102,
+          "mutation": "i != -1 -> i > -1",
+          "category": "equivalent mutant",
+          "reason": "strings.IndexByte returns -1 or a non-negative integer. Both `i != -1` and `i > -1` distinguish the same two cases."
+        },
+        {
+          "line": 48,
+          "mutation": "gz := gzipWriterPool.Get().(*gzip.Writer); gz.Reset(w) -> gz := gzip.NewWriter(w)",
+          "category": "equivalent for correctness",
+          "reason": "Pool reuse is a performance optimization; functional output is identical. Testing requires allocation profiling, not unit-level assertions."
+        },
+        {
+          "line": 53,
+          "mutation": "_ = gz.Close() -> gz.Close() (drop error discard)",
+          "category": "equivalent mutant",
+          "reason": "Both discard the error; the underscore is only a lint hint to humans."
+        },
+        {
+          "line": 55,
+          "mutation": "gzipWriterPool.Put(gz) -> (deleted)",
+          "category": "equivalent for correctness",
+          "reason": "Pool Put is a performance optimization (reuse the writer); not putting back causes GC to reclaim it. No functional difference observable at the response layer."
+        },
+        {
+          "line": 88,
+          "mutation": "g.ResponseWriter.WriteHeader(code) -> (deleted)",
+          "category": "equivalent for standard library behavior",
+          "reason": "net/http auto-calls WriteHeader(200) on the first Write() if the handler didn't. Explicit WriteHeader with a non-default code would differ, but in the gzip path the status has already been WriteHeader'd through the wrapper before this deletion site."
+        }
+      ]
     },
     "internal/server/handlers.go": {
       "status": "pending",

@@ -91,6 +91,33 @@ func TestGzipSkipsBinaryRoutes(t *testing.T) {
 	}
 }
 
+// TestGzipStripsUpstreamContentLength verifies that an upstream
+// Content-Length header from the inner handler is removed on compressed
+// responses — the compressed body length would not match the upstream
+// length and would break HTTP framing. Kills the statement-deletion
+// mutation of g.Header().Del("Content-Length").
+func TestGzipStripsUpstreamContentLength(t *testing.T) {
+	body := `{"hello":"world"}`
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Length", "17") // upstream-declared length
+		_, _ = io.WriteString(w, body)
+	})
+	wrapped := gzipMiddleware(inner)
+
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	w := httptest.NewRecorder()
+	wrapped.ServeHTTP(w, req)
+
+	if got := w.Header().Get("Content-Encoding"); got != "gzip" {
+		t.Fatalf("Content-Encoding = %q, want gzip", got)
+	}
+	if got := w.Header().Get("Content-Length"); got != "" {
+		t.Errorf("Content-Length should be stripped on gzip response, got %q", got)
+	}
+}
+
 // TestShouldCompress covers the content-type allowlist directly, making
 // sure charset suffixes are handled and unknown types pass through.
 func TestShouldCompress(t *testing.T) {
@@ -102,6 +129,9 @@ func TestShouldCompress(t *testing.T) {
 		{"application/json; charset=utf-8", true},
 		{"text/html", true},
 		{"text/html; charset=utf-8", true},
+		{"text/css", true},
+		{"text/css; charset=utf-8", true},
+		{" text/html ; charset=utf-8", true}, // leading/trailing whitespace around the type
 		{"image/png", false},
 		{"image/jpeg", false},
 		{"application/octet-stream", false},
