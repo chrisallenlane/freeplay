@@ -391,6 +391,28 @@ func TestGameDetailsMissingParams(t *testing.T) {
 	}
 }
 
+func TestGameDetailsPathTraversalBlocked(t *testing.T) {
+	srv, _ := testServer(t, &mockDetailsCache{})
+
+	// PoC from SEC-3 ticket: ../../tmp/evil/secret/details.json
+	tests := []string{
+		"/api/game-details?console=..&rom=x.nes",
+		"/api/game-details?console=NES&rom=..",
+		"/api/game-details?console=../../../tmp/evil&rom=secret.nes",
+		"/api/game-details?console=NES&rom=../../secret.nes",
+		"/api/game-details?console=NES%2F..&rom=x.nes",
+		"/api/game-details?console=NES&rom=x%00evil.nes",
+	}
+	for _, path := range tests {
+		t.Run(path, func(t *testing.T) {
+			w := doRequest(t, srv, http.MethodGet, path, nil)
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("got status %d, want 400", w.Code)
+			}
+		})
+	}
+}
+
 func TestGameDetailsCacheMiss404(t *testing.T) {
 	srv, _ := testServer(t, &mockDetailsCache{}) // cache returns nil for all Gets
 

@@ -124,6 +124,38 @@ func newGameFetcher(
 	}
 }
 
+// TestCacheGetRefusesPathsOutsideCacheDir pins the SEC-3 defense-in-depth:
+// even if the HTTP boundary validator is bypassed, Cache.Get must never
+// read a file outside CacheDir(dataDir).
+func TestCacheGetRefusesPathsOutsideCacheDir(t *testing.T) {
+	dir := t.TempDir()
+
+	// Plant a details.json-shaped file OUTSIDE the cache dir but
+	// still inside dataDir (reachable by a single ".." escape).
+	// The pre-fix code would have joined:
+	//   <dir>/cache/igdb/.. /evil/details.json
+	//     => <dir>/cache/evil/details.json
+	escapedDir := filepath.Join(dir, "cache", "evil")
+	if err := os.MkdirAll(escapedDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	planted := filepath.Join(escapedDir, "details.json")
+	if err := os.WriteFile(planted, []byte(`{"name":"LEAKED"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := New(dir, nil)
+
+	// Attack shape: console="..", romFilename="evil.nes". After
+	// igdb.CleanFilename, cleanName is "evil" — so detailsPath would
+	// be <dir>/cache/igdb/../evil/details.json which resolves to the
+	// planted file. Cache.Get must refuse the read.
+	result := c.Get("..", "evil.nes")
+	if result != nil {
+		t.Errorf("Cache.Get leaked planted file: Name=%q", result.Name)
+	}
+}
+
 func FuzzCacheGet(f *testing.F) {
 	f.Add("NES", "Mega Man.nes")
 	f.Add("", "")

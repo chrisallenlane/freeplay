@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -73,7 +74,9 @@ func (c *Cache) cacheDir(console, cleanName string) string {
 }
 
 // Get returns cached GameDetails for the given console and ROM filename,
-// or nil if not cached.
+// or nil if not cached. Defense-in-depth path-traversal check: refuses
+// to read any file outside CacheDir(dataDir), even if the HTTP boundary
+// validator (server.safeName) is bypassed.
 func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
 	_, cleanName := igdb.CleanFilename(romFilename)
 	if cleanName == "" {
@@ -81,6 +84,10 @@ func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
 	}
 
 	path := c.detailsPath(console, cleanName)
+	if !pathInside(path, CacheDir(c.dataDir)) {
+		return nil
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -91,6 +98,15 @@ func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
 		return nil
 	}
 	return &d
+}
+
+// pathInside reports whether the cleaned child path is rooted under
+// the cleaned parent directory. The same check used by server.serveSecureFile.
+func pathInside(child, parent string) bool {
+	cleanChild := filepath.Clean(child)
+	cleanParent := filepath.Clean(parent)
+	return cleanChild == cleanParent ||
+		strings.HasPrefix(cleanChild, cleanParent+string(filepath.Separator))
 }
 
 // FetchAll populates the cache for any games not yet cached.
