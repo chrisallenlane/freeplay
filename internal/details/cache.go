@@ -3,6 +3,7 @@ package details
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -32,7 +33,24 @@ func New(dataDir string, fetcher igdbFetcher) *Cache {
 	return &Cache{
 		dataDir: dataDir,
 		fetcher: fetcher,
-		client:  &http.Client{Timeout: 30 * time.Second},
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+			// Block redirects that would leave images.igdb.com — a
+			// compromised or spoofed IGDB could otherwise redirect image
+			// fetches to attacker-controlled hosts, bypassing the
+			// scheme/host check in igdb.transformImageURL.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if req.URL.Host != igdb.IGDBImageHost {
+					return fmt.Errorf(
+						"blocked cross-host redirect to %s", req.URL.Host,
+					)
+				}
+				if len(via) >= 10 {
+					return http.ErrUseLastResponse
+				}
+				return nil
+			},
+		},
 	}
 }
 

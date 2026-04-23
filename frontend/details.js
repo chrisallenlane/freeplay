@@ -105,9 +105,10 @@
 		}
 		meta.appendChild(table);
 
-		if (details?.igdbUrl) {
+		const igdbHref = FP.safeExternalHref(details?.igdbUrl);
+		if (igdbHref) {
 			const a = FP.el("a", "details-link", "View on IGDB");
-			a.href = details.igdbUrl;
+			a.href = igdbHref;
 			meta.appendChild(a);
 		}
 

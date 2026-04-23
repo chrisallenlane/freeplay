@@ -93,12 +93,13 @@ func FuzzTransformImageURL(f *testing.F) {
 
 		result := transformImageURL(rawURL, size)
 
-		// If the input starts with "//", output must start with "https:".
-		if strings.HasPrefix(rawURL, "//") &&
-			!strings.HasPrefix(result, "https:") {
+		// Invariant: output is either empty (rejected) or a full HTTPS
+		// URL whose host is exactly images.igdb.com. Any other shape
+		// would indicate the SSRF mitigation is broken.
+		if result != "" && !strings.HasPrefix(result, "https://"+IGDBImageHost+"/") {
 			t.Errorf(
-				"transformImageURL(%q, %q) = %q: want https: prefix",
-				rawURL, size, result,
+				"transformImageURL(%q, %q) = %q: want empty or https://%s/ prefix",
+				rawURL, size, result, IGDBImageHost,
 			)
 		}
 
@@ -569,6 +570,91 @@ func FuzzStripDiacritics(f *testing.F) {
 			)
 		}
 	})
+}
+
+func TestTransformImageURLRejectsUntrustedHosts(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"protocol-relative igdb host", "//images.igdb.com/igdb/image/upload/t_thumb/abc.jpg", "https://images.igdb.com/igdb/image/upload/t_original/abc.jpg"},
+		{"https igdb host", "https://images.igdb.com/igdb/image/upload/t_thumb/abc.jpg", "https://images.igdb.com/igdb/image/upload/t_original/abc.jpg"},
+		{"http attacker ssrf", "http://127.0.0.1:9999/secret", ""},
+		{"cloud metadata", "http://169.254.169.254/latest/meta-data/", ""},
+		{"file scheme", "file:///etc/passwd", ""},
+		{"javascript scheme", "javascript:alert(1)", ""},
+		{"protocol-relative attacker", "//attacker.example/foo.jpg", ""},
+		{"https attacker host", "https://attacker.example/foo.jpg", ""},
+		{"empty", "", ""},
+		{"bare images host no path", "https://images.igdb.com", ""},
+		{"host-prefix lookalike", "https://images.igdb.com.evil.example/x.jpg", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := transformImageURL(tt.in, "t_original")
+			if got != tt.want {
+				t.Errorf("transformImageURL(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSafeIGDBInfoURLRejectsNonHTTPSIGDB(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"valid igdb info", "https://www.igdb.com/games/mega-man", "https://www.igdb.com/games/mega-man"},
+		{"javascript xss", "javascript:alert(1)", ""},
+		{"data uri", "data:text/html,<script>alert(1)</script>", ""},
+		{"http attacker", "http://attacker.example/", ""},
+		{"https attacker", "https://attacker.example/", ""},
+		{"host-prefix lookalike", "https://www.igdb.com.evil.example/", ""},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := safeIGDBInfoURL(tt.in)
+			if got != tt.want {
+				t.Errorf("safeIGDBInfoURL(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGameDetailsFromIGDBRejectsJavaScriptURL(t *testing.T) {
+	g := igdbGame{
+		Name: "X",
+		URL:  "javascript:fetch('/api/saves')",
+	}
+	d := gameDetailsFromIGDB(g)
+	if d.IGDBURL != "" {
+		t.Errorf("IGDBURL = %q, want empty (javascript: rejected)", d.IGDBURL)
+	}
+}
+
+func TestGameDetailsFromIGDBFiltersUntrustedImageHosts(t *testing.T) {
+	g := igdbGame{Name: "X"}
+	g.Cover.URL = "http://127.0.0.1:9999/secret"
+	g.Screenshots = []struct {
+		URL string `json:"url"`
+	}{{URL: "//attacker.example/s.jpg"}, {URL: "//images.igdb.com/igdb/image/upload/t_thumb/s.jpg"}}
+	g.Artworks = []struct {
+		URL string `json:"url"`
+	}{{URL: "file:///etc/passwd"}}
+
+	d := gameDetailsFromIGDB(g)
+	if d.CoverURL != "" {
+		t.Errorf("CoverURL = %q, want empty (untrusted host rejected)", d.CoverURL)
+	}
+	if len(d.Screenshots) != 1 {
+		t.Errorf("Screenshots = %v, want 1 (igdb-host) item", d.Screenshots)
+	}
+	if len(d.Artworks) != 0 {
+		t.Errorf("Artworks = %v, want empty", d.Artworks)
+	}
 }
 
 // FuzzGameDetailsFromIGDB verifies that gameDetailsFromIGDB never panics on

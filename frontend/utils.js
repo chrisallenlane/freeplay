@@ -19,6 +19,21 @@ if (typeof module !== "undefined") {
 	// OS setting mid-session.
 	exports.prefersReducedMotion = () =>
 		window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+	// safeExternalHref returns u if it parses as a valid https: URL, or
+	// null otherwise. Defense-in-depth backstop for IGDB javascript:
+	// XSS (SEC-2 / H-2): the server-side safeIGDBInfoURL is the primary
+	// control, but this catches any regression that reaches the DOM.
+	exports.safeExternalHref = (u) => {
+		if (typeof u !== "string") return null;
+		try {
+			const parsed = new URL(u);
+			if (parsed.protocol === "https:") return u;
+		} catch {
+			// malformed URL — fall through
+		}
+		return null;
+	};
 })(
 	typeof module !== "undefined"
 		? (module.exports = globalThis.Freeplay = globalThis.Freeplay || {})
