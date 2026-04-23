@@ -441,6 +441,36 @@ func TestCatalogJSONOmitempty(t *testing.T) {
 	}
 }
 
+// TestHasGameAfterEnrichMetadata pins the invariant that HasGame's
+// O(1) lookup index (Catalog.gameSet) is carried across every path
+// that publishes a new Catalog. EnrichMetadata constructs a fresh
+// Catalog post-scan; a regression where it forgot to rebuild the
+// index would make save-upload handlers 404 on every request in
+// production, since the library pipeline always calls EnrichMetadata
+// after the initial scan.
+func TestHasGameAfterEnrichMetadata(t *testing.T) {
+	dir, cfg := setupTestDir(t)
+	s := New(cfg, dir)
+	s.ScanBlocking()
+
+	// Sanity-check: scanned games are present before enrichment.
+	if !s.HasGame("NES", "Mega Man.zip") {
+		t.Fatal("pre-enrichment HasGame(NES, Mega Man.zip) = false, want true")
+	}
+
+	// Run EnrichMetadata with a stub lookup — it must preserve the index.
+	s.EnrichMetadata(func(_, _ string) *GameMeta { return nil })
+
+	for _, g := range s.catalog.Load().Games {
+		if !s.HasGame(g.Console, g.Filename) {
+			t.Errorf(
+				"post-enrichment HasGame(%q, %q) = false, want true",
+				g.Console, g.Filename,
+			)
+		}
+	}
+}
+
 func TestParseYear(t *testing.T) {
 	tests := []struct {
 		name  string

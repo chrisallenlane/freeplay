@@ -21,13 +21,25 @@ type Game struct {
 }
 
 // Catalog is the full game library served by GET /api/games.
-// games is the canonical list served to clients; gameSet is a
-// derived index that backs HasGame in O(1) — populated in scan()
-// alongside games so the two swap atomically via atomic.Pointer.
+// Games is the canonical list served to clients; gameSet is a derived
+// index that backs HasGame in O(1). Both are published atomically via
+// atomic.Pointer on the Scanner. Use newCatalog so the two never drift.
 type Catalog struct {
 	Consoles []string            `json:"consoles"`
 	Games    []Game              `json:"games"`
 	gameSet  map[string]struct{} `json:"-"`
+}
+
+// newCatalog builds a Catalog with a freshly-indexed gameSet matching
+// the given games slice. Shared by scan() (first construction) and
+// EnrichMetadata (replacement after lookup-based enrichment) so the
+// index always tracks the slice.
+func newCatalog(consoles []string, games []Game) *Catalog {
+	set := make(map[string]struct{}, len(games))
+	for i := range games {
+		set[games[i].Console+"/"+games[i].Filename] = struct{}{}
+	}
+	return &Catalog{Consoles: consoles, Games: games, gameSet: set}
 }
 
 // DetailsLookup returns cached IGDB metadata for a game. The returned struct
@@ -69,10 +81,10 @@ func (s *Scanner) CatalogJSON() ([]byte, error) {
 // each game in the catalog using the provided lookup function.
 func (s *Scanner) EnrichMetadata(lookup DetailsLookup) {
 	cat := s.catalog.Load()
-	enriched := &Catalog{Consoles: cat.Consoles, Games: make([]Game, len(cat.Games))}
-	copy(enriched.Games, cat.Games)
-	for i := range enriched.Games {
-		g := &enriched.Games[i]
+	games := make([]Game, len(cat.Games))
+	copy(games, cat.Games)
+	for i := range games {
+		g := &games[i]
 		meta := lookup(g.Console, g.Filename)
 		if meta == nil {
 			continue
@@ -88,7 +100,7 @@ func (s *Scanner) EnrichMetadata(lookup DetailsLookup) {
 		}
 		g.Year = parseYear(meta.FirstReleaseDate)
 	}
-	s.catalog.Store(enriched)
+	s.catalog.Store(newCatalog(cat.Consoles, games))
 }
 
 // parseYear extracts the four-digit year from an ISO 8601 date string
