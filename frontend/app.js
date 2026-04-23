@@ -48,8 +48,26 @@
 		focusedKey = null;
 		hoveredKey = null;
 		blurActiveCard();
+
+		// Preserve keyboard focus across the filter rebuild: without this,
+		// focus falls to <body> and the user must Tab back from the top.
+		const activeFilterLabel = document.activeElement?.classList.contains(
+			"filter-btn",
+		)
+			? document.activeElement.textContent
+			: null;
+
 		renderFilters();
 		renderGrid();
+
+		if (activeFilterLabel) {
+			for (const btn of filtersBar.querySelectorAll(".filter-btn")) {
+				if (btn.textContent === activeFilterLabel) {
+					btn.focus();
+					break;
+				}
+			}
+		}
 	}
 
 	function addFilterBtn(label, isActive, onClick) {
