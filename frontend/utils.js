@@ -14,6 +14,11 @@ if (typeof module !== "undefined") {
 		exports.initThemeToggle();
 		return { consoleName, rom, gameName };
 	};
+
+	// Called per-invocation rather than cached: the user may toggle the
+	// OS setting mid-session.
+	exports.prefersReducedMotion = () =>
+		window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 })(
 	typeof module !== "undefined"
 		? (module.exports = globalThis.Freeplay = globalThis.Freeplay || {})
