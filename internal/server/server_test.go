@@ -38,23 +38,10 @@ func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
 	dir := t.TempDir()
 
 	romDir := filepath.Join(dir, "roms", "NES")
-	if err := os.MkdirAll(romDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"), 0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
+	writeTestFile(t, filepath.Join(romDir, "Mega Man.nes"), []byte("romdata"))
 
-	biosDir := filepath.Join(dir, "bios")
-	if err := os.MkdirAll(biosDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	biosFile := filepath.Join(biosDir, "scph1001.bin")
-	if err := os.WriteFile(biosFile, []byte("biosdata"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	biosFile := filepath.Join(dir, "bios", "scph1001.bin")
+	writeTestFile(t, biosFile, []byte("biosdata"))
 
 	cfg := &config.Config{
 		Port: 8080,
@@ -84,23 +71,32 @@ func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
 	return srv, dir
 }
 
-// writeCacheFile creates a cache/igdb/<console>/<game>/<filename> file inside
-// dataDir, creating all parent directories. It fails the test on any error.
+// writeTestFile writes content to path, creating all parent
+// directories first. Fails the test on any error.
+func writeTestFile(t *testing.T, path string, content []byte) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// writeCacheFile creates a cache/igdb/<console>/<game>/<filename> file
+// inside dataDir. Thin wrapper around writeTestFile that encodes the
+// IGDB cache directory layout.
 func writeCacheFile(
 	t *testing.T,
 	dataDir, console, game, filename string,
 	content []byte,
 ) {
 	t.Helper()
-	cacheDir := filepath.Join(dataDir, "cache", "igdb", console, game)
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(cacheDir, filename), content, 0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
+	writeTestFile(
+		t,
+		filepath.Join(dataDir, "cache", "igdb", console, game, filename),
+		content,
+	)
 }
 
 // doRequest issues method+path against srv.handler and returns the recorder.
@@ -312,13 +308,7 @@ func TestRescanEndpoint(t *testing.T) {
 func TestCoversServing(t *testing.T) {
 	srv, dir := testServer(t)
 
-	coverDir := filepath.Join(dir, "covers", "NES")
-	if err := os.MkdirAll(coverDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(coverDir, "Mega Man.png"), []byte("pngdata"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeTestFile(t, filepath.Join(dir, "covers", "NES", "Mega Man.png"), []byte("pngdata"))
 
 	w := doRequest(t, srv, http.MethodGet, "/covers/NES/Mega%20Man.png", nil)
 	if w.Code != 200 {
@@ -335,13 +325,7 @@ func TestCoversServing(t *testing.T) {
 func TestManualsServing(t *testing.T) {
 	srv, dir := testServer(t)
 
-	manualDir := filepath.Join(dir, "manuals", "NES")
-	if err := os.MkdirAll(manualDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(manualDir, "Mega Man.pdf"), []byte("pdfdata"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeTestFile(t, filepath.Join(dir, "manuals", "NES", "Mega Man.pdf"), []byte("pdfdata"))
 
 	w := doRequest(t, srv, http.MethodGet, "/manuals/NES/Mega%20Man.pdf", nil)
 	if w.Code != 200 {
@@ -482,9 +466,7 @@ func TestSavePathTraversalBlocked(t *testing.T) {
 
 	// Create a sentinel file outside the saves directory
 	sentinel := filepath.Join(dir, "secret")
-	if err := os.WriteFile(sentinel, []byte("sensitive"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeTestFile(t, sentinel, []byte("sensitive"))
 
 	tests := []struct {
 		name   string

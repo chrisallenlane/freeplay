@@ -1,7 +1,6 @@
 package details
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -298,20 +297,10 @@ func TestGet_CacheHit(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, nil)
 
-	details := &igdb.GameDetails{
+	seedCachedDetails(t, dir, "NES", "Mega Man", &igdb.GameDetails{
 		Name:    "Mega Man",
 		Summary: "A platformer.",
-	}
-	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Mega Man")
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	data, _ := json.Marshal(details)
-	if err := os.WriteFile(
-		filepath.Join(cacheDir, "details.json"), data, 0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
+	})
 
 	got := c.Get("NES", "Mega Man (USA).nes")
 	if got == nil {
@@ -353,16 +342,8 @@ func TestGet_ServesFromMemoryAfterDiskDelete(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, nil)
 
-	details := &igdb.GameDetails{Name: "Mega Man"}
-	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Mega Man")
-	if err := os.MkdirAll(cacheDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	jsonPath := filepath.Join(cacheDir, "details.json")
-	data, _ := json.Marshal(details)
-	if err := os.WriteFile(jsonPath, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	seedCachedDetails(t, dir, "NES", "Mega Man", &igdb.GameDetails{Name: "Mega Man"})
+	jsonPath := filepath.Join(CacheDir(dir), "NES", "Mega Man", "details.json")
 
 	// Prime the in-memory layer via a disk read.
 	if got := c.Get("NES", "Mega Man (USA).nes"); got == nil || got.Name != "Mega Man" {
@@ -386,14 +367,8 @@ func TestGet_NegativeCacheMemoizesNotFound(t *testing.T) {
 	dir := t.TempDir()
 	c := New(dir, nil)
 
-	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Unknown")
-	if err := os.MkdirAll(cacheDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	notFoundPath := filepath.Join(cacheDir, ".notfound")
-	if err := os.WriteFile(notFoundPath, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	seedNotFound(t, dir, "NES", "Unknown")
+	notFoundPath := filepath.Join(CacheDir(dir), "NES", "Unknown", ".notfound")
 
 	if got := c.Get("NES", "Unknown.nes"); got != nil {
 		t.Fatalf("first Get = %+v, want nil", got)
@@ -470,16 +445,7 @@ func TestFetchAll_SkipsExisting(t *testing.T) {
 	c := New(dir, fetcher)
 
 	// Pre-create the cache entry
-	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Mega Man")
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(cacheDir, "details.json"),
-		[]byte(`{"name":"Mega Man"}`), 0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
+	seedCachedDetails(t, dir, "NES", "Mega Man", &igdb.GameDetails{Name: "Mega Man"})
 
 	count := c.FetchAll([]igdb.GameEntry{
 		{Console: "NES", Filename: "Mega Man (USA).nes"},

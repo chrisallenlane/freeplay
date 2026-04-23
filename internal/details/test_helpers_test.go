@@ -1,11 +1,50 @@
 package details
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
+
+// seedCachedDetails writes a details.json file into the cache at the
+// canonical layout for the given (console, cleanName). Creates parent
+// directories. Fails the test on any error.
+func seedCachedDetails(
+	t *testing.T,
+	dataDir, console, cleanName string,
+	d *igdb.GameDetails,
+) {
+	t.Helper()
+	dir := filepath.Join(CacheDir(dataDir), console, cleanName)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "details.json"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// seedNotFound writes the .notfound marker for (console, cleanName).
+// Creates parent directories. Fails the test on any error.
+func seedNotFound(t *testing.T, dataDir, console, cleanName string) {
+	t.Helper()
+	dir := filepath.Join(CacheDir(dataDir), console, cleanName)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".notfound"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
 
 // startImageServerWith starts an httptest.Server using handler and registers
 // t.Cleanup(srv.Close). Use this when the test needs a custom handler.
