@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-	"path"
-	"strings"
 	"time"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
@@ -110,98 +108,4 @@ func (s *Server) newHTTPServer() *http.Server {
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    1 << 14,
 	}
-}
-
-func securityHeaders(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("Referrer-Policy", "same-origin")
-
-		// Reject cross-origin POST requests. A custom header forces a CORS
-		// preflight that the server will not grant, so browsers block the
-		// request before it is sent.
-		if r.Method == http.MethodPost && r.Header.Get("X-Requested-With") != "freeplay" {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (s *Server) routes() {
-	// Every non-idempotent or live-state /api/* route must never be
-	// heuristic-cached by browsers. Wrap at registration time so
-	// handlers stay focused on their response bodies.
-	noStore := func(h http.HandlerFunc) http.Handler {
-		return cacheControl("no-store", h)
-	}
-
-	// API routes
-	s.mux.Handle("GET /api/health", noStore(s.handleHealth))
-	s.mux.Handle("GET /api/games", noStore(s.handleGames))
-	s.mux.Handle("GET /api/saves/{console}/{game}/{type}", noStore(s.handleGetSave))
-	s.mux.Handle("POST /api/saves/{console}/{game}/{type}", noStore(s.handlePostSave))
-	s.mux.Handle("POST /api/rescan", noStore(s.handleRescan))
-	s.mux.Handle("GET /api/status", noStore(s.handleStatus))
-
-	// ROM serving
-	s.mux.HandleFunc("GET /roms/{console}/{file}", s.handleROM)
-
-	// BIOS serving
-	s.mux.HandleFunc("GET /bios/{console}", s.handleBIOS)
-
-	// Cover art serving
-	s.mux.HandleFunc("GET /covers/{rest...}", s.handleCovers)
-
-	// Cached IGDB images
-	s.mux.HandleFunc("GET /cache/igdb/{rest...}", s.handleCacheFiles)
-
-	// Manual serving
-	s.mux.HandleFunc("GET /manuals/{rest...}", s.handleManuals)
-
-	// Embedded EmulatorJS — immutable cache; assets are embedded at build time
-	s.mux.Handle("/emulatorjs/", cacheControl(longCacheImmutable, http.StripPrefix("/emulatorjs/", noDirListing(s.emulatorjsSub, http.FileServerFS(s.emulatorjsSub)))))
-
-	// Game details
-	s.mux.HandleFunc("GET /api/game-details", s.handleGameDetails)
-	s.mux.HandleFunc("GET /details", s.servePage("details.html"))
-
-	// Player page (explicit route before catch-all)
-	s.mux.HandleFunc("GET /play", s.servePage("play.html"))
-
-	// Embedded frontend (catch-all) — no-cache so deploys are picked up immediately
-	s.mux.Handle("/", cacheControl("no-cache", noDirListing(s.frontendSub, http.FileServerFS(s.frontendSub))))
-}
-
-// noDirListing wraps next so that requests whose URL path resolves to
-// a directory in fsys return 404 unless an index.html sits inside
-// that directory. Stops http.FileServerFS from emitting clickable
-// directory listings that leak EmulatorJS version / bundled cores
-// (see SEC-6 / L-1).
-func noDirListing(fsys fs.FS, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// path.Clean strips trailing slashes and normalizes to a
-		// path that fs.ValidPath accepts (fs.Stat rejects trailing /).
-		name := path.Clean(strings.TrimPrefix(r.URL.Path, "/"))
-		if name == "" {
-			name = "."
-		}
-		info, err := fs.Stat(fsys, name)
-		if err == nil && info.IsDir() {
-			if _, err := fs.Stat(fsys, path.Join(name, "index.html")); err != nil {
-				http.NotFound(w, r)
-				return
-			}
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func cacheControl(value string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", value)
-		next.ServeHTTP(w, r)
-	})
 }
