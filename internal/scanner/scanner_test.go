@@ -287,6 +287,20 @@ func TestEnrichMetadata(t *testing.T) {
 	if len(cat.Games) != 3 {
 		t.Fatalf("expected 3 games after enrichment, got %d", len(cat.Games))
 	}
+	// Consoles list must be preserved by EnrichMetadata — it's used by
+	// the frontend for the console-filter dropdown. Kills a mutation
+	// that would replace cat.Consoles with []string{} at the store site.
+	if len(cat.Consoles) == 0 {
+		t.Errorf("EnrichMetadata dropped Consoles list; got empty")
+	}
+	// The accessor Scanner.Catalog() must return the same catalog the
+	// internal atomic pointer holds — kills a mutation that returns nil.
+	if got := s.Catalog(); got == nil {
+		t.Errorf("Scanner.Catalog() returned nil after ScanBlocking + EnrichMetadata")
+	} else if len(got.Games) != len(cat.Games) {
+		t.Errorf("Scanner.Catalog() games length = %d, want %d",
+			len(got.Games), len(cat.Games))
+	}
 
 	found := false
 	for _, g := range cat.Games {

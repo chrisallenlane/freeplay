@@ -295,8 +295,37 @@
       ]
     },
     "internal/scanner/catalog.go": {
-      "status": "pending",
-      "covering_tests": ["internal/scanner/scanner_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/scanner/scanner_test.go"],
+      "last_tested": "2026-04-23T17:45:00Z",
+      "mutations_applied": 28,
+      "killed": 25,
+      "survived_accepted": 3,
+      "mutation_score": 89.3,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Extended TestEnrichMetadata to assert Consoles list is preserved post-enrichment and that Scanner.Catalog() accessor returns non-nil"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 38,
+          "mutation": "make(map[string]struct{}, len(games)) -> len(games)+1",
+          "category": "equivalent mutant",
+          "reason": "Map capacity hint; over-allocating by one doesn't affect functional correctness, only allocation efficiency."
+        },
+        {
+          "line": 95,
+          "mutation": "len(meta.Developers) > 0 -> >= 0",
+          "category": "equivalent mutant for observable output",
+          "reason": "Original assigns only if non-empty; mutated always assigns. For nil-vs-empty slice, JSON omitempty treats them identically. Observable output (JSON, frontend) is unchanged."
+        },
+        {
+          "line": 98,
+          "mutation": "len(meta.Publishers) > 0 -> >= 0",
+          "category": "equivalent mutant for observable output",
+          "reason": "Same as line 95."
+        }
+      ]
     },
     "internal/scanner/scanner.go": {
       "status": "pending",
