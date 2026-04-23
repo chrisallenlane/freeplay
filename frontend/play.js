@@ -77,18 +77,7 @@
 				const res = await fetch(`${saveBase}/sram`);
 				if (res.ok) {
 					const buf = await res.arrayBuffer();
-					const gm = window.EJS_emulator.gameManager;
-					const path = gm.getSaveFilePath();
-					const parts = path.split("/");
-					let cp = "";
-					for (let i = 0; i < parts.length - 1; i++) {
-						if (parts[i] === "") continue;
-						cp += `/${parts[i]}`;
-						if (!gm.FS.analyzePath(cp).exists) gm.FS.mkdir(cp);
-					}
-					if (gm.FS.analyzePath(path).exists) gm.FS.unlink(path);
-					gm.FS.writeFile(path, new Uint8Array(buf));
-					gm.loadSaveFiles();
+					FP.restoreSaveToFS(window.EJS_emulator.gameManager, buf);
 				}
 			} catch (err) {
 				console.error("SRAM restore failed:", err);

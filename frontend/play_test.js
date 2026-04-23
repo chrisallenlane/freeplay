@@ -1,25 +1,13 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 
-// The SRAM restore logic from play.js (lines 101-114) is reproduced here
-// in a testable form. This is the exact algorithm used to create directories
-// and write save data to the emulator's virtual filesystem.
-//
-// Original code:
-//   const path = gm.getSaveFilePath();
-//   const parts = path.split("/");
-//   let cp = "";
-//   for (let i = 0; i < parts.length - 1; i++) {
-//       if (parts[i] === "") continue;
-//       cp += `/${parts[i]}`;
-//       if (!gm.FS.analyzePath(cp).exists) gm.FS.mkdir(cp);
-//   }
-//   if (gm.FS.analyzePath(path).exists) gm.FS.unlink(path);
-//   gm.FS.writeFile(path, new Uint8Array(buf));
-//   gm.loadSaveFiles();
+// restoreSaveToFS is the pure SRAM-restore helper extracted from play.js.
+// play.js calls FP.restoreSaveToFS(gm, buf) so these tests exercise the
+// same code path the browser runs.
+const FP = require("./sram.js");
 
-// Simulate the SRAM restore flow exactly as play.js does it, returning
-// a log of FS operations performed.
+// Drive FP.restoreSaveToFS against an in-memory gameManager stub and
+// return the log of FS operations performed.
 function simulateRestore(path, existingPaths, buf) {
 	const ops = [];
 	const known = new Set(existingPaths || []);
@@ -46,17 +34,7 @@ function simulateRestore(path, existingPaths, buf) {
 		},
 	};
 
-	// Exact reproduction of play.js lines 103-114
-	const parts = path.split("/");
-	let cp = "";
-	for (let i = 0; i < parts.length - 1; i++) {
-		if (parts[i] === "") continue;
-		cp += `/${parts[i]}`;
-		if (!gm.FS.analyzePath(cp).exists) gm.FS.mkdir(cp);
-	}
-	if (gm.FS.analyzePath(path).exists) gm.FS.unlink(path);
-	gm.FS.writeFile(path, new Uint8Array(buf));
-	gm.loadSaveFiles();
+	FP.restoreSaveToFS(gm, buf);
 
 	return { ops, known };
 }

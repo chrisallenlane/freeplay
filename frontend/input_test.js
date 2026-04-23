@@ -96,4 +96,21 @@ describe("readGamepadAction", () => {
 		const gp = { buttons: [{ pressed: false }], axes: [0, 0] };
 		assert.equal(FP.readGamepadAction(gp), null);
 	});
+
+	// Axis deadband boundary: the threshold is strict (< -0.5 or > 0.5).
+	// A value exactly at -0.5 or 0.5 must NOT trigger. Kills `< -0.5`
+	// -> `<= -0.5` and `> 0.5` -> `>= 0.5` mutations.
+	it("exact -0.5 axis value is below threshold (strict less-than)", () => {
+		const gpY = makeGamepad((g) => (g.axes = [0, -0.5]));
+		assert.equal(FP.readGamepadAction(gpY), null);
+		const gpX = makeGamepad((g) => (g.axes = [-0.5, 0]));
+		assert.equal(FP.readGamepadAction(gpX), null);
+	});
+
+	it("exact 0.5 axis value is below threshold (strict greater-than)", () => {
+		const gpY = makeGamepad((g) => (g.axes = [0, 0.5]));
+		assert.equal(FP.readGamepadAction(gpY), null);
+		const gpX = makeGamepad((g) => (g.axes = [0.5, 0]));
+		assert.equal(FP.readGamepadAction(gpX), null);
+	});
 });

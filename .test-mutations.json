@@ -593,12 +593,46 @@
       "reason": "Page controller for the details page. No Node-runnable test file — DOM-dependent. Same rationale as frontend/app.js."
     },
     "frontend/input.js": {
-      "status": "pending",
-      "covering_tests": ["frontend/input_test.js"]
+      "status": "completed",
+      "covering_tests": ["frontend/input_test.js"],
+      "last_tested": "2026-04-23T19:55:00Z",
+      "mutations_applied": 19,
+      "killed": 18,
+      "survived_accepted": 5,
+      "mutation_score": 73.7,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added exact-threshold tests for axis deadband boundaries (-0.5 and 0.5). Kills the `<`/`<=` and `>`/`>=` mutations on axis comparisons."
+      ],
+      "accepted_survivors": [
+        {
+          "line": 51,
+          "mutation": "REPEAT_DELAY = 180 -> 179",
+          "category": "time-dependent, untested in unit scope",
+          "reason": "REPEAT_DELAY is the gamepad key-repeat interval used inside gamepadLoop. Testing requires time control (fake timers) and requestAnimationFrame mocking, not available in the plain node --test scope."
+        },
+        {
+          "line": 75,
+          "mutation": "gamepadLoop debounce state mutations (action === null, now - heldLastFired >= REPEAT_DELAY, gamepadCount++/--)",
+          "category": "DOM/RAF-dependent, untested in unit scope",
+          "reason": "gamepadLoop uses window.addEventListener(gamepadconnected/disconnected), window.requestAnimationFrame, performance.now(). Testing these requires jsdom + fake timers. Covered by manual browser testing."
+        }
+      ]
     },
     "frontend/play.js": {
-      "status": "pending",
-      "covering_tests": ["frontend/play_test.js"]
+      "status": "excluded",
+      "covering_tests": [],
+      "reason": "IIFE page controller. After the 2026-04-23 refactor, the only pure logic in the original play.js — the SRAM-to-virtual-FS restore algorithm — was extracted to frontend/sram.js (see that module's entry for mutation coverage). What remains in play.js is orchestration: FP.initSubpage/loadGame/loadGameDetails invocation, setting window.EJS_* globals (core, gameUrl, color, biosUrl, loadStateURL), registering EJS_onSaveState/EJS_onGameStart handlers, injecting the EmulatorJS loader script. All of it is browser-only (window.fetch, document, window.EJS_emulator.gameManager). Testing requires jsdom + a mocked EmulatorJS runtime; covered by manual browser testing."
+    },
+    "frontend/sram.js": {
+      "status": "completed",
+      "covering_tests": ["frontend/play_test.js"],
+      "last_tested": "2026-04-23T20:05:00Z",
+      "mutation_score": 100.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "New module extracted from play.js on 2026-04-23 to make the SRAM restore algorithm unit-testable. play.js now calls FP.restoreSaveToFS(gm, buf); play_test.js exercises the same code via the FP namespace. Loop-bound, Uint8Array-construction, analyzePath guards, and loadSaveFiles call are all covered by existing test cases (typical path, deep nesting, existing dirs, existing file, trailing slash, empty path, bare filename)."
+      ]
     },
     "frontend/theme.js": {
       "status": "completed",
