@@ -76,6 +76,11 @@ func (c *Cache) cacheDir(console, cleanName string) string {
 	return datadir.IGDBCacheGame(c.dataDir, console, cleanName)
 }
 
+// memKey builds the in-memory cache key for (console, cleanName).
+func memKey(console, cleanName string) string {
+	return console + "/" + cleanName
+}
+
 // Get returns cached GameDetails for the given console and ROM filename,
 // or nil if not cached. Defense-in-depth path-traversal check: refuses
 // to read any file outside datadir.IGDBCache(dataDir), even if the HTTP
