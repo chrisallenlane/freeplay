@@ -72,8 +72,31 @@
       ]
     },
     "internal/datadir/datadir.go": {
-      "status": "pending",
-      "covering_tests": ["internal/datadir/datadir_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/datadir/datadir_test.go"],
+      "last_tested": "2026-04-23T15:20:00Z",
+      "mutations_applied": 26,
+      "killed": 24,
+      "survived_accepted": 2,
+      "mutation_score": 92.3,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added TestPathInsideNormalizesParent to catch filepath.Clean(parent) deletion — useful defense-in-depth regression test for path safety primitive"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 74,
+          "mutation": "reorder 's != \".\" && s != \"..\"' operands",
+          "category": "equivalent mutant",
+          "reason": "AND is commutative; reordering operands yields identical truth tables and identical short-circuit paths for all inputs."
+        },
+        {
+          "line": 74,
+          "mutation": "relocate 's != \"\"' empty-check to end of AND chain",
+          "category": "equivalent mutant",
+          "reason": "Same as above — AND is commutative/associative."
+        }
+      ]
     },
     "internal/details/cache.go": {
       "status": "pending",

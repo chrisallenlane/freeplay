@@ -48,6 +48,28 @@ func TestPathInside(t *testing.T) {
 	}
 }
 
+// TestPathInsideNormalizesParent verifies that PathInside filepath.Cleans
+// the parent argument, not just the child. An unclean parent like
+// "/data/covers/." must still correctly recognize "/data/covers/NES"
+// as inside it.
+func TestPathInsideNormalizesParent(t *testing.T) {
+	tests := []struct {
+		child  string
+		parent string
+		want   bool
+	}{
+		{"/data/covers/NES", "/data/covers/.", true},
+		{"/data/covers/NES", "/data//covers", true},
+		{"/data/covers", "/data/covers/.", true},
+		{"/data/other", "/data/covers/.", false},
+	}
+	for _, tt := range tests {
+		if got := PathInside(tt.child, tt.parent); got != tt.want {
+			t.Errorf("PathInside(%q, %q) = %v, want %v", tt.child, tt.parent, got, tt.want)
+		}
+	}
+}
+
 func TestLayoutConstructors(t *testing.T) {
 	const dataDir = "/data"
 	tests := []struct {
