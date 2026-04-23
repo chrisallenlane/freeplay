@@ -21,9 +21,13 @@ type Game struct {
 }
 
 // Catalog is the full game library served by GET /api/games.
+// games is the canonical list served to clients; gameSet is a
+// derived index that backs HasGame in O(1) — populated in scan()
+// alongside games so the two swap atomically via atomic.Pointer.
 type Catalog struct {
-	Consoles []string `json:"consoles"`
-	Games    []Game   `json:"games"`
+	Consoles []string            `json:"consoles"`
+	Games    []Game              `json:"games"`
+	gameSet  map[string]struct{} `json:"-"`
 }
 
 // DetailsLookup returns cached IGDB metadata for a game. The returned struct
@@ -52,12 +56,8 @@ func (s *Scanner) Catalog() *Catalog {
 // rather than allowed into an unbounded namespace.
 func (s *Scanner) HasGame(console, filename string) bool {
 	cat := s.catalog.Load()
-	for i := range cat.Games {
-		if cat.Games[i].Console == console && cat.Games[i].Filename == filename {
-			return true
-		}
-	}
-	return false
+	_, ok := cat.gameSet[console+"/"+filename]
+	return ok
 }
 
 // CatalogJSON returns the catalog as JSON bytes.

@@ -1,11 +1,11 @@
-var { describe, it } = require("node:test");
-var assert = require("node:assert/strict");
-var FP = require("./theme.js");
+const { describe, it } = require("node:test");
+const assert = require("node:assert/strict");
+const FP = require("./theme.js");
 
 describe("initThemeToggle", () => {
 	function withThemeMocks(theme, hasButton, fn) {
-		var clickHandler;
-		var btn = hasButton
+		let clickHandler;
+		const btn = hasButton
 			? {
 					textContent: "",
 					addEventListener: (event, handler) => {
@@ -13,10 +13,10 @@ describe("initThemeToggle", () => {
 					},
 				}
 			: null;
-		var dataset = { theme: theme };
-		var storage = {};
-		var origDoc = globalThis.document;
-		var origStorage = globalThis.localStorage;
+		const dataset = { theme: theme };
+		const storage = {};
+		const origDoc = globalThis.document;
+		const origStorage = globalThis.localStorage;
 		globalThis.document = {
 			getElementById: (id) => (id === "theme-toggle" ? btn : null),
 			documentElement: { dataset: dataset },

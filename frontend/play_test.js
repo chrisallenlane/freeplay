@@ -1,5 +1,5 @@
-var { describe, it } = require("node:test");
-var assert = require("node:assert/strict");
+const { describe, it } = require("node:test");
+const assert = require("node:assert/strict");
 
 // The SRAM restore logic from play.js (lines 101-114) is reproduced here
 // in a testable form. This is the exact algorithm used to create directories
@@ -21,10 +21,10 @@ var assert = require("node:assert/strict");
 // Simulate the SRAM restore flow exactly as play.js does it, returning
 // a log of FS operations performed.
 function simulateRestore(path, existingPaths, buf) {
-	var ops = [];
-	var known = new Set(existingPaths || []);
+	const ops = [];
+	const known = new Set(existingPaths || []);
 
-	var gm = {
+	const gm = {
 		FS: {
 			analyzePath: (p) => ({ exists: known.has(p) }),
 			mkdir: (p) => {
@@ -47,10 +47,9 @@ function simulateRestore(path, existingPaths, buf) {
 	};
 
 	// Exact reproduction of play.js lines 103-114
-	var parts = path.split("/");
-	var cp = "";
-	var i;
-	for (i = 0; i < parts.length - 1; i++) {
+	const parts = path.split("/");
+	let cp = "";
+	for (let i = 0; i < parts.length - 1; i++) {
 		if (parts[i] === "") continue;
 		cp += `/${parts[i]}`;
 		if (!gm.FS.analyzePath(cp).exists) gm.FS.mkdir(cp);
@@ -64,7 +63,7 @@ function simulateRestore(path, existingPaths, buf) {
 
 describe("SRAM restore: directory creation logic", () => {
 	it("creates intermediate directories for typical path /data/saves/game.srm", () => {
-		var { ops } = simulateRestore(
+		const { ops } = simulateRestore(
 			"/data/saves/game.srm",
 			[],
 			new ArrayBuffer(16),
@@ -76,7 +75,7 @@ describe("SRAM restore: directory creation logic", () => {
 	});
 
 	it("skips directory creation when directories already exist", () => {
-		var { ops } = simulateRestore(
+		const { ops } = simulateRestore(
 			"/data/saves/game.srm",
 			["/data", "/data/saves"],
 			new ArrayBuffer(16),
@@ -88,33 +87,33 @@ describe("SRAM restore: directory creation logic", () => {
 	});
 
 	it("unlinks existing save file before writing", () => {
-		var { ops } = simulateRestore(
+		const { ops } = simulateRestore(
 			"/data/saves/game.srm",
 			["/data", "/data/saves", "/data/saves/game.srm"],
 			new ArrayBuffer(16),
 		);
-		var unlinkOps = ops.filter((o) => o.op === "unlink");
+		const unlinkOps = ops.filter((o) => o.op === "unlink");
 		assert.equal(unlinkOps.length, 1);
 		assert.equal(unlinkOps[0].path, "/data/saves/game.srm");
 	});
 
 	it("writes the file and calls loadSaveFiles", () => {
-		var { ops } = simulateRestore(
+		const { ops } = simulateRestore(
 			"/data/saves/game.srm",
 			["/data", "/data/saves"],
 			new ArrayBuffer(32),
 		);
-		var writeOps = ops.filter((o) => o.op === "writeFile");
+		const writeOps = ops.filter((o) => o.op === "writeFile");
 		assert.equal(writeOps.length, 1);
 		assert.equal(writeOps[0].path, "/data/saves/game.srm");
 		assert.equal(writeOps[0].size, 32);
 
-		var loadOps = ops.filter((o) => o.op === "loadSaveFiles");
+		const loadOps = ops.filter((o) => o.op === "loadSaveFiles");
 		assert.equal(loadOps.length, 1);
 	});
 
 	it("creates all intermediate directories for deeply nested path", () => {
-		var { ops } = simulateRestore(
+		const { ops } = simulateRestore(
 			"/a/b/c/d/e/game.srm",
 			[],
 			new ArrayBuffer(8),
@@ -132,7 +131,7 @@ describe("SRAM restore: edge case — path with no slashes", () => {
 	// No directories are created. The file is written at "game.srm" (a relative
 	// path in the virtual FS).
 	it("handles path with no slashes gracefully", () => {
-		var { ops } = simulateRestore("game.srm", [], new ArrayBuffer(8));
+		const { ops } = simulateRestore("game.srm", [], new ArrayBuffer(8));
 		assert.deepEqual(
 			ops.filter((o) => o.op === "mkdir"),
 			[],
@@ -146,7 +145,7 @@ describe("SRAM restore: edge case — empty string path", () => {
 	// If getSaveFilePath() returns "", split("/") yields [""].
 	// The loop runs 0 iterations. writeFile is called with path "".
 	it("handles empty path without crashing", () => {
-		var { ops } = simulateRestore("", [], new ArrayBuffer(8));
+		const { ops } = simulateRestore("", [], new ArrayBuffer(8));
 		assert.deepEqual(
 			ops.filter((o) => o.op === "mkdir"),
 			[],
@@ -161,7 +160,7 @@ describe("SRAM restore: edge case — root path", () => {
 	// Path "/" splits into ["", ""], loop runs 1 iteration, skips empty part.
 	// No mkdir is called. writeFile is called with "/".
 	it("handles root path without creating directories", () => {
-		var { ops } = simulateRestore("/", [], new ArrayBuffer(8));
+		const { ops } = simulateRestore("/", [], new ArrayBuffer(8));
 		assert.deepEqual(
 			ops.filter((o) => o.op === "mkdir"),
 			[],
@@ -177,8 +176,8 @@ describe("SRAM restore: edge case — trailing slash in path", () => {
 	// Then writeFile is called with "/data/saves/" which treats the
 	// directory itself as a file path.
 	it("treats trailing-slash path as a file, writing to directory path", () => {
-		var { ops } = simulateRestore("/data/saves/", [], new ArrayBuffer(8));
-		var writeOps = ops.filter((o) => o.op === "writeFile");
+		const { ops } = simulateRestore("/data/saves/", [], new ArrayBuffer(8));
+		const writeOps = ops.filter((o) => o.op === "writeFile");
 		assert.equal(writeOps.length, 1);
 		assert.equal(writeOps[0].path, "/data/saves/");
 	});
@@ -235,20 +234,20 @@ describe("SRAM save: duplicate save on manual button click", () => {
 	//
 	// Result: every manual save click sends SRAM data to server twice.
 	it("demonstrates that manual save triggers two postSave calls", () => {
-		var postCalls = [];
+		const postCalls = [];
 
 		function postSave(type, data) {
 			if (data) postCalls.push({ type, size: data.length });
 		}
 
-		var sramData = new Uint8Array([1, 2, 3, 4]);
+		const sramData = new Uint8Array([1, 2, 3, 4]);
 
 		// Step 4: "saveSaveFiles" event fires (from getSaveFile -> saveSaveFiles)
-		var onSaveSaveFiles = (data) => postSave("sram", data);
+		const onSaveSaveFiles = (data) => postSave("sram", data);
 		onSaveSaveFiles(sramData);
 
 		// Step 6: "saveSave" event fires (from emulator.js after getSaveFile returns)
-		var onSaveSave = (data) => postSave("sram", data.save);
+		const onSaveSave = (data) => postSave("sram", data.save);
 		onSaveSave({ save: sramData });
 
 		// Both fire, resulting in two POSTs for a single user action
@@ -275,16 +274,15 @@ describe("SRAM save: duplicate handler registration on game restart", () => {
 	// the same page), handlers accumulate, causing duplicate POSTs for
 	// each save event.
 	it("accumulates handlers across multiple game starts", () => {
-		var handlers = [];
-		var emulator = {
+		const handlers = [];
+		const emulator = {
 			on: (event, fn) => {
 				handlers.push({ event, fn });
 			},
 		};
 
 		// Simulate three game starts
-		var i;
-		for (i = 0; i < 3; i++) {
+		for (let i = 0; i < 3; i++) {
 			emulator.on("saveSaveFiles", () => {});
 		}
 
@@ -292,8 +290,8 @@ describe("SRAM save: duplicate handler registration on game restart", () => {
 
 		// All three handlers would fire on a single save event,
 		// resulting in three POSTs to the server.
-		var postCalls = 0;
-		for (var handler of handlers) {
+		let postCalls = 0;
+		for (const handler of handlers) {
 			handler.fn();
 			postCalls++;
 		}
@@ -320,8 +318,8 @@ describe("SRAM save: exit triggers double saveSaveFiles", () => {
 	// Each call emits the "saveSaveFiles" event, causing the play.js
 	// handler to POST SRAM data twice during a single exit.
 	it("demonstrates that exit triggers two saveSaveFiles events", () => {
-		var eventsFired = 0;
-		var events = [];
+		let eventsFired = 0;
+		const events = [];
 
 		// Simulate the event emission for each saveSaveFiles() call
 		function simulateSaveSaveFiles() {
@@ -330,7 +328,7 @@ describe("SRAM save: exit triggers double saveSaveFiles", () => {
 		}
 
 		// Simulate exit sequence (GameManager.js lines 47-51)
-		var failedToStart = false;
+		const failedToStart = false;
 		if (!failedToStart) {
 			simulateSaveSaveFiles(); // line 48
 			// this.functions.restart() happens here

@@ -1,6 +1,6 @@
-var { describe, it } = require("node:test");
-var assert = require("node:assert/strict");
-var FP = require("./urls.js");
+const { describe, it } = require("node:test");
+const assert = require("node:assert/strict");
+const FP = require("./urls.js");
 
 describe("stripExt", () => {
 	it("removes a simple extension", () => {

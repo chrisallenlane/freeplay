@@ -1,9 +1,9 @@
-var { describe, it } = require("node:test");
-var assert = require("node:assert/strict");
-var FP = require("./api.js");
+const { describe, it } = require("node:test");
+const assert = require("node:assert/strict");
+const FP = require("./api.js");
 
 describe("filterGames", () => {
-	var games = [
+	const games = [
 		{ console: "SNES", filename: "Zelda.smc" },
 		{ console: "SNES", filename: "Mario.smc" },
 		{ console: "NES", filename: "Zelda.nes" },
@@ -11,25 +11,25 @@ describe("filterGames", () => {
 	];
 
 	it("returns all games with no filters", () => {
-		var result = FP.filterGames(games, {});
+		const result = FP.filterGames(games, {});
 		assert.equal(result.length, 4);
 	});
 
 	it("filters by console", () => {
-		var result = FP.filterGames(games, { console: "NES" });
+		const result = FP.filterGames(games, { console: "NES" });
 		assert.equal(result.length, 2);
 		assert.ok(result.every((g) => g.console === "NES"));
 	});
 
 	it("filters by search query (case-insensitive)", () => {
-		var result = FP.filterGames(games, { query: "zelda" });
+		const result = FP.filterGames(games, { query: "zelda" });
 		assert.equal(result.length, 2);
 		assert.ok(result.every((g) => g.filename.toLowerCase().includes("zelda")));
 	});
 
 	it("filters by favorites", () => {
-		var favs = new Set(["SNES/Mario.smc", "NES/Metroid.nes"]);
-		var result = FP.filterGames(games, {
+		const favs = new Set(["SNES/Mario.smc", "NES/Metroid.nes"]);
+		const result = FP.filterGames(games, {
 			favoritesOnly: true,
 			favorites: favs,
 		});
@@ -41,14 +41,14 @@ describe("filterGames", () => {
 	});
 
 	it("combines console and query filters", () => {
-		var result = FP.filterGames(games, { console: "SNES", query: "zel" });
+		const result = FP.filterGames(games, { console: "SNES", query: "zel" });
 		assert.equal(result.length, 1);
 		assert.equal(result[0].filename, "Zelda.smc");
 	});
 
 	it("combines favorites and query filters", () => {
-		var favs = new Set(["SNES/Zelda.smc", "SNES/Mario.smc", "NES/Zelda.nes"]);
-		var result = FP.filterGames(games, {
+		const favs = new Set(["SNES/Zelda.smc", "SNES/Mario.smc", "NES/Zelda.nes"]);
+		const result = FP.filterGames(games, {
 			favoritesOnly: true,
 			favorites: favs,
 			query: "zelda",
@@ -57,12 +57,12 @@ describe("filterGames", () => {
 	});
 
 	it("returns empty array when nothing matches", () => {
-		var result = FP.filterGames(games, { query: "nonexistent" });
+		const result = FP.filterGames(games, { query: "nonexistent" });
 		assert.equal(result.length, 0);
 	});
 
 	it("treats empty query as no filter", () => {
-		var result = FP.filterGames(games, { query: "" });
+		const result = FP.filterGames(games, { query: "" });
 		assert.equal(result.length, 4);
 	});
 
@@ -71,7 +71,7 @@ describe("filterGames", () => {
 	});
 
 	// Metadata search tests (developers, publishers, year, igdbName).
-	var metaGames = [
+	const metaGames = [
 		{
 			console: "NES",
 			filename: "smb.nes",
@@ -104,59 +104,59 @@ describe("filterGames", () => {
 	];
 
 	it("matches by developer substring", () => {
-		var result = FP.filterGames(metaGames, { query: "konami" });
+		const result = FP.filterGames(metaGames, { query: "konami" });
 		assert.equal(result.length, 1);
 		assert.equal(result[0].filename, "contra.nes");
 	});
 
 	it("matches by publisher substring", () => {
-		var result = FP.filterGames(metaGames, { query: "capcom" });
+		const result = FP.filterGames(metaGames, { query: "capcom" });
 		assert.equal(result.length, 1);
 		assert.equal(result[0].filename, "sf2.smc");
 	});
 
 	it("matches by year", () => {
-		var result = FP.filterGames(metaGames, { query: "1985" });
+		const result = FP.filterGames(metaGames, { query: "1985" });
 		assert.equal(result.length, 1);
 		assert.equal(result[0].filename, "smb.nes");
 	});
 
 	it("matches by igdbName when filename differs", () => {
-		var result = FP.filterGames(metaGames, { query: "mario" });
+		const result = FP.filterGames(metaGames, { query: "mario" });
 		assert.equal(result.length, 1);
 		assert.equal(result[0].filename, "smb.nes");
 	});
 
 	it("multi-token AND across fields matches when all tokens present", () => {
-		var result = FP.filterGames(metaGames, { query: "konami 1987" });
+		const result = FP.filterGames(metaGames, { query: "konami 1987" });
 		assert.equal(result.length, 1);
 		assert.equal(result[0].filename, "contra.nes");
 	});
 
 	it("multi-token AND returns no result when only one token matches", () => {
-		var result = FP.filterGames(metaGames, { query: "konami 1985" });
+		const result = FP.filterGames(metaGames, { query: "konami 1985" });
 		assert.equal(result.length, 0);
 	});
 
 	it("games without IGDB metadata still match by filename", () => {
-		var result = FP.filterGames(metaGames, { query: "plain" });
+		const result = FP.filterGames(metaGames, { query: "plain" });
 		assert.equal(result.length, 1);
 		assert.equal(result[0].filename, "plain.nes");
 	});
 
 	it("empty query returns all games", () => {
-		var result = FP.filterGames(metaGames, { query: "" });
+		const result = FP.filterGames(metaGames, { query: "" });
 		assert.equal(result.length, metaGames.length);
 	});
 
 	it("whitespace-only query returns all games", () => {
-		var result = FP.filterGames(metaGames, { query: "   " });
+		const result = FP.filterGames(metaGames, { query: "   " });
 		assert.equal(result.length, metaGames.length);
 	});
 
 	it("extra whitespace in query works the same as trimmed query", () => {
-		var trimmed = FP.filterGames(metaGames, { query: "konami 1987" });
-		var padded = FP.filterGames(metaGames, { query: "  konami   1987  " });
+		const trimmed = FP.filterGames(metaGames, { query: "konami 1987" });
+		const padded = FP.filterGames(metaGames, { query: "  konami   1987  " });
 		assert.deepEqual(
 			trimmed.map((g) => g.filename),
 			padded.map((g) => g.filename),
@@ -165,13 +165,13 @@ describe("filterGames", () => {
 });
 
 describe("findGame", () => {
-	var games = [
+	const games = [
 		{ console: "SNES", filename: "Zelda.smc" },
 		{ console: "NES", filename: "Zelda.nes" },
 	];
 
 	it("finds a game by console and filename", () => {
-		var game = FP.findGame(games, "NES", "Zelda.nes");
+		const game = FP.findGame(games, "NES", "Zelda.nes");
 		assert.equal(game.console, "NES");
 		assert.equal(game.filename, "Zelda.nes");
 	});

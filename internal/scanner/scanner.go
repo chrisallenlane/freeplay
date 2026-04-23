@@ -29,7 +29,11 @@ type Scanner struct {
 // New creates a Scanner.
 func New(cfg *config.Config, dataDir string) *Scanner {
 	s := &Scanner{cfg: cfg, dataDir: dataDir}
-	empty := &Catalog{Consoles: []string{}, Games: []Game{}}
+	empty := &Catalog{
+		Consoles: []string{},
+		Games:    []Game{},
+		gameSet:  map[string]struct{}{},
+	}
 	s.catalog.Store(empty)
 	return s
 }
@@ -124,7 +128,12 @@ func (s *Scanner) scan() {
 
 	s.lastGameCount = len(games)
 
-	catalog := &Catalog{Consoles: consoles, Games: games}
+	gameSet := make(map[string]struct{}, len(games))
+	for i := range games {
+		gameSet[games[i].Console+"/"+games[i].Filename] = struct{}{}
+	}
+
+	catalog := &Catalog{Consoles: consoles, Games: games, gameSet: gameSet}
 	s.catalog.Store(catalog)
 
 	slog.Info("scan complete", "consoles", len(consoles), "games", len(games))
