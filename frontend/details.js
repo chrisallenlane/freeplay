@@ -152,6 +152,9 @@
 			link.href = details.coverUrl;
 			const img = FP.el("img", "details-cover-full");
 			img.src = details.coverUrl;
+			// Cover renders below the fold; deprioritize its byte cost
+			// so screenshots/artworks aren't starved on first paint.
+			img.loading = "lazy";
 			img.alt = `${displayName} cover art`;
 			link.appendChild(img);
 			appendSection(content, "Cover Art", link);
