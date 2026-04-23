@@ -100,18 +100,33 @@ func writeCacheFile(
 }
 
 // doRequest issues method+path against srv.handler and returns the recorder.
-// For non-GET/HEAD methods it automatically sets X-Requested-With: freeplay.
-// Use this helper only when the test does not need to control request headers.
+// For non-GET/HEAD methods it automatically sets X-Requested-With: freeplay
+// unless the caller overrides it via extraHeaders. Optional extraHeaders
+// entries are applied after the default; pass an empty http.Header to drop
+// X-Requested-With (e.g. for a CSRF test).
 func doRequest(
 	t *testing.T,
 	srv *Server,
 	method, path string,
 	body io.Reader,
+	extraHeaders ...http.Header,
 ) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, body)
 	if method != http.MethodGet && method != http.MethodHead {
 		req.Header.Set("X-Requested-With", "freeplay")
+	}
+	for _, h := range extraHeaders {
+		// Caller-supplied headers overwrite defaults. A caller that
+		// wants to drop a default header sets its value to "" in h.
+		for k, vs := range h {
+			req.Header.Del(k)
+			for _, v := range vs {
+				if v != "" {
+					req.Header.Add(k, v)
+				}
+			}
+		}
 	}
 	w := httptest.NewRecorder()
 	srv.handler.ServeHTTP(w, req)
@@ -482,15 +497,11 @@ func TestSavePathTraversalBlocked(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var req *http.Request
+			var body io.Reader
 			if tt.method == "POST" {
-				req = httptest.NewRequest(tt.method, tt.path, bytes.NewReader([]byte("payload")))
-			} else {
-				req = httptest.NewRequest(tt.method, tt.path, nil)
+				body = bytes.NewReader([]byte("payload"))
 			}
-			w := httptest.NewRecorder()
-			srv.handler.ServeHTTP(w, req)
-
+			w := doRequest(t, srv, tt.method, tt.path, body)
 			if w.Code == 200 {
 				t.Errorf("path traversal attempt should not return 200, got %d", w.Code)
 			}
@@ -701,11 +712,9 @@ func TestPostWithoutCSRFHeaderRejected(t *testing.T) {
 		"/api/saves/NES/Mega%20Man.nes/state",
 		"/api/rescan",
 	}
+	dropCSRF := http.Header{"X-Requested-With": {""}}
 	for _, ep := range endpoints {
-		req := httptest.NewRequest("POST", ep, nil)
-		w := httptest.NewRecorder()
-		srv.handler.ServeHTTP(w, req)
-
+		w := doRequest(t, srv, http.MethodPost, ep, nil, dropCSRF)
 		if w.Code != http.StatusForbidden {
 			t.Errorf("POST %s without X-Requested-With: got %d, want 403", ep, w.Code)
 		}
@@ -856,12 +865,13 @@ func TestCSRFHeaderValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("POST", "/api/rescan", nil)
-			if tt.setHeader {
-				req.Header.Set("X-Requested-With", tt.headerVal)
+			var headers []http.Header
+			if !tt.setHeader {
+				headers = append(headers, http.Header{"X-Requested-With": {""}})
+			} else {
+				headers = append(headers, http.Header{"X-Requested-With": {tt.headerVal}})
 			}
-			w := httptest.NewRecorder()
-			srv.handler.ServeHTTP(w, req)
+			w := doRequest(t, srv, http.MethodPost, "/api/rescan", nil, headers...)
 			if w.Code != tt.wantStatus {
 				t.Errorf(
 					"POST /api/rescan with X-Requested-With=%q: got %d, want %d",

@@ -83,3 +83,13 @@ func writeJSONOK(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
+
+// writeJSONError writes a JSON-shaped error body with the given
+// status code. Response Content-Type is application/json so callers
+// know how to parse the body; the bare http.Error helper sets
+// text/plain which is inconsistent with our /api/* JSON responses.
+func writeJSONError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}

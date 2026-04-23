@@ -57,7 +57,7 @@ func (s *Server) handleManuals(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 	if s.detailsCache == nil {
-		http.Error(w, `{"error":"IGDB not configured"}`, http.StatusNotFound)
+		writeJSONError(w, "IGDB not configured", http.StatusNotFound)
 		return
 	}
 
@@ -67,17 +67,13 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 		// safeName rejects empty, "..", "/", "\\", and NUL. Blocks the
 		// SEC-3 path-traversal PoC (console=../../../../tmp/evil) at
 		// the HTTP boundary; defense-in-depth lives in Cache.Get.
-		http.Error(
-			w,
-			`{"error":"invalid console or rom parameter"}`,
-			http.StatusBadRequest,
-		)
+		writeJSONError(w, "invalid console or rom parameter", http.StatusBadRequest)
 		return
 	}
 
 	d := s.detailsCache.Get(console, rom)
 	if d == nil {
-		http.Error(w, `{"error":"game not found"}`, http.StatusNotFound)
+		writeJSONError(w, "game not found", http.StatusNotFound)
 		return
 	}
 
@@ -149,15 +145,11 @@ func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {
 	if s.rescanner == nil {
-		http.Error(
-			w,
-			`{"error":"rescan not available"}`,
-			http.StatusServiceUnavailable,
-		)
+		writeJSONError(w, "rescan not available", http.StatusServiceUnavailable)
 		return
 	}
 	if !s.rescanner.TriggerRescan() {
-		http.Error(w, `{"error":"scan already in progress"}`, http.StatusConflict)
+		writeJSONError(w, "scan already in progress", http.StatusConflict)
 		return
 	}
 	writeJSONOK(w)
