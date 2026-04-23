@@ -441,11 +441,22 @@ func TestEmulatorJSDirectoryListingBlocked(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Errorf("dir listing: got status %d, want 404", w.Code)
 	}
+	// Body must be exactly one NotFound line. Missing `return` after
+	// http.NotFound would let next.ServeHTTP append another 404 body.
+	if got := w.Body.String(); got != "404 page not found\n" {
+		t.Errorf("dir listing body = %q, want single %q (return missing?)",
+			got, "404 page not found\n")
+	}
 
-	// Files inside the directory are still served.
+	// Files inside the directory are still served — body must be non-empty.
+	// If next.ServeHTTP were removed from noDirListing, the fall-through
+	// path would yield status 200 with an empty body.
 	w = doRequest(t, srv, http.MethodGet, "/emulatorjs/data/loader.js", nil)
 	if w.Code != http.StatusOK {
 		t.Errorf("file inside dir: got status %d, want 200", w.Code)
+	}
+	if w.Body.Len() == 0 {
+		t.Errorf("file inside dir: body empty (next.ServeHTTP missing?)")
 	}
 
 	// Root "/" still serves index.html (noDirListing allows directories
@@ -453,6 +464,9 @@ func TestEmulatorJSDirectoryListingBlocked(t *testing.T) {
 	w = doRequest(t, srv, http.MethodGet, "/", nil)
 	if w.Code != http.StatusOK {
 		t.Errorf("/ root: got status %d, want 200", w.Code)
+	}
+	if w.Body.Len() == 0 {
+		t.Errorf("/ root: body empty (next.ServeHTTP missing?)")
 	}
 }
 
@@ -718,6 +732,12 @@ func TestPostWithoutCSRFHeaderRejected(t *testing.T) {
 		w := doRequest(t, srv, http.MethodPost, ep, nil, dropCSRF)
 		if w.Code != http.StatusForbidden {
 			t.Errorf("POST %s without X-Requested-With: got %d, want 403", ep, w.Code)
+		}
+		// Body must be exactly "forbidden\n". Missing `return` after
+		// http.Error would let next.ServeHTTP append additional output.
+		if got := w.Body.String(); got != "forbidden\n" {
+			t.Errorf("POST %s body = %q, want %q (return missing after http.Error?)",
+				ep, got, "forbidden\n")
 		}
 	}
 }

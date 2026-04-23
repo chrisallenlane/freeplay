@@ -435,8 +435,32 @@
       ]
     },
     "internal/server/middleware.go": {
-      "status": "pending",
-      "covering_tests": ["internal/server/server_test.go", "internal/server/cachecontrol_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/server/server_test.go", "internal/server/cachecontrol_test.go"],
+      "last_tested": "2026-04-23T18:30:00Z",
+      "mutations_applied": 20,
+      "killed": 18,
+      "survived_accepted": 2,
+      "mutation_score": 90.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added body-exactness assertions to TestPostWithoutCSRFHeaderRejected (kills return removal after http.Error)",
+        "Added body-exactness and body-nonempty assertions to TestEmulatorJSDirectoryListingBlocked (kills return removal after http.NotFound and next.ServeHTTP removal)"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 39,
+          "mutation": "name = \".\" -> name = \"\"",
+          "category": "equivalent for test-fs configuration (index.html at root)",
+          "reason": "With '.' original fs.Stat returns root dir info and proceeds to the index.html check which succeeds, falling through to next. With '', fs.Stat errors (invalid path), the IsDir branch is skipped, and execution also falls through to next. For any embedded FS with an index.html at root, the two paths converge. Would be observable only if the root had no index.html — not the case in production (the frontend always has one)."
+        },
+        {
+          "line": 37,
+          "mutation": "path.Clean(TrimPrefix(r.URL.Path, \"/\")) -> TrimPrefix(path.Clean(r.URL.Path), \"/\")",
+          "category": "equivalent for non-traversal paths",
+          "reason": "Differs only for paths starting with /.. — path.Clean then TrimPrefix collapses '/../foo' to 'foo' (masking the traversal), while TrimPrefix then Clean preserves '../foo' (which fs.Stat then rejects). The routes served through noDirListing are the frontend catch-all and /emulatorjs/; downstream FileServerFS also enforces path safety, making this middleware's handling of traversal paths defense-in-depth. Current tests don't exercise this boundary; accepted."
+        }
+      ]
     },
     "internal/server/routes.go": {
       "status": "pending",
