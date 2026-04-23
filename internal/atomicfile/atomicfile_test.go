@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -99,6 +100,9 @@ func TestWriteDirectoryCreationFails(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when directory cannot be created")
 	}
+	if !strings.Contains(err.Error(), "creating directory") {
+		t.Errorf("expected 'creating directory' in error, got: %v", err)
+	}
 }
 
 func TestWriteReadOnlyDirectory(t *testing.T) {
@@ -114,6 +118,9 @@ func TestWriteReadOnlyDirectory(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error when directory is read-only")
+	}
+	if !strings.Contains(err.Error(), "creating temp file") {
+		t.Errorf("expected 'creating temp file' in error, got: %v", err)
 	}
 }
 
