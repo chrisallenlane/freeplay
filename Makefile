@@ -25,6 +25,11 @@ BUILD_FLAGS := -ldflags="-s -w -X github.com/chrisallenlane/freeplay.Version=$(V
 build: $(EMULATORJS_SENTINEL) | $(dist_dir)
 	$(GO) build $(BUILD_FLAGS) -o $(dist_dir)/freeplay $(cmd_dir)
 
+## build-debug: build with pprof exposed on 127.0.0.1:6060
+.PHONY: build-debug
+build-debug: $(EMULATORJS_SENTINEL) | $(dist_dir)
+	$(GO) build -tags debug -ldflags="-X github.com/chrisallenlane/freeplay.Version=$(VERSION)-debug" -mod vendor -o $(dist_dir)/freeplay-debug $(cmd_dir)
+
 ## run: build and run with test data
 .PHONY: run
 run: build
