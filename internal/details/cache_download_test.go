@@ -150,36 +150,32 @@ func TestDownloadImage_LimitReader(t *testing.T) {
 	}
 }
 
-// TestDownloadImage_RedirectFollowed verifies that downloadImage follows
-// HTTP redirects (since it uses http.Client.Get which follows redirects
-// by default).
-func TestDownloadImage_RedirectFollowed(t *testing.T) {
-	// Final destination server
+// TestDownloadImage_CrossHostRedirectBlocked verifies that downloadImage
+// refuses redirects to hosts other than images.igdb.com. This is the
+// defense-in-depth layer for SEC-2 SSRF: a compromised or spoofed IGDB
+// could otherwise return a 301/302 pointing at an attacker-controlled
+// or internal-network host, bypassing the scheme/host check in
+// igdb.transformImageURL.
+func TestDownloadImage_CrossHostRedirectBlocked(t *testing.T) {
+	// Final destination — attacker-controlled from the server's POV
+	// because it is NOT images.igdb.com.
 	finalServer := startImageServerWith(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
-		_, _ = w.Write([]byte{0xFF, 0xD8, 0xFF, 0xE0}) // JPEG header
+		_, _ = w.Write([]byte{0xFF, 0xD8, 0xFF, 0xE0})
 	})
 
-	// Redirect server
 	redirectServer := startImageServerWith(t, func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, finalServer.URL+"/final.jpg", http.StatusMovedPermanently)
 	})
 
 	c := New(t.TempDir(), nil)
 
-	localPath, _, err := downloadTestImage(t, c, redirectServer.URL+"/cover.jpg")
-	if err != nil {
-		t.Fatalf("downloadImage should follow redirects, got error: %v", err)
+	_, _, err := downloadTestImage(t, c, redirectServer.URL+"/cover.jpg")
+	if err == nil {
+		t.Fatal("downloadImage must block cross-host redirect, got nil error")
 	}
-
-	data, err := os.ReadFile(localPath)
-	if err != nil {
-		t.Fatalf("reading saved file: %v", err)
-	}
-
-	// Should have the JPEG header from the final destination
-	if len(data) != 4 || data[0] != 0xFF || data[1] != 0xD8 {
-		t.Errorf("expected JPEG header from redirect target, got %v", data)
+	if !strings.Contains(err.Error(), "blocked cross-host redirect") {
+		t.Errorf("error = %v, want 'blocked cross-host redirect'", err)
 	}
 }
 

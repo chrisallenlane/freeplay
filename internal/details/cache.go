@@ -3,10 +3,12 @@ package details
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -32,7 +34,24 @@ func New(dataDir string, fetcher igdbFetcher) *Cache {
 	return &Cache{
 		dataDir: dataDir,
 		fetcher: fetcher,
-		client:  &http.Client{Timeout: 30 * time.Second},
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+			// Block redirects that would leave images.igdb.com — a
+			// compromised or spoofed IGDB could otherwise redirect image
+			// fetches to attacker-controlled hosts, bypassing the
+			// scheme/host check in igdb.transformImageURL.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if req.URL.Host != igdb.IGDBImageHost {
+					return fmt.Errorf(
+						"blocked cross-host redirect to %s", req.URL.Host,
+					)
+				}
+				if len(via) >= 10 {
+					return http.ErrUseLastResponse
+				}
+				return nil
+			},
+		},
 	}
 }
 
@@ -55,7 +74,9 @@ func (c *Cache) cacheDir(console, cleanName string) string {
 }
 
 // Get returns cached GameDetails for the given console and ROM filename,
-// or nil if not cached.
+// or nil if not cached. Defense-in-depth path-traversal check: refuses
+// to read any file outside CacheDir(dataDir), even if the HTTP boundary
+// validator (server.safeName) is bypassed.
 func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
 	_, cleanName := igdb.CleanFilename(romFilename)
 	if cleanName == "" {
@@ -63,6 +84,11 @@ func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
 	}
 
 	path := c.detailsPath(console, cleanName)
+	if !pathInside(path, CacheDir(c.dataDir)) {
+		return nil
+	}
+
+	// #nosec G304 -- path-boundary enforced above by pathInside (SEC-3).
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -73,6 +99,26 @@ func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
 		return nil
 	}
 	return &d
+}
+
+// pathInside reports whether the cleaned child path is rooted under
+// the cleaned parent directory. The same check used by server.serveSecureFile.
+func pathInside(child, parent string) bool {
+	cleanChild := filepath.Clean(child)
+	cleanParent := filepath.Clean(parent)
+	return cleanChild == cleanParent ||
+		strings.HasPrefix(cleanChild, cleanParent+string(filepath.Separator))
+}
+
+// safePathSegment reports whether s is safe to use as a single path
+// segment inside a trusted directory. Rejects empty, ".", "..",
+// anything containing a path separator, and NUL bytes. Callers should
+// skip (tombstone) offending inputs rather than trying to sanitize —
+// a ROM whose filename produces an unsafe segment is an attacker
+// signal, not an ergonomic concern.
+func safePathSegment(s string) bool {
+	return s != "" && s != "." && s != ".." &&
+		!strings.ContainsAny(s, `/\`+"\x00")
 }
 
 // FetchAll populates the cache for any games not yet cached.
@@ -102,6 +148,21 @@ func (c *Cache) FetchAll(games []igdb.GameEntry) int {
 func (c *Cache) fetchOne(g igdb.GameEntry, ticker *time.Ticker) bool {
 	nameNoExt, cleanName := igdb.CleanFilename(g.Filename)
 	if cleanName == "" {
+		return false
+	}
+	// Segment-safety gate: CleanName does not reject "..", "/", "\" or
+	// NUL in the result. A ROM named "..(USA).nes" yields cleanName="..";
+	// a ROM named "../../pwned.nes" yields nameNoExt="../../pwned". Tombstone
+	// these at the cache-population boundary so no downstream write path
+	// has to re-validate (see SEC-5).
+	if !safePathSegment(g.Console) ||
+		!safePathSegment(cleanName) ||
+		!safePathSegment(nameNoExt) {
+		slog.Warn(
+			"skipping game with unsafe path segment",
+			"console", g.Console,
+			"filename", g.Filename,
+		)
 		return false
 	}
 

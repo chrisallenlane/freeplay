@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"path/filepath"
 
@@ -60,10 +61,13 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 
 	console := r.URL.Query().Get("console")
 	rom := r.URL.Query().Get("rom")
-	if console == "" || rom == "" {
+	if !safeName(console) || !safeName(rom) {
+		// safeName rejects empty, "..", "/", "\\", and NUL. Blocks the
+		// SEC-3 path-traversal PoC (console=../../../../tmp/evil) at
+		// the HTTP boundary; defense-in-depth lives in Cache.Get.
 		http.Error(
 			w,
-			`{"error":"console and rom parameters required"}`,
+			`{"error":"invalid console or rom parameter"}`,
 			http.StatusBadRequest,
 		)
 		return
@@ -85,6 +89,10 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid save parameters", http.StatusBadRequest)
 		return
 	}
+	if !s.scanner.HasGame(console, game) {
+		http.NotFound(w, r)
+		return
+	}
 
 	data := s.saves.Get(console, game, saveType)
 	if data == nil {
@@ -92,6 +100,8 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
+	// #nosec G705 -- opaque binary save blob served as octet-stream;
+	// X-Content-Type-Options: nosniff is set globally by securityHeaders.
 	_, _ = w.Write(data)
 }
 
@@ -101,9 +111,21 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid save parameters", http.StatusBadRequest)
 		return
 	}
+	// Gate on catalog membership: prevents unbounded disk growth via
+	// unique game names (see SEC-4). The check runs before body read,
+	// so attackers targeting unknown games never pay for file I/O.
+	if !s.scanner.HasGame(console, game) {
+		http.NotFound(w, r)
+		return
+	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 64<<20) // 64 MB
 	if err := s.saves.Put(console, game, saveType, r.Body); err != nil {
+		var mb *http.MaxBytesError
+		if errors.As(err, &mb) {
+			http.Error(w, "save too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "save failed", http.StatusInternalServerError)
 		return
 	}

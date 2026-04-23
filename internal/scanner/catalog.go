@@ -45,6 +45,21 @@ func (s *Scanner) Catalog() *Catalog {
 	return s.catalog.Load()
 }
 
+// HasGame reports whether the given (console, filename) pair is in the
+// current catalog. Used by save-upload handlers to reject writes for
+// games not in the library. Before the first scan completes, always
+// returns false — saves during startup race are intentionally rejected
+// rather than allowed into an unbounded namespace.
+func (s *Scanner) HasGame(console, filename string) bool {
+	cat := s.catalog.Load()
+	for i := range cat.Games {
+		if cat.Games[i].Console == console && cat.Games[i].Filename == filename {
+			return true
+		}
+	}
+	return false
+}
+
 // CatalogJSON returns the catalog as JSON bytes.
 func (s *Scanner) CatalogJSON() ([]byte, error) {
 	return json.Marshal(s.catalog.Load())

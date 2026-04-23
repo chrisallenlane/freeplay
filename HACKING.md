@@ -4,7 +4,8 @@
 
 - Go 1.26 or later (<https://go.dev/dl/>)
 - Node.js and npm — required for JavaScript formatting, linting, and testing
-- [gofumpt][] (formatter) and [golangci-lint][] (linter) — install both with:
+- [gofumpt][] (formatter), [golangci-lint][] (linter), [govulncheck][], and
+  [gosec][] — install all with:
 
 ```bash
 make setup
@@ -46,6 +47,7 @@ Run `make help` for the full list. The most useful targets:
 | `make a11y`          | Run pa11y + axe-core accessibility audit against live server |
 | `make fuzz`          | Run fuzz tests (15s each)               |
 | `make fuzz-long`     | Run fuzz tests (10m each)               |
+| `make audit`         | Scan deps (govulncheck) and source (gosec) for security issues |
 | `make vendor`        | Tidy and re-vendor Go dependencies      |
 | `make vendor-update` | Update all dependencies then re-vendor  |
 | `make docker`        | Build the Docker image                  |
@@ -134,3 +136,5 @@ docker compose up --build
 
 [gofumpt]: https://github.com/mvdan/gofumpt
 [golangci-lint]: https://github.com/golangci/golangci-lint
+[govulncheck]: https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck
+[gosec]: https://github.com/securego/gosec

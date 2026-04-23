@@ -63,7 +63,7 @@ change without notice.
 | `GET`  | `/api/game-details`                  | IGDB metadata for a single game (`?console=&rom=`)       |
 | `POST` | `/api/rescan`                        | Trigger a ROM directory rescan                           |
 | `GET`  | `/api/saves/{console}/{game}/{type}` | Download a save file (`type`: `state` or `sram`)         |
-| `POST` | `/api/saves/{console}/{game}/{type}` | Upload a save file (64 MB max)                           |
+| `POST` | `/api/saves/{console}/{game}/{type}` | Upload a save file (64 MiB max)                          |
 
 ## Static file routes
 

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"path"
+	"strings"
+	"time"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
@@ -77,10 +80,25 @@ func New(
 	return s, nil
 }
 
-// ListenAndServe starts the HTTP server.
+// ListenAndServe starts the HTTP server with production timeouts.
 func (s *Server) ListenAndServe() error {
-	addr := fmt.Sprintf(":%d", s.cfg.Port)
-	return http.ListenAndServe(addr, s.handler)
+	return s.newHTTPServer().ListenAndServe()
+}
+
+// newHTTPServer constructs the http.Server with explicit timeouts.
+// Timeouts defeat slow-body drip attacks (see SEC-1) that otherwise
+// pin heap memory per idle connection. WriteTimeout of 60s is generous
+// enough for a 64 MiB save upload over LAN.
+func (s *Server) newHTTPServer() *http.Server {
+	return &http.Server{
+		Addr:              fmt.Sprintf(":%d", s.cfg.Port),
+		Handler:           s.handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 14,
+	}
 }
 
 func securityHeaders(next http.Handler) http.Handler {
@@ -126,7 +144,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /manuals/{rest...}", s.handleManuals)
 
 	// Embedded EmulatorJS — immutable cache; assets are embedded at build time
-	s.mux.Handle("/emulatorjs/", cacheControl(longCacheValue, http.StripPrefix("/emulatorjs/", http.FileServerFS(s.emulatorjsSub))))
+	s.mux.Handle("/emulatorjs/", cacheControl(longCacheValue, http.StripPrefix("/emulatorjs/", noDirListing(s.emulatorjsSub, http.FileServerFS(s.emulatorjsSub)))))
 
 	// Game details
 	s.mux.HandleFunc("GET /api/game-details", s.handleGameDetails)
@@ -136,7 +154,31 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /play", s.servePage("play.html"))
 
 	// Embedded frontend (catch-all) — no-cache so deploys are picked up immediately
-	s.mux.Handle("/", cacheControl("no-cache", http.FileServerFS(s.frontendSub)))
+	s.mux.Handle("/", cacheControl("no-cache", noDirListing(s.frontendSub, http.FileServerFS(s.frontendSub))))
+}
+
+// noDirListing wraps next so that requests whose URL path resolves to
+// a directory in fsys return 404 unless an index.html sits inside
+// that directory. Stops http.FileServerFS from emitting clickable
+// directory listings that leak EmulatorJS version / bundled cores
+// (see SEC-6 / L-1).
+func noDirListing(fsys fs.FS, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// path.Clean strips trailing slashes and normalizes to a
+		// path that fs.ValidPath accepts (fs.Stat rejects trailing /).
+		name := path.Clean(strings.TrimPrefix(r.URL.Path, "/"))
+		if name == "" {
+			name = "."
+		}
+		info, err := fs.Stat(fsys, name)
+		if err == nil && info.IsDir() {
+			if _, err := fs.Stat(fsys, path.Join(name, "index.html")); err != nil {
+				http.NotFound(w, r)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func cacheControl(value string, next http.Handler) http.Handler {

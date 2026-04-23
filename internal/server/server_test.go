@@ -243,19 +243,20 @@ func TestServeSecureFileBlocksDirectory(t *testing.T) {
 
 func TestSaveRoundtrip(t *testing.T) {
 	srv, _ := testServer(t)
+	srv.scanner.ScanBlocking()
 	saveData := []byte("my save state data")
 
 	// POST save
 	postW := doRequest(
 		t, srv, http.MethodPost,
-		"/api/saves/NES/game1/state", bytes.NewReader(saveData),
+		"/api/saves/NES/Mega%20Man.nes/state", bytes.NewReader(saveData),
 	)
 	if postW.Code != 200 {
 		t.Fatalf("POST save got status %d, want 200", postW.Code)
 	}
 
 	// GET save
-	getW := doRequest(t, srv, http.MethodGet, "/api/saves/NES/game1/state", nil)
+	getW := doRequest(t, srv, http.MethodGet, "/api/saves/NES/Mega%20Man.nes/state", nil)
 	if getW.Code != 200 {
 		t.Fatalf("GET save got status %d, want 200", getW.Code)
 	}
@@ -390,6 +391,28 @@ func TestGameDetailsMissingParams(t *testing.T) {
 	}
 }
 
+func TestGameDetailsPathTraversalBlocked(t *testing.T) {
+	srv, _ := testServer(t, &mockDetailsCache{})
+
+	// PoC from SEC-3 ticket: ../../tmp/evil/secret/details.json
+	tests := []string{
+		"/api/game-details?console=..&rom=x.nes",
+		"/api/game-details?console=NES&rom=..",
+		"/api/game-details?console=../../../tmp/evil&rom=secret.nes",
+		"/api/game-details?console=NES&rom=../../secret.nes",
+		"/api/game-details?console=NES%2F..&rom=x.nes",
+		"/api/game-details?console=NES&rom=x%00evil.nes",
+	}
+	for _, path := range tests {
+		t.Run(path, func(t *testing.T) {
+			w := doRequest(t, srv, http.MethodGet, path, nil)
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("got status %d, want 400", w.Code)
+			}
+		})
+	}
+}
+
 func TestGameDetailsCacheMiss404(t *testing.T) {
 	srv, _ := testServer(t, &mockDetailsCache{}) // cache returns nil for all Gets
 
@@ -405,6 +428,31 @@ func TestCoversNotFound(t *testing.T) {
 	w := doRequest(t, srv, http.MethodGet, "/covers/NES/noexist.png", nil)
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
+	}
+}
+
+func TestEmulatorJSDirectoryListingBlocked(t *testing.T) {
+	srv, _ := testServer(t)
+
+	// Pre-fix: http.FileServerFS rendered a clickable HTML listing of
+	// emulatorjs/data/ subdirectories, leaking version + bundled cores.
+	// Post-fix: no index.html in that dir → 404.
+	w := doRequest(t, srv, http.MethodGet, "/emulatorjs/data/", nil)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("dir listing: got status %d, want 404", w.Code)
+	}
+
+	// Files inside the directory are still served.
+	w = doRequest(t, srv, http.MethodGet, "/emulatorjs/data/loader.js", nil)
+	if w.Code != http.StatusOK {
+		t.Errorf("file inside dir: got status %d, want 200", w.Code)
+	}
+
+	// Root "/" still serves index.html (noDirListing allows directories
+	// that contain an index.html).
+	w = doRequest(t, srv, http.MethodGet, "/", nil)
+	if w.Code != http.StatusOK {
+		t.Errorf("/ root: got status %d, want 200", w.Code)
 	}
 }
 
@@ -668,7 +716,7 @@ func TestPostWithoutCSRFHeaderRejected(t *testing.T) {
 	srv, _ := testServer(t)
 
 	endpoints := []string{
-		"/api/saves/NES/game1/state",
+		"/api/saves/NES/Mega%20Man.nes/state",
 		"/api/rescan",
 	}
 	for _, ep := range endpoints {
@@ -862,6 +910,73 @@ func TestCSRFHeaderValidation(t *testing.T) {
 	}
 }
 
+func TestPostSaveTooLargeReturns413(t *testing.T) {
+	srv, _ := testServer(t)
+	srv.scanner.ScanBlocking()
+
+	// 65 MiB — one byte over the 64 MiB MaxBytesReader cap
+	payload := bytes.Repeat([]byte{'a'}, 65<<20)
+	w := doRequest(
+		t, srv, http.MethodPost,
+		"/api/saves/NES/Mega%20Man.nes/state", bytes.NewReader(payload),
+	)
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("got status %d, want 413", w.Code)
+	}
+}
+
+func TestNewHTTPServerHasTimeouts(t *testing.T) {
+	srv, _ := testServer(t)
+	h := srv.newHTTPServer()
+	if h.ReadHeaderTimeout == 0 {
+		t.Error("ReadHeaderTimeout must be set (slowloris defense)")
+	}
+	if h.ReadTimeout == 0 {
+		t.Error("ReadTimeout must be set (slow-body defense)")
+	}
+	if h.WriteTimeout == 0 {
+		t.Error("WriteTimeout must be set")
+	}
+	if h.IdleTimeout == 0 {
+		t.Error("IdleTimeout must be set")
+	}
+	if h.MaxHeaderBytes == 0 || h.MaxHeaderBytes > 1<<16 {
+		t.Errorf("MaxHeaderBytes = %d, want a bounded value", h.MaxHeaderBytes)
+	}
+}
+
+func TestPostSaveUnknownGameReturns404(t *testing.T) {
+	srv, dir := testServer(t)
+	srv.scanner.ScanBlocking()
+
+	w := doRequest(
+		t, srv, http.MethodPost,
+		"/api/saves/NES/FakeGame.nes/state", bytes.NewReader([]byte("data")),
+	)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("got status %d, want 404", w.Code)
+	}
+
+	// No file should have been written under saves/NES/FakeGame.nes/
+	path := filepath.Join(dir, "saves", "NES", "FakeGame.nes")
+	if _, err := os.Stat(path); err == nil {
+		t.Errorf("unexpected save directory created for unknown game: %s", path)
+	}
+}
+
+func TestGetSaveUnknownGameReturns404(t *testing.T) {
+	srv, _ := testServer(t)
+	srv.scanner.ScanBlocking()
+
+	w := doRequest(
+		t, srv, http.MethodGet,
+		"/api/saves/NES/FakeGame.nes/state", nil,
+	)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("got status %d, want 404", w.Code)
+	}
+}
+
 func TestPostSaveInvalidType(t *testing.T) {
 	srv, _ := testServer(t)
 
@@ -903,6 +1018,7 @@ func TestNoCacheMiddleware(t *testing.T) {
 
 func TestPostSavePutError(t *testing.T) {
 	srv, dir := testServer(t)
+	srv.scanner.ScanBlocking()
 
 	savesDir := filepath.Join(dir, "saves")
 	if err := os.MkdirAll(savesDir, 0o755); err != nil {
@@ -915,7 +1031,7 @@ func TestPostSavePutError(t *testing.T) {
 
 	w := doRequest(
 		t, srv, http.MethodPost,
-		"/api/saves/NES/game1/state", bytes.NewReader([]byte("data")),
+		"/api/saves/NES/Mega%20Man.nes/state", bytes.NewReader([]byte("data")),
 	)
 
 	if w.Code != http.StatusInternalServerError {

@@ -10,9 +10,10 @@ make build            # build binary to dist/
 make run              # build and run with testdata
 make fuzz             # run fuzz tests (15s each)
 make fuzz-long        # run fuzz tests (10m each)
+make audit            # govulncheck + gosec security scan
 make a11y             # run accessibility audit against live server
 make fetch-emulatorjs # download pinned EmulatorJS assets (auto-invoked by build/check)
-make setup            # install dev tools (gofumpt, golangci-lint)
+make setup            # install dev tools (gofumpt, golangci-lint, govulncheck, gosec)
 ```
 
 `make fmt`, `make lint`, and `make test` cover both Go and frontend (JS/HTML)

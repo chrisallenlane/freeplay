@@ -34,16 +34,16 @@ func (m *Manager) Get(console, game, saveType string) []byte {
 	return data
 }
 
-// Put writes save data to disk atomically.
+// Put writes save data to disk atomically by streaming body directly to
+// the temp file. No full-body buffering — per-connection memory is
+// bounded by atomicfile's internal 32 KiB io.Copy buffer rather than
+// the full save size.
 func (m *Manager) Put(console, game, saveType string, body io.Reader) error {
-	data, err := io.ReadAll(body)
-	if err != nil {
-		return fmt.Errorf("reading save data: %w", err)
-	}
-
 	return atomicfile.Write(m.savePath(console, game, saveType), func(w io.Writer) error {
-		_, err := w.Write(data)
-		return err
+		if _, err := io.Copy(w, body); err != nil {
+			return fmt.Errorf("reading save data: %w", err)
+		}
+		return nil
 	})
 }
 

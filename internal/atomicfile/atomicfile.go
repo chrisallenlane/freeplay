@@ -8,11 +8,13 @@ import (
 	"path/filepath"
 )
 
-// Write atomically writes data to path by writing to a temporary file
-// in the same directory and renaming. The directory is created if needed.
+// Write atomically writes data to path by writing to a temporary file in
+// the same directory, fsync'ing it, and renaming. The directory is created
+// (mode 0o750) if needed. If fn returns an error or panics, the temporary
+// file is removed before the error/panic propagates.
 func Write(path string, fn func(w io.Writer) error) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("creating directory: %w", err)
 	}
 
@@ -21,17 +23,29 @@ func Write(path string, fn func(w io.Writer) error) error {
 		return fmt.Errorf("creating temp file: %w", err)
 	}
 
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tmp.Close()
+			_ = os.Remove(tmp.Name())
+		}
+	}()
+
 	if err := fn(tmp); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
 		return err
 	}
-	_ = tmp.Close()
-
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		_ = os.Remove(tmp.Name())
-		return fmt.Errorf("renaming temp file: %w", err)
+	// fsync before rename: guarantees durability across power loss,
+	// not just program crashes.
+	if err := tmp.Sync(); err != nil {
+		return fmt.Errorf("syncing temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("closing temp file: %w", err)
 	}
 
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return fmt.Errorf("renaming temp file: %w", err)
+	}
+	committed = true
 	return nil
 }
