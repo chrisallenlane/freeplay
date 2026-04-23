@@ -120,11 +120,15 @@ func (c *Cache) saveDetails(
 		details.Artworks, cacheDir, urlBase, cleanName, "artwork",
 	)
 
-	// Write details.json
+	// Write details.json, then memoize for in-memory lookups.
 	jsonPath := filepath.Join(cacheDir, "details.json")
-	return atomicfile.Write(jsonPath, func(w io.Writer) error {
+	if err := atomicfile.Write(jsonPath, func(w io.Writer) error {
 		return json.NewEncoder(w).Encode(details)
-	})
+	}); err != nil {
+		return err
+	}
+	c.storeDetails(console, cleanName, details)
+	return nil
 }
 
 // ensureCoverThumbnail copies the cached cover image to the standard cover

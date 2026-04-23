@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,11 +23,21 @@ type igdbFetcher interface {
 }
 
 // Cache stores IGDB game details and images locally.
+//
+// An in-memory layer (mem) backs the on-disk details.json / .notfound
+// layout. Key-presence means the lookup has been resolved (either from
+// disk or from a saveDetails/writeNotFound write); a nil value is the
+// negative sentinel (.notfound). The map is populated lazily on the
+// first disk-hitting Get for a key and eagerly on every successful
+// write, so steady-state rescans avoid ~2000 ReadFile+Stat syscalls.
 type Cache struct {
 	dataDir  string
 	fetcher  igdbFetcher
 	client   *http.Client
 	fetching atomic.Int32
+
+	mu  sync.RWMutex
+	mem map[string]*igdb.GameDetails
 }
 
 // New creates a Cache. fetcher may be nil if IGDB is not configured.
@@ -34,6 +45,7 @@ func New(dataDir string, fetcher igdbFetcher) *Cache {
 	return &Cache{
 		dataDir: dataDir,
 		fetcher: fetcher,
+		mem:     make(map[string]*igdb.GameDetails),
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 			// Block redirects that would leave images.igdb.com — a
@@ -82,23 +94,73 @@ func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
 	if cleanName == "" {
 		return nil
 	}
+	d, _ := c.load(console, cleanName)
+	return d
+}
 
-	path := c.detailsPath(console, cleanName)
-	if !pathInside(path, CacheDir(c.dataDir)) {
-		return nil
+// memKey builds the in-memory cache key for (console, cleanName).
+func memKey(console, cleanName string) string {
+	return console + "/" + cleanName
+}
+
+// load resolves the lookup for (console, cleanName) — first against the
+// in-memory map, then falling through to disk. Returns the details
+// pointer (nil for a negative cache entry) and whether the lookup
+// resolved (i.e. is it safe to skip re-fetching from IGDB). Results
+// from disk are memoized so subsequent calls in the same rescan pass
+// avoid both ReadFile and Unmarshal.
+func (c *Cache) load(console, cleanName string) (*igdb.GameDetails, bool) {
+	key := memKey(console, cleanName)
+
+	c.mu.RLock()
+	d, ok := c.mem[key]
+	c.mu.RUnlock()
+	if ok {
+		return d, true
+	}
+
+	detailsPath := c.detailsPath(console, cleanName)
+	if !pathInside(detailsPath, CacheDir(c.dataDir)) {
+		return nil, false
 	}
 
 	// #nosec G304 -- path-boundary enforced above by pathInside (SEC-3).
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
+	if data, err := os.ReadFile(detailsPath); err == nil {
+		var parsed igdb.GameDetails
+		if err := json.Unmarshal(data, &parsed); err != nil {
+			// Corrupt details.json: don't poison the cache.
+			return nil, false
+		}
+		c.mu.Lock()
+		c.mem[key] = &parsed
+		c.mu.Unlock()
+		return &parsed, true
 	}
 
-	var d igdb.GameDetails
-	if err := json.Unmarshal(data, &d); err != nil {
-		return nil
+	// No details.json — check for .notfound marker.
+	if _, err := os.Stat(c.notFoundPath(console, cleanName)); err == nil {
+		c.mu.Lock()
+		c.mem[key] = nil
+		c.mu.Unlock()
+		return nil, true
 	}
-	return &d
+
+	return nil, false
+}
+
+// storeDetails memoizes a successful details write. Callers pass a copy
+// so later mutations by the caller don't race with cache readers.
+func (c *Cache) storeDetails(console, cleanName string, d *igdb.GameDetails) {
+	c.mu.Lock()
+	c.mem[memKey(console, cleanName)] = d
+	c.mu.Unlock()
+}
+
+// storeNotFound memoizes a .notfound write (negative cache entry).
+func (c *Cache) storeNotFound(console, cleanName string) {
+	c.mu.Lock()
+	c.mem[memKey(console, cleanName)] = nil
+	c.mu.Unlock()
 }
 
 // pathInside reports whether the cleaned child path is rooted under

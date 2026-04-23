@@ -345,6 +345,76 @@ func TestGet_EmptyCleanName(t *testing.T) {
 	}
 }
 
+// TestGet_ServesFromMemoryAfterDiskDelete verifies that once Get has
+// read details.json from disk, subsequent calls resolve from the
+// in-memory layer without re-reading. We prove this by deleting the
+// underlying file after the first call.
+func TestGet_ServesFromMemoryAfterDiskDelete(t *testing.T) {
+	dir := t.TempDir()
+	c := New(dir, nil)
+
+	details := &igdb.GameDetails{Name: "Mega Man"}
+	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Mega Man")
+	if err := os.MkdirAll(cacheDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	jsonPath := filepath.Join(cacheDir, "details.json")
+	data, _ := json.Marshal(details)
+	if err := os.WriteFile(jsonPath, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prime the in-memory layer via a disk read.
+	if got := c.Get("NES", "Mega Man (USA).nes"); got == nil || got.Name != "Mega Man" {
+		t.Fatalf("first Get returned %+v, want {Name: Mega Man}", got)
+	}
+
+	// Delete details.json from disk. The memoized entry should still serve.
+	if err := os.Remove(jsonPath); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.Get("NES", "Mega Man (USA).nes"); got == nil || got.Name != "Mega Man" {
+		t.Errorf("post-delete Get returned %+v, want memoized {Name: Mega Man}", got)
+	}
+}
+
+// TestGet_NegativeCacheMemoizesNotFound verifies that a game with a
+// .notfound marker on disk resolves via the negative cache slot after
+// its first lookup. Deleting the marker afterwards should not cause a
+// stale result — Get keeps returning nil.
+func TestGet_NegativeCacheMemoizesNotFound(t *testing.T) {
+	dir := t.TempDir()
+	c := New(dir, nil)
+
+	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Unknown")
+	if err := os.MkdirAll(cacheDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	notFoundPath := filepath.Join(cacheDir, ".notfound")
+	if err := os.WriteFile(notFoundPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := c.Get("NES", "Unknown.nes"); got != nil {
+		t.Fatalf("first Get = %+v, want nil", got)
+	}
+	if !c.isCached("NES", "Unknown") {
+		t.Fatal("isCached should be true after .notfound disk hit")
+	}
+
+	// Removing the marker does not change the answer — the negative
+	// sentinel stays in memory.
+	if err := os.Remove(notFoundPath); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.Get("NES", "Unknown.nes"); got != nil {
+		t.Errorf("post-delete Get = %+v, want nil (negative cache)", got)
+	}
+	if !c.isCached("NES", "Unknown") {
+		t.Error("isCached should remain true via negative cache")
+	}
+}
+
 func TestFetchAll_NilFetcher(t *testing.T) {
 	c := New(t.TempDir(), nil)
 	got := c.FetchAll([]igdb.GameEntry{
