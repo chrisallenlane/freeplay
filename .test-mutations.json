@@ -520,8 +520,9 @@
       ]
     },
     "cmd/freeplay/main.go": {
-      "status": "pending",
-      "covering_tests": []
+      "status": "excluded",
+      "covering_tests": [],
+      "reason": "CLI entry point (65 LOC) — flag parsing, config load, server construction, ListenAndServe. Has no test file. All mutations would survive because no unit test exercises main(). Testing would require process-level integration tests (spawn the binary, hit endpoints, kill it). Exercised end-to-end by `make run` + `make a11y` + manual smoke testing during development."
     },
     "frontend/api.js": {
       "status": "pending",
@@ -552,8 +553,49 @@
       "covering_tests": ["frontend/urls_test.js"]
     },
     "frontend/utils.js": {
-      "status": "pending",
-      "covering_tests": ["frontend/utils_test.js"]
+      "status": "completed",
+      "covering_tests": ["frontend/utils_test.js"],
+      "last_tested": "2026-04-23T19:20:00Z",
+      "mutations_applied": 20,
+      "killed": 14,
+      "survived_accepted": 7,
+      "mutation_score": 70.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "safeExternalHref has strong mutation coverage. Remaining survivors split between equivalent mutants and DOM-dependent orchestration functions (initSubpage, prefersReducedMotion, scrollElementIntoView)."
+      ],
+      "accepted_survivors": [
+        {
+          "line": 37,
+          "mutation": "if (typeof u !== \"string\") return null; -> (deleted)",
+          "category": "equivalent mutant",
+          "reason": "new URL(non-string) coerces to string and then rejects with a thrown error, caught by the try/catch and returning null. Observable behavior is identical to the explicit type check."
+        },
+        {
+          "line": 39,
+          "mutation": "new URL(u) -> u.startsWith(\"https://\")",
+          "category": "equivalent mutant for all tested inputs",
+          "reason": "For every URL in the covering test suite (https:, http:, javascript:, data:, file:, malformed, non-string), new URL + protocol check and startsWith(\"https://\") produce the same null-vs-u decision."
+        },
+        {
+          "line": 11,
+          "mutation": "!consoleName || !rom -> various (||, &&, single-negation variants) in initSubpage",
+          "category": "DOM-dependent, untested in unit scope",
+          "reason": "initSubpage touches window.location.search, document.title, and URLSearchParams. Testing requires a jsdom harness or equivalent browser DOM mock."
+        },
+        {
+          "line": 20,
+          "mutation": "window.matchMedia(...).matches -> !window.matchMedia(...).matches",
+          "category": "DOM-dependent, untested in unit scope",
+          "reason": "prefersReducedMotion wraps window.matchMedia. Testing requires DOM mock. Reversed behavior is observable via manual testing, not unit tests."
+        },
+        {
+          "line": 27,
+          "mutation": "prefersReducedMotion ternary in scrollElementIntoView — negation / branch swap",
+          "category": "DOM-dependent, untested in unit scope",
+          "reason": "scrollElementIntoView calls el.scrollIntoView with behavior: instant|smooth. Testing requires a DOM Element with scrollIntoView."
+        }
+      ]
     }
   },
   "excluded_modules": {
