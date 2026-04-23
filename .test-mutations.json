@@ -463,8 +463,17 @@
       ]
     },
     "internal/server/routes.go": {
-      "status": "pending",
-      "covering_tests": ["internal/server/server_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/server/server_test.go"],
+      "last_tested": "2026-04-23T18:40:00Z",
+      "mutations_applied": 17,
+      "killed": 17,
+      "survived_accepted": 0,
+      "mutation_score": 100.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Route registration is fully exercised — all HTTP method changes, cache-control header changes, and immutable vs mutable long-cache mutations are killed by the endpoint tests."
+      ]
     },
     "internal/server/serve.go": {
       "status": "pending",
