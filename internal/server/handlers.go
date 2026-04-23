@@ -16,7 +16,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleGames(w http.ResponseWriter, _ *http.Request) {
 	data, err := s.scanner.CatalogJSON()
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeJSONError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -89,7 +89,7 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 	console, game, saveType, ok := parseSaveParams(r)
 	if !ok {
-		http.Error(w, "invalid save parameters", http.StatusBadRequest)
+		writeJSONError(w, "invalid save parameters", http.StatusBadRequest)
 		return
 	}
 	if !s.scanner.HasGame(console, game) {
@@ -111,7 +111,7 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	console, game, saveType, ok := parseSaveParams(r)
 	if !ok {
-		http.Error(w, "invalid save parameters", http.StatusBadRequest)
+		writeJSONError(w, "invalid save parameters", http.StatusBadRequest)
 		return
 	}
 	// Gate on catalog membership: prevents unbounded disk growth via
@@ -126,10 +126,10 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	if err := s.saves.Put(console, game, saveType, r.Body); err != nil {
 		var mb *http.MaxBytesError
 		if errors.As(err, &mb) {
-			http.Error(w, "save too large", http.StatusRequestEntityTooLarge)
+			writeJSONError(w, "save too large", http.StatusRequestEntityTooLarge)
 			return
 		}
-		http.Error(w, "save failed", http.StatusInternalServerError)
+		writeJSONError(w, "save failed", http.StatusInternalServerError)
 		return
 	}
 

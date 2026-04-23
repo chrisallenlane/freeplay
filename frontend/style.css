@@ -218,7 +218,10 @@ header h1 {
 .btn:focus-visible,
 .fav-btn:focus-visible,
 .skip-link:focus-visible,
-.game-card.highlighted {
+.game-card.highlighted,
+.details-action-btn:focus-visible,
+.details-action-btn.highlighted,
+.header-btn.highlighted {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
 }
