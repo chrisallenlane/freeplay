@@ -10,22 +10,24 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/saves"
 )
 
-// serveFile serves a single file from the filesystem with long cache headers.
-// Returns 404 if the path does not exist or is a directory.
-func serveFile(w http.ResponseWriter, r *http.Request, path string) {
+// serveFile serves a single file from the filesystem with the given
+// Cache-Control directive. Returns 404 if the path does not exist or
+// is a directory.
+func serveFile(w http.ResponseWriter, r *http.Request, path, cacheControl string) {
 	info, err := os.Stat(path)
 	if err != nil || info.IsDir() {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Cache-Control", longCacheValue)
+	w.Header().Set("Cache-Control", cacheControl)
 	http.ServeFile(w, r, path)
 }
 
 // serveSecureFile serves a file from baseDir after verifying the cleaned
 // target path stays within baseDir. Used for user-controlled file routes
-// (ROMs, covers, manuals, IGDB cache).
-func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir, file string) {
+// (ROMs, covers, manuals, IGDB cache). The cacheControl argument is
+// passed through to the response.
+func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir, file, cacheControl string) {
 	baseDir = filepath.Clean(baseDir)
 
 	clean := filepath.Clean(file)
@@ -42,7 +44,7 @@ func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir
 		return
 	}
 
-	serveFile(w, r, fullPath)
+	serveFile(w, r, fullPath, cacheControl)
 }
 
 // servePage returns a handler that serves a named file from the embedded

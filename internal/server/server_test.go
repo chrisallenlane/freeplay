@@ -172,8 +172,8 @@ func TestROMServing(t *testing.T) {
 	if w.Body.String() != "romdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "romdata")
 	}
-	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
-		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheImmutable {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheImmutable)
 	}
 }
 
@@ -196,8 +196,8 @@ func TestBIOSServing(t *testing.T) {
 	if w.Body.String() != "biosdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "biosdata")
 	}
-	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
-		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheImmutable {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheImmutable)
 	}
 }
 
@@ -327,8 +327,8 @@ func TestCoversServing(t *testing.T) {
 	if w.Body.String() != "pngdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "pngdata")
 	}
-	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
-		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheMutable {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheMutable)
 	}
 }
 
@@ -350,8 +350,8 @@ func TestManualsServing(t *testing.T) {
 	if w.Body.String() != "pdfdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "pdfdata")
 	}
-	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
-		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheMutable {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheMutable)
 	}
 }
 
@@ -463,8 +463,8 @@ func TestEmulatorJSCacheHeaders(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
-	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
-		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheImmutable {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheImmutable)
 	}
 }
 
@@ -846,8 +846,8 @@ func TestCacheFilesServing(t *testing.T) {
 	if w.Body.String() != "jpgdata" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "jpgdata")
 	}
-	if cc := w.Header().Get("Cache-Control"); cc != longCacheValue {
-		t.Errorf("Cache-Control = %q, want %q", cc, longCacheValue)
+	if cc := w.Header().Get("Cache-Control"); cc != longCacheMutable {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCacheMutable)
 	}
 }
 
