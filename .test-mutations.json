@@ -414,8 +414,25 @@
       ]
     },
     "internal/server/handlers.go": {
-      "status": "pending",
-      "covering_tests": ["internal/server/server_test.go", "internal/server/server_cachefile_test.go", "internal/server/server_securefile_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/server/server_test.go", "internal/server/server_cachefile_test.go", "internal/server/server_securefile_test.go"],
+      "last_tested": "2026-04-23T18:20:00Z",
+      "mutations_applied": 32,
+      "killed": 31,
+      "survived_accepted": 1,
+      "mutation_score": 96.9,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "No new tests needed; the single survivor is an equivalent mutant"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 36,
+          "mutation": "!ok || rom.Bios == \"\" -> ok && rom.Bios == \"\" in handleBIOS",
+          "category": "equivalent mutant",
+          "reason": "Three observable cases all produce identical responses: (a) unknown console: original returns NotFound directly; mutated falls through to serveFile(\"\") which also returns NotFound via os.Stat error. (b) known console with empty Bios: both branches return NotFound. (c) known console with non-empty Bios: both branches call serveFile with the same path. No external difference in status, headers, or body."
+        }
+      ]
     },
     "internal/server/middleware.go": {
       "status": "pending",
