@@ -498,8 +498,26 @@
       ]
     },
     "internal/server/server.go": {
-      "status": "pending",
-      "covering_tests": ["internal/server/server_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/server/server_test.go"],
+      "last_tested": "2026-04-23T19:10:00Z",
+      "mutations_applied": 25,
+      "killed": 24,
+      "survived_accepted": 1,
+      "mutation_score": 96.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "TestNewHTTPServerTimeouts inspects the *http.Server fields: Addr, ReadHeaderTimeout, ReadTimeout, WriteTimeout, IdleTimeout, MaxHeaderBytes (kills all timeout/header-bytes constant mutations)",
+        "TestCacheControlConstantValues pins the exact Cache-Control strings (kills off-by-one max-age mutations)"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 94,
+          "mutation": "return s.newHTTPServer().ListenAndServe() -> return nil",
+          "category": "structurally untestable in unit tests",
+          "reason": "ListenAndServe blocks; exercising it in a unit test would require either a goroutine with a real port or a custom transport. The method is a thin wrapper over newHTTPServer() (tested directly) + ListenAndServe() (stdlib). Integration-test scope."
+        }
+      ]
     },
     "cmd/freeplay/main.go": {
       "status": "pending",

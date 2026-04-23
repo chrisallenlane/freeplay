@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
 	"github.com/chrisallenlane/freeplay/internal/datadir"
@@ -306,6 +307,44 @@ func TestSaveInvalidType(t *testing.T) {
 		t.Errorf("error body not valid JSON: %v (body: %q)", err, w.Body.String())
 	} else if body["error"] == "" {
 		t.Errorf("error body missing 'error' key: %v", body)
+	}
+}
+
+// TestNewHTTPServerTimeouts pins the production http.Server construction:
+// address format, timeouts (slow-drip defenses), and MaxHeaderBytes.
+// Kills mutations on any of the constant values in newHTTPServer.
+func TestNewHTTPServerTimeouts(t *testing.T) {
+	srv, _ := testServer(t)
+	hs := srv.newHTTPServer()
+
+	if hs.Addr != ":8080" {
+		t.Errorf("Addr = %q, want %q", hs.Addr, ":8080")
+	}
+	if hs.ReadHeaderTimeout != 10*time.Second {
+		t.Errorf("ReadHeaderTimeout = %v, want 10s", hs.ReadHeaderTimeout)
+	}
+	if hs.ReadTimeout != 60*time.Second {
+		t.Errorf("ReadTimeout = %v, want 60s", hs.ReadTimeout)
+	}
+	if hs.WriteTimeout != 60*time.Second {
+		t.Errorf("WriteTimeout = %v, want 60s", hs.WriteTimeout)
+	}
+	if hs.IdleTimeout != 120*time.Second {
+		t.Errorf("IdleTimeout = %v, want 120s", hs.IdleTimeout)
+	}
+	if hs.MaxHeaderBytes != 1<<14 {
+		t.Errorf("MaxHeaderBytes = %d, want %d", hs.MaxHeaderBytes, 1<<14)
+	}
+}
+
+// TestCacheControlConstantValues pins the Cache-Control constant strings
+// literally so off-by-one mutations on max-age are caught.
+func TestCacheControlConstantValues(t *testing.T) {
+	if longCacheImmutable != "public, max-age=31536000, immutable" {
+		t.Errorf("longCacheImmutable = %q", longCacheImmutable)
+	}
+	if longCacheMutable != "public, max-age=31536000" {
+		t.Errorf("longCacheMutable = %q", longCacheMutable)
 	}
 }
 
