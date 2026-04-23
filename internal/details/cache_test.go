@@ -619,8 +619,8 @@ func TestFetchAll_URLsRewrittenToLocalPaths(t *testing.T) {
 	fetcher := newGameFetcher("Mega Man", 17, igdb.GameDetails{
 		Name:        "Mega Man",
 		CoverURL:    imgURL,
-		Screenshots: []string{imgURL},
-		Artworks:    []string{imgURL},
+		Screenshots: []igdb.ImageRef{{URL: imgURL, ThumbURL: imgURL}},
+		Artworks:    []igdb.ImageRef{{URL: imgURL, ThumbURL: imgURL}},
 	})
 
 	dir := t.TempDir()
@@ -640,14 +640,20 @@ func TestFetchAll_URLsRewrittenToLocalPaths(t *testing.T) {
 	if len(got.Screenshots) != 1 {
 		t.Fatalf("Screenshots len = %d, want 1", len(got.Screenshots))
 	}
-	if !strings.HasPrefix(got.Screenshots[0], "/cache/igdb/") {
-		t.Errorf("Screenshot URL not rewritten: %q", got.Screenshots[0])
+	if !strings.HasPrefix(got.Screenshots[0].URL, "/cache/igdb/") {
+		t.Errorf("Screenshot full URL not rewritten: %q", got.Screenshots[0].URL)
+	}
+	if !strings.HasPrefix(got.Screenshots[0].ThumbURL, "/cache/igdb/") {
+		t.Errorf("Screenshot thumb URL not rewritten: %q", got.Screenshots[0].ThumbURL)
 	}
 	if len(got.Artworks) != 1 {
 		t.Fatalf("Artworks len = %d, want 1", len(got.Artworks))
 	}
-	if !strings.HasPrefix(got.Artworks[0], "/cache/igdb/") {
-		t.Errorf("Artwork URL not rewritten: %q", got.Artworks[0])
+	if !strings.HasPrefix(got.Artworks[0].URL, "/cache/igdb/") {
+		t.Errorf("Artwork full URL not rewritten: %q", got.Artworks[0].URL)
+	}
+	if !strings.HasPrefix(got.Artworks[0].ThumbURL, "/cache/igdb/") {
+		t.Errorf("Artwork thumb URL not rewritten: %q", got.Artworks[0].ThumbURL)
 	}
 }
 
@@ -837,8 +843,8 @@ func TestFetchAll_ImageDownloadFailure(t *testing.T) {
 		Name:        "Mega Man",
 		Summary:     "A platformer.",
 		CoverURL:    coverURL,
-		Screenshots: []string{imgServer.URL + "/ss0.jpg"},
-		Artworks:    []string{imgServer.URL + "/art0.jpg"},
+		Screenshots: []igdb.ImageRef{{URL: imgServer.URL + "/ss0.jpg"}},
+		Artworks:    []igdb.ImageRef{{URL: imgServer.URL + "/art0.jpg"}},
 	})
 
 	dir := t.TempDir()
