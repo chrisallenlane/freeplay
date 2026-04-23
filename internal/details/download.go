@@ -130,6 +130,15 @@ func (c *Cache) saveDetails(
 // ensureCoverThumbnail copies the cached cover image to the standard cover
 // path (used by the covers handler) if it doesn't already exist.
 func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
+	// Defense-in-depth: fetchOne already tombstones unsafe segments, but
+	// isCached() also calls this on the early-return path, so we re-check
+	// here. A segment slip would let dst escape the covers subtree
+	// (see SEC-5).
+	if !safePathSegment(console) ||
+		!safePathSegment(nameNoExt) ||
+		!safePathSegment(cleanName) {
+		return
+	}
 	dst := coverPath(c.dataDir, console, nameNoExt)
 	if _, err := os.Stat(dst); err == nil {
 		return // already exists

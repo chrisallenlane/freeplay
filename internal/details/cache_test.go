@@ -124,6 +124,69 @@ func newGameFetcher(
 	}
 }
 
+// TestFetchOneRejectsUnsafeFilenames pins the SEC-5 tombstoning: a
+// catalog entry whose name or console produces an unsafe path segment
+// must be skipped by fetchOne without any filesystem writes. Covers
+// the two PoC shapes from the SEC-5 ticket:
+//   - "..(USA).nes" → cleanName = ".." → would escape the NES subdir
+//     into <cacheDir> via filepath.Join(cacheDir, "NES", "..", ...).
+//   - "../../pwned.nes" → nameNoExt = "../../pwned" → would escape
+//     the covers subtree in ensureCoverThumbnail.
+func TestFetchOneRejectsUnsafeFilenames(t *testing.T) {
+	dir := t.TempDir()
+	// mockIGDBFetcher is defined in cache_search_test.go; give it a
+	// result so a successful fetchOne would actually write files.
+	fetcher := &mockIGDBFetcher{
+		searchResults:  map[string]int{"": 1, "..": 1, "pwned": 1},
+		detailsResults: map[int]*igdb.GameDetails{1: {Name: "ATTACKER"}},
+	}
+	c := New(dir, fetcher)
+
+	c.FetchAll([]igdb.GameEntry{
+		{Console: "NES", Filename: "..(USA).nes", IGDBPlatformIDs: []int{18}},
+		{Console: "NES", Filename: "../../pwned.nes", IGDBPlatformIDs: []int{18}},
+		{Console: "..", Filename: "Game.nes", IGDBPlatformIDs: []int{18}},
+	})
+
+	// Files allowed ONLY under the per-game cache subdirectory. Any
+	// escape (e.g., <cacheDir>/details.json, <cacheDir>/.notfound,
+	// <dir>/covers/../pwned.png) means a segment check was missed.
+	cacheRoot := CacheDir(dir)
+	for _, suspect := range []string{
+		filepath.Join(cacheRoot, "details.json"),
+		filepath.Join(cacheRoot, ".notfound"),
+		filepath.Join(cacheRoot, "cover.jpg"),
+		filepath.Join(dir, "pwned.png"),
+		filepath.Join(dir, "covers", "pwned.png"),
+	} {
+		if _, err := os.Stat(suspect); err == nil {
+			t.Errorf("file escaped per-game subdir: %s", suspect)
+		}
+	}
+}
+
+func TestSafePathSegment(t *testing.T) {
+	tests := []struct {
+		in   string
+		want bool
+	}{
+		{"Mega Man", true},
+		{"", false},
+		{".", false},
+		{"..", false},
+		{"../evil", false},
+		{"a/b", false},
+		{"a\\b", false},
+		{"a\x00b", false},
+		{"normal.nes", true},
+	}
+	for _, tt := range tests {
+		if got := safePathSegment(tt.in); got != tt.want {
+			t.Errorf("safePathSegment(%q) = %v, want %v", tt.in, got, tt.want)
+		}
+	}
+}
+
 // TestCacheGetRefusesPathsOutsideCacheDir pins the SEC-3 defense-in-depth:
 // even if the HTTP boundary validator is bypassed, Cache.Get must never
 // read a file outside CacheDir(dataDir).

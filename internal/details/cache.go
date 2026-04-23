@@ -109,6 +109,17 @@ func pathInside(child, parent string) bool {
 		strings.HasPrefix(cleanChild, cleanParent+string(filepath.Separator))
 }
 
+// safePathSegment reports whether s is safe to use as a single path
+// segment inside a trusted directory. Rejects empty, ".", "..",
+// anything containing a path separator, and NUL bytes. Callers should
+// skip (tombstone) offending inputs rather than trying to sanitize —
+// a ROM whose filename produces an unsafe segment is an attacker
+// signal, not an ergonomic concern.
+func safePathSegment(s string) bool {
+	return s != "" && s != "." && s != ".." &&
+		!strings.ContainsAny(s, `/\`+"\x00")
+}
+
 // FetchAll populates the cache for any games not yet cached.
 // Returns the count of newly cached games.
 func (c *Cache) FetchAll(games []igdb.GameEntry) int {
@@ -136,6 +147,21 @@ func (c *Cache) FetchAll(games []igdb.GameEntry) int {
 func (c *Cache) fetchOne(g igdb.GameEntry, ticker *time.Ticker) bool {
 	nameNoExt, cleanName := igdb.CleanFilename(g.Filename)
 	if cleanName == "" {
+		return false
+	}
+	// Segment-safety gate: CleanName does not reject "..", "/", "\" or
+	// NUL in the result. A ROM named "..(USA).nes" yields cleanName="..";
+	// a ROM named "../../pwned.nes" yields nameNoExt="../../pwned". Tombstone
+	// these at the cache-population boundary so no downstream write path
+	// has to re-validate (see SEC-5).
+	if !safePathSegment(g.Console) ||
+		!safePathSegment(cleanName) ||
+		!safePathSegment(nameNoExt) {
+		slog.Warn(
+			"skipping game with unsafe path segment",
+			"console", g.Console,
+			"filename", g.Filename,
+		)
 		return false
 	}
 
