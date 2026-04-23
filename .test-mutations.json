@@ -192,8 +192,38 @@
       ]
     },
     "internal/igdb/name.go": {
-      "status": "pending",
-      "covering_tests": ["internal/igdb/name_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/igdb/name_test.go"],
+      "last_tested": "2026-04-23T16:55:00Z",
+      "mutations_applied": 25,
+      "killed": 21,
+      "survived_accepted": 3,
+      "mutation_score": 84.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added TestCleanNameTrimsSurroundingSpace (kills CleanName trailing TrimSpace deletion)",
+        "Added TestNameVariantsDedupesAndTrimsSubtitle (kills TrimSpace on subtitle-prefix slice)"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 37,
+          "mutation": "seen[s] = true -> (deleted)",
+          "category": "equivalent mutant given current transformations",
+          "reason": "The dedup map is pre-seeded with cleanName at line 32. The current 3 transformations (dash->colon, space removal, subtitle drop) don't produce cross-transform collisions for any practical input, so removing seen[s] = true produces identical output for all current inputs. The line is defensive code against future transformations that might collide."
+        },
+        {
+          "line": 49,
+          "mutation": "idx > 0 -> idx >= 0 in `strings.Index(cleanName, \" - \")` branch",
+          "category": "equivalent mutant",
+          "reason": "If idx == 0, cleanName[:0] is empty string; strings.TrimSpace(\"\") is empty string; the add() helper guards with `s != \"\"` and rejects. Observable behavior identical to `idx > 0`."
+        },
+        {
+          "line": 51,
+          "mutation": "idx > 0 -> idx >= 0 in `strings.Index(cleanName, \": \")` branch",
+          "category": "equivalent mutant",
+          "reason": "Same as line 49 — add() guard rejects empty string additions, so the idx==0 case yields no observable difference."
+        }
+      ]
     },
     "internal/igdb/url.go": {
       "status": "pending",

@@ -37,6 +37,27 @@ func TestCleanName(t *testing.T) {
 	}
 }
 
+// TestCleanNameTrimsSurroundingSpace asserts that CleanName applies
+// strings.TrimSpace to the result — inputs with leading/trailing
+// whitespace that wasn't consumed by the regex replacements must come
+// back trimmed. Kills the statement-deletion mutation at the trailing
+// strings.TrimSpace in CleanName.
+func TestCleanNameTrimsSurroundingSpace(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"  Zelda  ", "Zelda"},
+		{"\tMega Man\n", "Mega Man"},
+	}
+	for _, tt := range tests {
+		got := CleanName(tt.input)
+		if got != tt.want {
+			t.Errorf("CleanName(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
 func TestNameVariants(t *testing.T) {
 	tests := []struct {
 		input string
@@ -84,6 +105,48 @@ func TestNameVariants(t *testing.T) {
 					tt.input, i, got[i], tt.want[i],
 				)
 			}
+		}
+	}
+}
+
+// TestNameVariantsDedupesAndTrimsSubtitle asserts two invariants:
+//  1. Variants are deduplicated. An input like "ab" produces the same
+//     string through every transformation; the result must have length 1.
+//  2. The "subtitle dropped" variant trims trailing whitespace. An
+//     atypical input like "Zelda : Subtitle" (space before colon) must
+//     yield "Zelda", not "Zelda ".
+//
+// Kills the line-37 (seen[s] = true) and line-52 (TrimSpace on prefix)
+// statement-deletion mutations.
+func TestNameVariantsDedupesAndTrimsSubtitle(t *testing.T) {
+	// Dedup: "ab" has no spaces, no dashes, no colons — every heuristic
+	// collapses back to "ab". Without dedup, variants would contain
+	// "ab" multiple times.
+	got := NameVariants("ab")
+	if len(got) != 1 || got[0] != "ab" {
+		t.Errorf("NameVariants(%q) = %v, want [\"ab\"] (dedup)", "ab", got)
+	}
+
+	// Subtitle-trim: atypical "Name : Subtitle" leaves a trailing space
+	// when we slice off the colon position. The TrimSpace in the
+	// subtitle-drop branch must handle it.
+	got = NameVariants("Zelda : Subtitle")
+	want := "Zelda"
+	found := false
+	for _, v := range got {
+		if v == want {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("NameVariants(%q) missing subtitle-drop variant %q; got %v",
+			"Zelda : Subtitle", want, got)
+	}
+	for _, v := range got {
+		if v == "Zelda " {
+			t.Errorf("NameVariants(%q) produced untrimmed variant %q; got %v",
+				"Zelda : Subtitle", v, got)
 		}
 	}
 }
