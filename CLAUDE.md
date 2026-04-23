@@ -8,6 +8,8 @@ Retro-gaming server that serves ROMs via EmulatorJS in the browser.
 make check            # fmt + lint + vet + test
 make build            # build binary to dist/
 make run              # build and run with testdata
+make bench            # run Go benchmarks (count=5, benchmem)
+make build-debug      # build with pprof listener on 127.0.0.1:6060
 make fuzz             # run fuzz tests (15s each)
 make fuzz-long        # run fuzz tests (10m each)
 make audit            # govulncheck + gosec security scan

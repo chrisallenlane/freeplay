@@ -18,6 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Fuzz testing infrastructure (`make fuzz`, `make fuzz-long`)
 - Accessibility audit target (`make a11y`)
 - CSRF protection on state-changing endpoints
+- Benchmark suite and `make bench` target for critical-path regression testing
+- `make build-debug` produces a debug binary with pprof on `127.0.0.1:6060`
+  (gated behind `//go:build debug`; not present in production builds)
 
 ### Changed
 - Clicking a game card navigates to the details page instead of launching
@@ -25,6 +28,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Page titles now use IGDB game names when available
 - Improved typography and visual hierarchy on the details page
 - Back-to-library link styled as a button on subpages
+- IGDB screenshots and artworks now cache two variants: a `t_screenshot_huge`
+  thumbnail and a `t_original` full-size image; wire format changed from
+  `[]string` to `[]ImageRef{URL, ThumbURL}` (legacy string arrays still
+  accepted via backward-compatible `UnmarshalJSON`)
+- Cache-Control split: `/covers/`, `/cache/igdb/`, and `/manuals/` use
+  `public, max-age=31536000` (no `immutable`) so browsers revalidate after
+  TTL expiry; `/emulatorjs/`, `/roms/`, and `/bios/` retain `immutable`
+- `/api/game-details` uses `private, max-age=300` to deduplicate in-session
+  navigation requests; all other `/api/*` endpoints use `no-store`
+- Gzip compression middleware: text responses (JSON, HTML, CSS, JS, WASM)
+  are compressed when the client sends `Accept-Encoding: gzip`; binary routes
+  (save blobs, ROM files, images) pass through uncompressed
+- Details cache now keeps a per-process in-memory layer; steady-state rescans
+  avoid per-game disk reads for already-cached entries
+- Scanner preallocates the games slice from the previous scan count and uses
+  `slices.SortFunc` (reduced allocations on repeated scans)
 
 ### Fixed
 - IGDB matching regression for games with diacritical characters in titles
