@@ -64,6 +64,40 @@ func TestScanFindsGames(t *testing.T) {
 	if len(cat.Consoles) != 2 {
 		t.Fatalf("got %d consoles, want 2", len(cat.Consoles))
 	}
+	// lastGameCount must track the scan result so the next scan can
+	// pre-allocate correctly. Kills the statement-deletion mutation that
+	// drops the assignment at the end of scan().
+	if s.lastGameCount != len(cat.Games) {
+		t.Errorf(
+			"scanner.lastGameCount = %d, want %d",
+			s.lastGameCount, len(cat.Games),
+		)
+	}
+}
+
+// TestScanSkipsConsoleWithMissingROMDir verifies that a console whose
+// ROM directory does not exist is skipped entirely — it must not appear
+// in the catalog's Consoles list. Kills the statement-deletion mutation
+// that removes the `continue` after an os.ReadDir error, which would
+// otherwise add an empty console to consoleSet.
+func TestScanSkipsConsoleWithMissingROMDir(t *testing.T) {
+	dir, cfg := setupTestDir(t)
+	cfg.ROMs["Ghost"] = config.ROM{
+		Path: filepath.Join(dir, "roms", "does-not-exist"),
+		Core: "none",
+	}
+	s := New(cfg, dir)
+	s.ScanBlocking()
+
+	cat := s.catalog.Load()
+	for _, c := range cat.Consoles {
+		if c == "Ghost" {
+			t.Errorf(
+				"console with missing ROM dir appeared in Consoles: %v",
+				cat.Consoles,
+			)
+		}
+	}
 }
 
 func TestScanSortOrder(t *testing.T) {

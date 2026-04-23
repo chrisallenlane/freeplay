@@ -328,8 +328,44 @@
       ]
     },
     "internal/scanner/scanner.go": {
-      "status": "pending",
-      "covering_tests": ["internal/scanner/scanner_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/scanner/scanner_test.go"],
+      "last_tested": "2026-04-23T17:55:00Z",
+      "mutations_applied": 26,
+      "killed": 22,
+      "survived_accepted": 4,
+      "mutation_score": 84.6,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "TestScanFindsGames extended to assert scanner.lastGameCount == len(Games) (kills deletion of capacity-tracking line)",
+        "TestScanSkipsConsoleWithMissingROMDir added (kills continue-deletion after ReadDir error by checking Consoles list doesn't include a console with a non-existent path)"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 47,
+          "mutation": "make([]Game, 0, s.lastGameCount) -> s.lastGameCount+1",
+          "category": "equivalent mutant",
+          "reason": "Capacity hint only; over-allocating by 1 doesn't change correctness."
+        },
+        {
+          "line": 57,
+          "mutation": "consoleSet[consoleName] = true -> = false",
+          "category": "equivalent mutant",
+          "reason": "Only map keys are read via `for c := range consoleSet`; values are never inspected."
+        },
+        {
+          "line": 110,
+          "mutation": "return cmp.Compare(a.Filename, b.Filename) -> return 0",
+          "category": "equivalent mutant given filesystem input",
+          "reason": "os.ReadDir returns entries sorted by name. Games within a console are already in filename order when appended, so the within-console sort is a no-op for all filesystem-sourced inputs. Defensive code; mutation produces identical observable output."
+        },
+        {
+          "line": 117,
+          "mutation": "slog.Info(\"scan complete\", ...) -> (deleted)",
+          "category": "observability side-effect",
+          "reason": "Logging-only side effect. Would require slog.Handler capture to test; low marginal value for an informational operational log line."
+        }
+      ]
     },
     "internal/server/gzip.go": {
       "status": "pending",
