@@ -86,6 +86,10 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid save parameters", http.StatusBadRequest)
 		return
 	}
+	if !s.scanner.HasGame(console, game) {
+		http.NotFound(w, r)
+		return
+	}
 
 	data := s.saves.Get(console, game, saveType)
 	if data == nil {
@@ -100,6 +104,13 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	console, game, saveType, ok := parseSaveParams(r)
 	if !ok {
 		http.Error(w, "invalid save parameters", http.StatusBadRequest)
+		return
+	}
+	// Gate on catalog membership: prevents unbounded disk growth via
+	// unique game names (see SEC-4). The check runs before body read,
+	// so attackers targeting unknown games never pay for file I/O.
+	if !s.scanner.HasGame(console, game) {
+		http.NotFound(w, r)
 		return
 	}
 
