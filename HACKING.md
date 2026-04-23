@@ -43,7 +43,7 @@ Run `make help` for the full list. The most useful targets:
 | `make test`          | Run Go and JS unit tests                |
 | `make coverage`      | Generate HTML coverage report           |
 | `make coverage-text` | Show per-function coverage in terminal  |
-| `make a11y`          | Run accessibility audit against live server |
+| `make a11y`          | Run pa11y + axe-core accessibility audit against live server |
 | `make fuzz`          | Run fuzz tests (15s each)               |
 | `make fuzz-long`     | Run fuzz tests (10m each)               |
 | `make vendor`        | Tidy and re-vendor Go dependencies      |

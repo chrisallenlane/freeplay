@@ -33,7 +33,7 @@ a TOML file, and you're done.
 - Supports gamepad navigation in the library UI (D-pad to browse, shoulder
   buttons to switch filters, A/Start to launch)
 - Supports keyboard navigation — arrow keys to browse, `[`/`]` to cycle
-  filters, semantic HTML, visible focus indicators
+  filters, skip-to-content link, semantic HTML, visible focus indicators
 
 ## What it doesn't do
 
