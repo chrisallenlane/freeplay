@@ -1,10 +1,13 @@
 package config
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -115,6 +118,7 @@ func TestLoadValidationErrors(t *testing.T) {
 		{"cover_art_api missing key", "cover_art_api = \"igdb\"", "cover_art_api_key is required"},
 		{"IGDB key missing separator", "cover_art_api = \"igdb\"\ncover_art_api_key = \"missingcolon\"", "client_id:client_secret"},
 		{"invalid port", "port = 99999", "port must be"},
+		{"negative port", "port = -1", "port must be"},
 		{"IGDB key empty client_id", "cover_art_api = \"igdb\"\ncover_art_api_key = \":secret\"", "client_id:client_secret"},
 		{"IGDB key empty secret", "cover_art_api = \"igdb\"\ncover_art_api_key = \"clientid:\"", "client_id:client_secret"},
 	}
@@ -154,6 +158,86 @@ bios = "bios/SCPH1001.BIN"
 	}
 	if cfg.ROMs["PlayStation"].Bios != filepath.Join(dir, "bios", "SCPH1001.BIN") {
 		t.Errorf("bios path = %q, want resolved path", cfg.ROMs["PlayStation"].Bios)
+	}
+}
+
+func TestLoadEmptyBIOSStaysEmpty(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+[roms.NES]
+path = "/roms/nes"
+core = "fceumm"
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rom, ok := cfg.ROMs["NES"]
+	if !ok {
+		t.Fatal("NES rom entry missing")
+	}
+	if rom.Bios != "" {
+		t.Errorf("Bios = %q, want empty string", rom.Bios)
+	}
+}
+
+// capturingHandler is a minimal slog.Handler that records every log record.
+type capturingHandler struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (h *capturingHandler) Enabled(_ context.Context, _ slog.Level) bool {
+	return true
+}
+
+func (h *capturingHandler) Handle(_ context.Context, r slog.Record) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.records = append(h.records, r)
+	return nil
+}
+
+func (h *capturingHandler) WithAttrs(_ []slog.Attr) slog.Handler { return h }
+func (h *capturingHandler) WithGroup(_ string) slog.Handler      { return h }
+
+func (h *capturingHandler) hasMessage(msg string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, r := range h.records {
+		if r.Message == msg {
+			return true
+		}
+	}
+	return false
+}
+
+func TestLoadWarnsOnMissingDirectories(t *testing.T) {
+	dir := t.TempDir()
+
+	// Use paths that are guaranteed not to exist.
+	writeConfig(t, dir, `
+[roms.SNES]
+path = "/nonexistent/roms/snes"
+core = "snes9x"
+bios = "/nonexistent/bios/snes.bin"
+`)
+
+	handler := &capturingHandler{}
+	prev := slog.Default()
+	slog.SetDefault(slog.New(handler))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	_, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !handler.hasMessage("ROM directory does not exist") {
+		t.Error("expected slog.Warn with message \"ROM directory does not exist\"")
+	}
+	if !handler.hasMessage("BIOS file does not exist") {
+		t.Error("expected slog.Warn with message \"BIOS file does not exist\"")
 	}
 }
 

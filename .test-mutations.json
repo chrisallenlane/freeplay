@@ -50,8 +50,26 @@
       ]
     },
     "internal/config/config.go": {
-      "status": "pending",
-      "covering_tests": ["internal/config/config_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/config/config_test.go"],
+      "last_tested": "2026-04-23T15:10:00Z",
+      "mutations_applied": 23,
+      "killed": 22,
+      "survived_accepted": 1,
+      "mutation_score": 95.7,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added negative-port case, empty-BIOS preservation test, and slog-capturing test for checkDirectories warning emission",
+        "slog.SetDefault + slog.Handler pattern lets tests assert on warning output without refactoring production code to inject a logger"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 54,
+          "mutation": "c.Port < 1 -> c.Port < 0",
+          "category": "equivalent mutant",
+          "reason": "cfg.Port == 0 at line 39 defaults to 8080 before validate() runs. Only non-zero values reach validate(), and for those Port < 1 and Port < 0 give identical results (negative rejects both, positive accepts both). Port = 0 is unreachable at the validate() call site, so the two conditions are functionally equivalent."
+        }
+      ]
     },
     "internal/datadir/datadir.go": {
       "status": "pending",
