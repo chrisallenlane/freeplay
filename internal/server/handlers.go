@@ -10,7 +10,6 @@ import (
 )
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Cache-Control", "no-store")
 	writeJSONOK(w)
 }
 
@@ -21,7 +20,6 @@ func (s *Server) handleGames(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write(data)
 }
 
@@ -108,7 +106,6 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Cache-Control", "no-store")
 	// #nosec G705 -- opaque binary save blob served as octet-stream;
 	// X-Content-Type-Options: nosniff is set globally by securityHeaders.
 	_, _ = w.Write(data)
@@ -139,7 +136,6 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -147,9 +143,6 @@ func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	fetching := s.detailsCache != nil && s.detailsCache.Fetching()
 	igdbConfigured := s.detailsCache != nil
 	w.Header().Set("Content-Type", "application/json")
-	// Polled every 2s while fetchingDetails is true — must never
-	// heuristic-cache or the UI would never see the flag clear.
-	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"fetchingDetails": fetching,
 		"igdbConfigured":  igdbConfigured,
@@ -169,6 +162,5 @@ func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, `{"error":"scan already in progress"}`, http.StatusConflict)
 		return
 	}
-	w.Header().Set("Cache-Control", "no-store")
 	writeJSONOK(w)
 }

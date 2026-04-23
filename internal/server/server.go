@@ -131,13 +131,20 @@ func securityHeaders(next http.Handler) http.Handler {
 }
 
 func (s *Server) routes() {
+	// Every non-idempotent or live-state /api/* route must never be
+	// heuristic-cached by browsers. Wrap at registration time so
+	// handlers stay focused on their response bodies.
+	noStore := func(h http.HandlerFunc) http.Handler {
+		return cacheControl("no-store", h)
+	}
+
 	// API routes
-	s.mux.HandleFunc("GET /api/health", s.handleHealth)
-	s.mux.HandleFunc("GET /api/games", s.handleGames)
-	s.mux.HandleFunc("GET /api/saves/{console}/{game}/{type}", s.handleGetSave)
-	s.mux.HandleFunc("POST /api/saves/{console}/{game}/{type}", s.handlePostSave)
-	s.mux.HandleFunc("POST /api/rescan", s.handleRescan)
-	s.mux.HandleFunc("GET /api/status", s.handleStatus)
+	s.mux.Handle("GET /api/health", noStore(s.handleHealth))
+	s.mux.Handle("GET /api/games", noStore(s.handleGames))
+	s.mux.Handle("GET /api/saves/{console}/{game}/{type}", noStore(s.handleGetSave))
+	s.mux.Handle("POST /api/saves/{console}/{game}/{type}", noStore(s.handlePostSave))
+	s.mux.Handle("POST /api/rescan", noStore(s.handleRescan))
+	s.mux.Handle("GET /api/status", noStore(s.handleStatus))
 
 	// ROM serving
 	s.mux.HandleFunc("GET /roms/{console}/{file}", s.handleROM)
