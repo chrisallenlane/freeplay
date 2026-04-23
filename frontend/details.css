@@ -139,6 +139,10 @@ main {
 .details-cover-full {
     display: block;
     max-width: 100%;
+    /* IGDB covers use the 3:4 poster aspect ratio; reserve the space
+       so the page doesn't shift as the lazy-loaded image arrives. */
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
     margin: 0 auto;
     border-radius: 8px;
 }
@@ -152,6 +156,10 @@ main {
 
 .details-gallery img {
     height: 180px;
+    /* IGDB screenshots/artworks are 16:9; reserving the ratio keeps
+       each tile's horizontal slot stable before the image lands. */
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
     border-radius: 6px;
 }
 
