@@ -85,6 +85,11 @@ fuzz: $(EMULATORJS_SENTINEL)
 fuzz-long: $(EMULATORJS_SENTINEL)
 	@./test/fuzz.sh 10m
 
+## bench: run Go benchmarks (count=5 for benchstat-friendly output)
+.PHONY: bench
+bench: $(EMULATORJS_SENTINEL)
+	$(GO) test -run=^$$ -bench=. -benchmem -count=5 ./...
+
 ## a11y: run accessibility audit against live server
 .PHONY: a11y
 a11y: build

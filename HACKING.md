@@ -47,6 +47,7 @@ Run `make help` for the full list. The most useful targets:
 | `make a11y`          | Run pa11y + axe-core accessibility audit against live server |
 | `make fuzz`          | Run fuzz tests (15s each)               |
 | `make fuzz-long`     | Run fuzz tests (10m each)               |
+| `make bench`         | Run Go benchmarks (count=5)             |
 | `make audit`         | Scan deps (govulncheck) and source (gosec) for security issues |
 | `make vendor`        | Tidy and re-vendor Go dependencies      |
 | `make vendor-update` | Update all dependencies then re-vendor  |
@@ -96,6 +97,23 @@ To run with a different data directory:
 ```bash
 make build
 ./dist/freeplay -data /path/to/data
+```
+
+## Benchmarks
+
+`make bench` runs the Go benchmarks with allocation reporting and
+`-count=5` so the output is suitable for `benchstat`. Targets focus on
+the scan / enrich / catalog pipeline and the IGDB details cache — the
+hot paths on constrained hardware.
+
+To compare two variants:
+
+```bash
+# baseline (before changes)
+make bench > /tmp/bench-before.txt
+# ...make changes...
+make bench > /tmp/bench-after.txt
+benchstat /tmp/bench-before.txt /tmp/bench-after.txt
 ```
 
 ## External assets
