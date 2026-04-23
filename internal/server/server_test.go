@@ -431,6 +431,31 @@ func TestCoversNotFound(t *testing.T) {
 	}
 }
 
+func TestEmulatorJSDirectoryListingBlocked(t *testing.T) {
+	srv, _ := testServer(t)
+
+	// Pre-fix: http.FileServerFS rendered a clickable HTML listing of
+	// emulatorjs/data/ subdirectories, leaking version + bundled cores.
+	// Post-fix: no index.html in that dir → 404.
+	w := doRequest(t, srv, http.MethodGet, "/emulatorjs/data/", nil)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("dir listing: got status %d, want 404", w.Code)
+	}
+
+	// Files inside the directory are still served.
+	w = doRequest(t, srv, http.MethodGet, "/emulatorjs/data/loader.js", nil)
+	if w.Code != http.StatusOK {
+		t.Errorf("file inside dir: got status %d, want 200", w.Code)
+	}
+
+	// Root "/" still serves index.html (noDirListing allows directories
+	// that contain an index.html).
+	w = doRequest(t, srv, http.MethodGet, "/", nil)
+	if w.Code != http.StatusOK {
+		t.Errorf("/ root: got status %d, want 200", w.Code)
+	}
+}
+
 func TestEmulatorJSCacheHeaders(t *testing.T) {
 	srv, _ := testServer(t)
 
