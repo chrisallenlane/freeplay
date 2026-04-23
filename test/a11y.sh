@@ -3,8 +3,10 @@
 # Run accessibility audit against a live Freeplay instance.
 # Usage: ./test/a11y.sh <freeplay-binary>
 #
-# Starts the server with testdata on a temporary port, runs pa11y
-# against all pages, then shuts the server down.
+# Starts the server with testdata on a temporary port, runs pa11y and
+# axe-core against all pages, then shuts the server down. axe-core
+# catches color-contrast failures that pa11y's HTML_CodeSniffer engine
+# reports only as heuristic warnings.
 
 set -e
 
@@ -56,6 +58,12 @@ PAGES=(
 # hide that subtree from the audit.
 PLAY_PAGE="${BASE}/play?console=${CONSOLE}&rom=${ROM}"
 
+# Axe-core rule tags to run (WCAG 2.0/2.1/2.2 Level A + AA).
+AXE_TAGS="wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa"
+
+echo "--- pa11y ---"
+echo
+
 FAILED=0
 for page in "${PAGES[@]}"; do
     echo "Auditing: $page"
@@ -71,9 +79,26 @@ if ! npx --yes pa11y --standard WCAG2AA --wait 1000 --hide-elements "#game" "$PL
 fi
 echo
 
+echo "--- axe-core (adds color-contrast checks pa11y lacks) ---"
+echo
+
+for page in "${PAGES[@]}"; do
+    echo "Auditing: $page"
+    if ! npx --yes @axe-core/cli --exit --tags "$AXE_TAGS" "$page"; then
+        FAILED=1
+    fi
+    echo
+done
+
+echo "Auditing: $PLAY_PAGE (excluding #game)"
+if ! npx --yes @axe-core/cli --exit --tags "$AXE_TAGS" --exclude "#game" "$PLAY_PAGE"; then
+    FAILED=1
+fi
+echo
+
 if [ "$FAILED" -eq 1 ]; then
     echo "Accessibility issues found."
     exit 1
 fi
 
-echo "All pages pass WCAG 2.0 AA."
+echo "All pages pass WCAG 2.0/2.1/2.2 AA (pa11y + axe-core)."
