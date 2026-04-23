@@ -116,3 +116,58 @@ func TestWriteReadOnlyDirectory(t *testing.T) {
 		t.Fatal("expected error when directory is read-only")
 	}
 }
+
+// TestWritePanicInCallbackCleansUp verifies that a panic in fn leaves no
+// residual .tmp-* file behind. Callers may panic during streaming; the
+// atomic-write flow must not leak temporary files.
+func TestWritePanicInCallbackCleansUp(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.txt")
+
+	func() {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("expected panic to propagate")
+			}
+		}()
+		_ = Write(path, func(_ io.Writer) error {
+			panic("deliberate panic in callback")
+		})
+	}()
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("target file should not exist after callback panic")
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		t.Errorf("unexpected file left behind after panic: %s", e.Name())
+	}
+}
+
+// TestWriteDirModeHasNoWorldBits verifies that directories created by
+// atomicfile are not world-accessible. Uses 0o007 (world rwx) as the
+// invariant rather than asserting exact mode, to stay umask-independent.
+func TestWriteDirModeHasNoWorldBits(t *testing.T) {
+	dir := t.TempDir()
+	subdir := filepath.Join(dir, "created-by-atomicfile")
+	path := filepath.Join(subdir, "test.txt")
+
+	err := Write(path, func(w io.Writer) error {
+		_, err := w.Write([]byte("x"))
+		return err
+	})
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	info, err := os.Stat(subdir)
+	if err != nil {
+		t.Fatalf("stat subdir: %v", err)
+	}
+	if info.Mode().Perm()&0o007 != 0 {
+		t.Errorf("directory is world-accessible: mode=%o", info.Mode().Perm())
+	}
+}

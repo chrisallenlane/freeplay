@@ -109,11 +109,11 @@ func TestWritePreservesOriginalOnRenameError(t *testing.T) {
 	}
 }
 
-// TestWriteCallbackClosesFile tests what happens when the callback closes
-// the underlying *os.File via type assertion. The second Close() on line 29
-// will fail (already closed), but that error is discarded. This test verifies
-// the data still ends up in the final file correctly.
-func TestWriteCallbackClosesFile(t *testing.T) {
+// TestWriteCallbackTypeAssertion verifies that a callback may obtain the
+// underlying *os.File via type assertion and call Write/Sync on it without
+// disrupting the atomic-write flow. Closing the file inside the callback
+// is NOT supported — Write calls Sync itself before Close/Rename.
+func TestWriteCallbackTypeAssertion(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.txt")
 
@@ -122,13 +122,10 @@ func TestWriteCallbackClosesFile(t *testing.T) {
 		if !ok {
 			return fmt.Errorf("expected *os.File, got %T", w)
 		}
-		if _, err := f.Write([]byte("closed-early")); err != nil {
+		if _, err := f.Write([]byte("type-asserted")); err != nil {
 			return err
 		}
-		if err := f.Sync(); err != nil {
-			return err
-		}
-		return f.Close()
+		return f.Sync()
 	})
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
@@ -138,8 +135,8 @@ func TestWriteCallbackClosesFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading written file: %v", err)
 	}
-	if string(data) != "closed-early" {
-		t.Errorf("got %q, want %q", string(data), "closed-early")
+	if string(data) != "type-asserted" {
+		t.Errorf("got %q, want %q", string(data), "type-asserted")
 	}
 }
 
