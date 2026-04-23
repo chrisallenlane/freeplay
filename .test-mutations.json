@@ -151,8 +151,17 @@
       ]
     },
     "internal/igdb/details.go": {
-      "status": "pending",
-      "covering_tests": ["internal/igdb/fetcher_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/igdb/fetcher_test.go"],
+      "last_tested": "2026-04-23T16:20:00Z",
+      "mutations_applied": 33,
+      "killed": 33,
+      "survived_accepted": 0,
+      "mutation_score": 100.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added TestGameDetailsFromIGDBZeroReleaseDateUnset (kills FirstReleaseDate > 0 -> >= 0 boundary mutation — would surface 1970-01-01 for unset dates)"
+      ]
     },
     "internal/igdb/fetcher.go": {
       "status": "pending",

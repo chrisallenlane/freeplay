@@ -663,6 +663,19 @@ func TestSafeIGDBInfoURLRejectsNonHTTPSIGDB(t *testing.T) {
 	}
 }
 
+// TestGameDetailsFromIGDBZeroReleaseDateUnset verifies that a zero
+// FirstReleaseDate (unset / missing in the upstream payload) does NOT
+// produce a populated date field. Kills the `> 0` -> `>= 0` mutation
+// which would format 0 as "1970-01-01" and surface Unix epoch as a
+// release date on every unset game.
+func TestGameDetailsFromIGDBZeroReleaseDateUnset(t *testing.T) {
+	g := igdbGame{Name: "X", FirstReleaseDate: 0}
+	d := gameDetailsFromIGDB(g)
+	if d.FirstReleaseDate != "" {
+		t.Errorf("FirstReleaseDate = %q, want empty for unset date", d.FirstReleaseDate)
+	}
+}
+
 func TestGameDetailsFromIGDBRejectsJavaScriptURL(t *testing.T) {
 	g := igdbGame{
 		Name: "X",
