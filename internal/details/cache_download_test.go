@@ -151,6 +151,47 @@ func TestDownloadImage_LimitReader(t *testing.T) {
 	}
 }
 
+// TestCheckRedirect_CrossHostRedirectBlockedByHostCheck kills the line-56
+// mutation that changes "!=" to "==" in the host comparison of
+// CheckRedirect. Under the mutation, cross-host redirects are ALLOWED and
+// same-host redirects (to images.igdb.com) are blocked instead.
+//
+// Strategy: start a server A that issues a 302 to a completely different
+// host (evil.invalid). The real code blocks the redirect and returns an
+// error containing "blocked cross-host redirect". Under the mutation, the
+// redirect to evil.invalid is allowed, resulting in a DNS/connection error
+// — not the "blocked cross-host redirect" substring — so the assertion
+// kills the mutant.
+func TestCheckRedirect_CrossHostRedirectBlockedByHostCheck(t *testing.T) {
+	// Server that redirects to an attacker-controlled host.
+	redirectServer := startImageServerWith(
+		t,
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(
+				w, r,
+				"http://evil.invalid/malicious.jpg",
+				http.StatusFound,
+			)
+		},
+	)
+
+	c := New(t.TempDir(), nil)
+
+	_, _, err := downloadTestImage(t, c, redirectServer.URL+"/cover.jpg")
+	if err == nil {
+		t.Fatal(
+			"downloadImage must return an error when redirected to evil.invalid",
+		)
+	}
+	if !strings.Contains(err.Error(), "blocked cross-host redirect") {
+		t.Errorf(
+			"error = %v\nwant substring %q\n"+
+				"(if this is a DNS error, the != → == mutation slipped through)",
+			err, "blocked cross-host redirect",
+		)
+	}
+}
+
 // TestDownloadImage_CrossHostRedirectBlocked verifies that downloadImage
 // refuses redirects to hosts other than images.igdb.com. This is the
 // defense-in-depth layer for SEC-2 SSRF: a compromised or spoofed IGDB

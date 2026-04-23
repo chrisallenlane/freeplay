@@ -771,6 +771,126 @@ func TestFetchAll_SearchError(t *testing.T) {
 	}
 }
 
+// TestMemKey_SeparatorPreventsCollision kills the line-92 mutation that
+// drops the "/" separator in memKey (console+cleanName vs console+"/"+cleanName).
+// Two (console, cleanName) pairs that share a concatenated string — e.g.
+// ("NES", "Foo") and ("NESF", "oo") — must resolve independently.
+// We seed one via seedCachedDetails and assert Get returns nil for the
+// collision-neighbour, proving the separator is load-bearing.
+func TestMemKey_SeparatorPreventsCollision(t *testing.T) {
+	dir := t.TempDir()
+	c := New(dir, nil)
+
+	// Seed ("NES", "Foo") — cleanName derived from "Foo.nes".
+	seedCachedDetails(t, dir, "NES", "Foo", &igdb.GameDetails{Name: "Foo"})
+
+	// The real entry must be found.
+	if got := c.Get("NES", "Foo.nes"); got == nil || got.Name != "Foo" {
+		t.Fatalf("Get(NES, Foo.nes) = %v, want {Name: Foo}", got)
+	}
+
+	// The collision neighbour ("NESF", "oo") must NOT return the cached entry.
+	// Without the "/" separator both keys produce the string "NESFoo".
+	if got := c.Get("NESF", "oo.nes"); got != nil {
+		t.Errorf(
+			"Get(NESF, oo.nes) = %v, want nil — memKey separator collision",
+			got,
+		)
+	}
+}
+
+// TestFetchOne_UnsafeConsoleSkipsAll kills the line-204 mutation that
+// changes the first "||" to "&&" in the path-segment OR chain.
+// A GameEntry with an unsafe Console value (e.g. "../evil") but a safe
+// Filename must be skipped entirely: FetchAll must return 0, write no
+// files, and never call the IGDB fetcher.
+func TestFetchOne_UnsafeConsoleSkipsAll(t *testing.T) {
+	dir := t.TempDir()
+
+	fetcher := &mockIGDBFetcher{
+		searchResults: map[string]int{"Game": 1},
+		detailsResults: map[int]*igdb.GameDetails{
+			1: {Name: "Game"},
+		},
+	}
+	c := New(dir, fetcher)
+
+	count := c.FetchAll([]igdb.GameEntry{
+		// Console is unsafe; Filename/cleanName are perfectly safe.
+		{Console: "../evil", Filename: "Game.nes", IGDBPlatformIDs: []int{18}},
+	})
+
+	if count != 0 {
+		t.Errorf("FetchAll() = %d, want 0 for unsafe Console", count)
+	}
+	if fetcher.searchCalls != 0 {
+		t.Errorf(
+			"SearchGame called %d times, want 0 — unsafe Console must be tombstoned",
+			fetcher.searchCalls,
+		)
+	}
+
+	// No directory should be created under the cache root for this console.
+	cacheRoot := datadir.IGDBCache(dir)
+	entries, err := os.ReadDir(cacheRoot)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatalf("ReadDir(%q): %v", cacheRoot, err)
+	}
+	if len(entries) != 0 {
+		names := make([]string, len(entries))
+		for i, e := range entries {
+			names[i] = e.Name()
+		}
+		t.Errorf(
+			"unexpected directories under cache root: %v — unsafe Console must not create files",
+			names,
+		)
+	}
+}
+
+// TestFetchOne_SuccessfulSearchNoNotFound kills the line-230 mutation that
+// changes "gameID == 0" to "gameID != 0". Under the mutation, a successful
+// search (gameID != 0) would write a .notfound marker and return false.
+// We verify: .notfound is NOT written, details.json IS written.
+func TestFetchOne_SuccessfulSearchNoNotFound(t *testing.T) {
+	imgServer := startFakeImageServer(t)
+
+	coverURL := imgServer.URL + "/cover.jpg"
+
+	fetcher := newGameFetcher("Mega Man", 42, igdb.GameDetails{
+		Name:     "Mega Man",
+		Summary:  "A platformer.",
+		CoverURL: coverURL,
+	})
+
+	dir := t.TempDir()
+	c := New(dir, fetcher)
+
+	count := c.FetchAll([]igdb.GameEntry{
+		{Console: "NES", Filename: "Mega Man.nes"},
+	})
+
+	if count != 1 {
+		t.Errorf("FetchAll() = %d, want 1", count)
+	}
+
+	gameDir := datadir.IGDBCacheGame(dir, "NES", "Mega Man")
+
+	// details.json must exist.
+	if _, err := os.Stat(filepath.Join(gameDir, "details.json")); err != nil {
+		t.Errorf("details.json not found after successful fetch: %v", err)
+	}
+
+	// .notfound must NOT exist — the search succeeded.
+	notFoundPath := filepath.Join(gameDir, ".notfound")
+	if _, err := os.Stat(notFoundPath); err == nil {
+		t.Errorf(
+			".notfound marker written despite successful IGDB search — " +
+				"gameID == 0 sentinel inverted?",
+		)
+	}
+}
+
 // TestFetchAll_ImageDownloadFailure verifies that when the image server
 // returns 404, FetchAll still succeeds (count=1, details.json written) and
 // the CoverURL is cleared rather than left as a remote URL.

@@ -99,12 +99,38 @@
       ]
     },
     "internal/details/cache.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": [
         "internal/details/cache_test.go",
         "internal/details/cache_download_test.go",
         "internal/details/cache_rescan_test.go",
         "internal/details/cache_search_test.go"
+      ],
+      "last_tested": "2026-04-23T15:45:00Z",
+      "mutations_applied": 32,
+      "killed": 29,
+      "survived_accepted": 2,
+      "mutation_score": 90.6,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added TestMemKey_SeparatorPreventsCollision (key collision regression)",
+        "Added TestFetchOne_UnsafeConsoleSkipsAll (defense-in-depth at cache boundary)",
+        "Added TestFetchOne_SuccessfulSearchNoNotFound (sentinel inversion regression)",
+        "Added TestCheckRedirect_CrossHostRedirectBlockedByHostCheck (SSRF defense)"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 180,
+          "mutation": "334 * time.Millisecond -> 335 * time.Millisecond",
+          "category": "equivalent mutant",
+          "reason": "Ticker period 1ms difference is below any observable rate-limit behavior; both yield ~3 req/s as intended."
+        },
+        {
+          "line": 61,
+          "mutation": "len(via) >= 10 -> len(via) > 10",
+          "category": "structurally untestable boundary",
+          "reason": "Testing exactly len(via) == 10 requires 10-hop redirect chain. The line 56 cross-host check fires on the first non-IGDB redirect, making it impossible to accumulate 10 same-host hops in a unit test. Real-world impact bounded: mutant allows one extra redirect beyond 10 before stopping; Go's http.Client caps at 10 by default anyway."
+        }
       ]
     },
     "internal/details/download.go": {
