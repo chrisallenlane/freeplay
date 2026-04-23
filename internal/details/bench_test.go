@@ -20,7 +20,7 @@ func populateCacheOnDisk(tb testing.TB, dataDir string, count int) (string, func
 	romFor := func(i int) string { return fmt.Sprintf("Game%04d.nes", i) }
 	for i := range count {
 		_, cleanName := igdb.CleanFilename(romFor(i))
-		dir := filepath.Join(datadir.IGDBCache(dataDir), console, cleanName)
+		dir := datadir.IGDBCacheGame(dataDir, console, cleanName)
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			tb.Fatalf("mkdir: %v", err)
 		}

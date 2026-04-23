@@ -8,15 +8,6 @@ import (
 	"testing/iotest"
 )
 
-func TestSavePath(t *testing.T) {
-	m := New("/data")
-	got := m.savePath("NES", "game1", "state")
-	want := filepath.Join("/data", "saves", "NES", "game1", "state")
-	if got != want {
-		t.Errorf("savePath() = %q, want %q", got, want)
-	}
-}
-
 func TestValidType(t *testing.T) {
 	tests := []struct {
 		input string

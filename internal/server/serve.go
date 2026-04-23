@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/chrisallenlane/freeplay/internal/datadir"
 	"github.com/chrisallenlane/freeplay/internal/saves"
@@ -29,31 +28,19 @@ func serveFile(w http.ResponseWriter, r *http.Request, path, cacheControl string
 // (ROMs, covers, manuals, IGDB cache). The cacheControl argument is
 // passed through to the response.
 func (s *Server) serveSecureFile(w http.ResponseWriter, r *http.Request, baseDir, file, cacheControl string) {
-	baseDir = filepath.Clean(baseDir)
-
-	clean := filepath.Clean(file)
-	if strings.Contains(clean, "..") {
+	fullPath := filepath.Join(baseDir, filepath.Clean(file))
+	if !datadir.PathInside(fullPath, baseDir) {
 		http.NotFound(w, r)
 		return
 	}
-
-	fullPath := filepath.Join(baseDir, clean)
-
-	// Verify cleaned path is within base directory
-	if !strings.HasPrefix(fullPath, baseDir+string(filepath.Separator)) && fullPath != baseDir {
-		http.NotFound(w, r)
-		return
-	}
-
 	serveFile(w, r, fullPath, cacheControl)
 }
 
 // servePage returns a handler that serves a named file from the embedded
-// frontend filesystem with a no-cache header so deploys are picked up
-// immediately.
+// frontend filesystem. Cache-Control is applied at mux registration
+// time via cacheControl("no-cache", ...) — consistent with other routes.
 func (s *Server) servePage(filename string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeFileFS(w, r, s.frontendSub, filename)
 	}
 }

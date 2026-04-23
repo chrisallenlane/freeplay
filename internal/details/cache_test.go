@@ -322,7 +322,7 @@ func TestGet_ServesFromMemoryAfterDiskDelete(t *testing.T) {
 	c := New(dir, nil)
 
 	seedCachedDetails(t, dir, "NES", "Mega Man", &igdb.GameDetails{Name: "Mega Man"})
-	jsonPath := filepath.Join(datadir.IGDBCache(dir), "NES", "Mega Man", "details.json")
+	jsonPath := filepath.Join(datadir.IGDBCacheGame(dir, "NES", "Mega Man"), "details.json")
 
 	// Prime the in-memory layer via a disk read.
 	if got := c.Get("NES", "Mega Man (USA).nes"); got == nil || got.Name != "Mega Man" {
@@ -347,7 +347,7 @@ func TestGet_NegativeCacheMemoizesNotFound(t *testing.T) {
 	c := New(dir, nil)
 
 	seedNotFound(t, dir, "NES", "Unknown")
-	notFoundPath := filepath.Join(datadir.IGDBCache(dir), "NES", "Unknown", ".notfound")
+	notFoundPath := filepath.Join(datadir.IGDBCacheGame(dir, "NES", "Unknown"), ".notfound")
 
 	if got := c.Get("NES", "Unknown.nes"); got != nil {
 		t.Fatalf("first Get = %+v, want nil", got)

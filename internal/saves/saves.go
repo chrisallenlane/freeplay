@@ -20,14 +20,10 @@ func New(dataDir string) *Manager {
 	return &Manager{dataDir: dataDir}
 }
 
-func (m *Manager) savePath(console, game, saveType string) string {
-	return datadir.SavePath(m.dataDir, console, game, saveType)
-}
-
 // Get reads a save file and returns its contents.
 // Returns nil if the save does not exist.
 func (m *Manager) Get(console, game, saveType string) []byte {
-	data, err := os.ReadFile(m.savePath(console, game, saveType))
+	data, err := os.ReadFile(datadir.SavePath(m.dataDir, console, game, saveType))
 	if err != nil {
 		return nil
 	}
@@ -39,7 +35,8 @@ func (m *Manager) Get(console, game, saveType string) []byte {
 // bounded by atomicfile's internal 32 KiB io.Copy buffer rather than
 // the full save size.
 func (m *Manager) Put(console, game, saveType string, body io.Reader) error {
-	return atomicfile.Write(m.savePath(console, game, saveType), func(w io.Writer) error {
+	path := datadir.SavePath(m.dataDir, console, game, saveType)
+	return atomicfile.Write(path, func(w io.Writer) error {
 		if _, err := io.Copy(w, body); err != nil {
 			return fmt.Errorf("reading save data: %w", err)
 		}

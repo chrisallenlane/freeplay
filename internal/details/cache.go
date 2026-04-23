@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -76,9 +77,27 @@ func (c *Cache) cacheDir(console, cleanName string) string {
 	return datadir.IGDBCacheGame(c.dataDir, console, cleanName)
 }
 
+// detailsPath returns the filesystem path for the game's details.json.
+func (c *Cache) detailsPath(console, cleanName string) string {
+	return filepath.Join(c.cacheDir(console, cleanName), "details.json")
+}
+
+// notFoundPath returns the filesystem path for the game's .notfound marker.
+func (c *Cache) notFoundPath(console, cleanName string) string {
+	return filepath.Join(c.cacheDir(console, cleanName), ".notfound")
+}
+
 // memKey builds the in-memory cache key for (console, cleanName).
 func memKey(console, cleanName string) string {
 	return console + "/" + cleanName
+}
+
+// isCached reports whether details.json or .notfound exists for the game.
+// Resolves via the in-memory layer — after the first rescan pass, this
+// is a map lookup with no disk access.
+func (c *Cache) isCached(console, cleanName string) bool {
+	_, ok := c.load(console, cleanName)
+	return ok
 }
 
 // Get returns cached GameDetails for the given console and ROM filename,
