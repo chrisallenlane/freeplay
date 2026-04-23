@@ -177,7 +177,7 @@ header h1 {
 }
 
 #search::placeholder {
-    color: var(--color-text-faint);
+    color: var(--color-text-dim);
 }
 
 #search:focus {
@@ -239,13 +239,13 @@ header h1 {
 
 .placeholder-cover .placeholder-name {
     font-size: 0.75rem;
-    color: var(--color-text-dim);
+    color: var(--color-text-muted);
     word-break: break-word;
 }
 
 .placeholder-cover .placeholder-console {
     font-size: 0.625rem;
-    color: var(--color-text-faint);
+    color: var(--color-text-muted);
     margin-top: 4px;
 }
 
