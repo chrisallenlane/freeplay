@@ -525,16 +525,72 @@
       "reason": "CLI entry point (65 LOC) — flag parsing, config load, server construction, ListenAndServe. Has no test file. All mutations would survive because no unit test exercises main(). Testing would require process-level integration tests (spawn the binary, hit endpoints, kill it). Exercised end-to-end by `make run` + `make a11y` + manual smoke testing during development."
     },
     "frontend/api.js": {
-      "status": "pending",
-      "covering_tests": ["frontend/api_test.js"]
+      "status": "completed",
+      "covering_tests": ["frontend/api_test.js"],
+      "last_tested": "2026-04-23T19:45:00Z",
+      "mutations_applied": 25,
+      "killed": 18,
+      "survived_accepted": 7,
+      "mutation_score": 72.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added three filterGames test cases: uppercase query against lowercase fields, lowercase query against uppercase developer/publisher content, and cross-field concatenation prevention via join separator",
+        "Kills .toLowerCase() mutations on query/developer/publisher and the parts.join(\" \") -> parts.join(\"\") mutation"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 24,
+          "mutation": "t.length > 0 -> t.length >= 0 (token filter)",
+          "category": "equivalent mutant",
+          "reason": "Empty-string tokens passed through would then be used in corpus.includes(t); any string contains the empty string as a substring. tokens.every(...) returns true for empty tokens, so no game is excluded. Observable output identical."
+        },
+        {
+          "line": 29,
+          "mutation": "tokens.length > 0 -> tokens.length >= 0 (branch guard)",
+          "category": "equivalent mutant",
+          "reason": "tokens.length is always >= 0. Entering the search branch with zero tokens makes tokens.every(...) vacuously true, so no game is excluded. Same as skipping the branch."
+        },
+        {
+          "line": 47,
+          "mutation": "games.find(...) ?? null -> games.find(...) || null",
+          "category": "equivalent mutant",
+          "reason": "Array.prototype.find returns the matched element or undefined; it never returns other falsy values (0, '', false). For the possible return set, ?? and || produce identical output."
+        },
+        {
+          "line": 38,
+          "mutation": "String(g.year) -> g.year",
+          "category": "equivalent mutant",
+          "reason": "g.year is pushed to a parts array that is subsequently joined. Array.prototype.join coerces numeric elements to strings via toString. String(1985) and 1985.toString() produce the same result."
+        },
+        {
+          "line": 9,
+          "mutation": "if (text !== undefined) node.textContent = text -> ===",
+          "category": "DOM-dependent, untested",
+          "reason": "el() helper creates a document element; testing requires jsdom. Not exercised in Node test scope."
+        },
+        {
+          "line": 14,
+          "mutation": "showError style.display \"none\" -> \"\" and \"\" -> \"block\"",
+          "category": "DOM-dependent, untested",
+          "reason": "showError touches document.getElementById; testing requires jsdom."
+        },
+        {
+          "line": 62,
+          "mutation": "loadGame/loadGameDetails response-ok and null-game guards",
+          "category": "async fetch-dependent, untested in unit scope",
+          "reason": "loadGame and loadGameDetails wrap window.fetch. Testing requires fetch mocks or jsdom; not in current Node test scope."
+        }
+      ]
     },
     "frontend/app.js": {
-      "status": "pending",
-      "covering_tests": []
+      "status": "excluded",
+      "covering_tests": [],
+      "reason": "Page controller for the library page (~380 LOC). No Node-runnable test file because the module depends on DOM (document, event listeners, innerHTML, form elements). Unit mutation testing would require a jsdom harness; current test strategy is to cover pure-logic modules (api, urls, utils, theme, input, play) in Node and rely on manual + a11y testing for the page controllers."
     },
     "frontend/details.js": {
-      "status": "pending",
-      "covering_tests": []
+      "status": "excluded",
+      "covering_tests": [],
+      "reason": "Page controller for the details page. No Node-runnable test file — DOM-dependent. Same rationale as frontend/app.js."
     },
     "frontend/input.js": {
       "status": "pending",
@@ -545,12 +601,30 @@
       "covering_tests": ["frontend/play_test.js"]
     },
     "frontend/theme.js": {
-      "status": "pending",
-      "covering_tests": ["frontend/theme_test.js"]
+      "status": "completed",
+      "covering_tests": ["frontend/theme_test.js"],
+      "last_tested": "2026-04-23T19:35:00Z",
+      "mutations_applied": 15,
+      "killed": 15,
+      "survived_accepted": 0,
+      "mutation_score": 100.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Theme-toggle module thoroughly exercised — icon characters, theme values, DOM-mutation calls, localStorage writes, and event binding are all asserted."
+      ]
     },
     "frontend/urls.js": {
-      "status": "pending",
-      "covering_tests": ["frontend/urls_test.js"]
+      "status": "completed",
+      "covering_tests": ["frontend/urls_test.js"],
+      "last_tested": "2026-04-23T19:30:00Z",
+      "mutations_applied": 15,
+      "killed": 15,
+      "survived_accepted": 0,
+      "mutation_score": 100.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Pure URL-building module. Existing urls_test.js asserts exact output for every builder (playUrl, detailsUrl, coverUrl, manualUrl, romUrl, biosUrl, saveBasePath, gameDetailsUrl, favKey) — all path/query/extension mutations are caught."
+      ]
     },
     "frontend/utils.js": {
       "status": "completed",

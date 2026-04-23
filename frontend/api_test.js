@@ -154,6 +154,39 @@ describe("filterGames", () => {
 		assert.equal(result.length, metaGames.length);
 	});
 
+	// Case-insensitivity must apply to the query itself (not just the
+	// fields). Kills the .toLowerCase() mutation on opts.query.
+	it("uppercase query matches lowercase field content", () => {
+		const result = FP.filterGames(metaGames, { query: "KONAMI" });
+		assert.equal(result.length, 1);
+		assert.equal(result[0].filename, "contra.nes");
+	});
+
+	// The developer/publisher lists are lowercased before joining. Test
+	// with uppercase developer content to kill the .toLowerCase() mutations.
+	it("query matches uppercase developer/publisher content case-insensitively", () => {
+		const games = [
+			{ console: "NES", filename: "x.nes", developers: ["BIG COMPANY"] },
+			{ console: "NES", filename: "y.nes", publishers: ["PUB CO"] },
+		];
+		// Lowercase query should match uppercase developer name.
+		assert.equal(FP.filterGames(games, { query: "big" }).length, 1);
+		// Lowercase query should match uppercase publisher name.
+		assert.equal(FP.filterGames(games, { query: "pub" }).length, 1);
+	});
+
+	// The corpus is field-joined with " ". Across-field substring match
+	// must NOT work — e.g. "contrakonami" must not match because the
+	// filename and developer are different fields. Kills the
+	// parts.join(" ") -> parts.join("") mutation (which would produce a
+	// concatenated string that lets arbitrary cross-field substrings match).
+	it("query does not match cross-field concatenation (join keeps separator)", () => {
+		// "konami1987" spans publisher and year with no separator in the
+		// mutated corpus; with the correct separator it's never a substring.
+		const result = FP.filterGames(metaGames, { query: "konami1987" });
+		assert.equal(result.length, 0);
+	});
+
 	it("extra whitespace in query works the same as trimmed query", () => {
 		const trimmed = FP.filterGames(metaGames, { query: "konami 1987" });
 		const padded = FP.filterGames(metaGames, { query: "  konami   1987  " });
