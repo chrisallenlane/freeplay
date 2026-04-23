@@ -94,6 +94,11 @@ a11y: build
 .PHONY: check
 check: fmt lint vet test
 
+## audit: scan dependencies for known vulnerabilities (govulncheck)
+.PHONY: audit
+audit: $(EMULATORJS_SENTINEL)
+	govulncheck ./...
+
 ## clean: remove compiled binary and temporary files
 .PHONY: clean
 clean:
@@ -110,11 +115,12 @@ vendor:
 vendor-update:
 	$(GO) get -t -u ./... && $(GO) mod vendor && $(GO) mod tidy && $(GO) mod verify
 
-## setup: install dev dependencies (gofumpt, golangci-lint)
+## setup: install dev dependencies (gofumpt, golangci-lint, govulncheck)
 .PHONY: setup
 setup:
 	$(GO) install mvdan.cc/gofumpt@v0.9.2
 	$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.3
+	$(GO) install golang.org/x/vuln/cmd/govulncheck@latest
 
 ## docker: build docker image
 .PHONY: docker
