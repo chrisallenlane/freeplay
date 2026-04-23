@@ -134,8 +134,21 @@
       ]
     },
     "internal/details/download.go": {
-      "status": "pending",
-      "covering_tests": ["internal/details/cache_download_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/details/cache_download_test.go"],
+      "last_tested": "2026-04-23T16:10:00Z",
+      "mutations_applied": 24,
+      "killed": 24,
+      "survived_accepted": 0,
+      "mutation_score": 100.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added recordingHandler (slog.Handler) in cache_download_test.go for assertion on emitted log messages",
+        "TestDownloadCoverPair_EmptyCoverURLNoRequest: slog capture — original emits no warning on empty CoverURL; mutant triggers 'downloading cover failed'",
+        "TestDownloadCoverPair_ThumbURLUsesCovertBig: records server paths; asserts one request contains /t_cover_big/ (kills strings.Replace count=0)",
+        "TestEnsureCoverThumbnail_UnsafeConsoleBlocked: asserts dataDir/evil/safe.png NOT created under unsafe console (path-traversal guard)",
+        "TestWriteNotFound_MemoizesNegativeCache: deletes .notfound file post-write, asserts load() still resolves from memory"
+      ]
     },
     "internal/igdb/details.go": {
       "status": "pending",

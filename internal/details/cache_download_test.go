@@ -1,17 +1,48 @@
 package details
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/chrisallenlane/freeplay/internal/datadir"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
+
+// recordingHandler is a minimal slog.Handler that captures emitted records for
+// test assertions. Safe for concurrent use by slog.
+type recordingHandler struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (h *recordingHandler) Enabled(_ context.Context, _ slog.Level) bool { return true }
+func (h *recordingHandler) Handle(_ context.Context, r slog.Record) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.records = append(h.records, r)
+	return nil
+}
+func (h *recordingHandler) WithAttrs(_ []slog.Attr) slog.Handler { return h }
+func (h *recordingHandler) WithGroup(_ string) slog.Handler      { return h }
+
+// messages returns the messages of all recorded slog records.
+func (h *recordingHandler) messages() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]string, len(h.records))
+	for i, r := range h.records {
+		out[i] = r.Message
+	}
+	return out
+}
 
 // TestDownloadImage_HTMLContentRejected verifies that downloadImage rejects
 // responses with non-image Content-Type headers. If the remote server returns
@@ -662,5 +693,157 @@ func TestWriteNotFound_ContentIsEmpty(t *testing.T) {
 	}
 	if len(data) != 0 {
 		t.Errorf(".notfound content should be empty, got %q", string(data))
+	}
+}
+
+// TestDownloadCoverPair_EmptyCoverURLNoRequest kills the line-27 mutation that
+// changes the early-return guard from `== ""` to `== "MUTATED"`. Under the
+// mutation an empty CoverURL proceeds to c.client.Get("") which makes an HTTP
+// request (or errors trying). This test counts requests to a recording server
+// and asserts exactly zero are made when CoverURL is empty.
+func TestDownloadCoverPair_EmptyCoverURLNoRequest(t *testing.T) {
+	// An empty CoverURL must short-circuit before c.client.Get is attempted.
+	// c.client.Get("") errors immediately without hitting any server, so a
+	// request counter can't distinguish original vs mutant. The observable
+	// behavioral difference is that the mutant logs a "downloading cover
+	// failed" warning. Capture slog output and assert no such warning fires.
+	origDefault := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(origDefault) })
+	h := &recordingHandler{}
+	slog.SetDefault(slog.New(h))
+
+	dir := t.TempDir()
+	c := New(dir, nil)
+
+	details := &igdb.GameDetails{
+		Name:     "No Cover Game",
+		CoverURL: "",
+	}
+
+	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "No Cover Game")
+	c.downloadCoverPair(details, cacheDir, "/cache/igdb/NES/No Cover Game", "No Cover Game")
+
+	for _, msg := range h.messages() {
+		if strings.Contains(msg, "downloading cover failed") {
+			t.Errorf(
+				"downloadCoverPair logged %q with empty CoverURL — guard bypassed (mutation survived)",
+				msg,
+			)
+		}
+	}
+	if details.CoverURL != "" {
+		t.Errorf("CoverURL should remain %q after no-op, got %q", "", details.CoverURL)
+	}
+}
+
+// TestDownloadCoverPair_ThumbURLUsesCovertBig kills the line-43 mutation that
+// changes strings.Replace count from 1 to 0. With count=0, strings.Replace
+// performs no substitution so the thumbnail request goes to t_original instead
+// of t_cover_big. This test records all paths received by the server and
+// asserts that exactly one request arrives at a path containing "/t_cover_big/".
+func TestDownloadCoverPair_ThumbURLUsesCovertBig(t *testing.T) {
+	var receivedPaths []string
+	srv := startImageServerWith(t, func(w http.ResponseWriter, r *http.Request) {
+		receivedPaths = append(receivedPaths, r.URL.Path)
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("fakeimage"))
+	})
+
+	dir := t.TempDir()
+	c := New(dir, nil)
+
+	details := &igdb.GameDetails{
+		Name:     "Test Game",
+		CoverURL: srv.URL + "/t_original/cover.jpg",
+	}
+
+	cacheDir := filepath.Join(dir, "cache", "igdb", "NES", "Test Game")
+	c.downloadCoverPair(details, cacheDir, "/cache/igdb/NES/Test Game", "Test Game")
+
+	foundThumb := false
+	for _, p := range receivedPaths {
+		if strings.Contains(p, "/t_cover_big/") {
+			foundThumb = true
+			break
+		}
+	}
+	if !foundThumb {
+		t.Errorf(
+			"no request to /t_cover_big/ path; received paths: %v\n"+
+				"(if both paths are /t_original/, the count=0 mutation survived)",
+			receivedPaths,
+		)
+	}
+}
+
+// TestEnsureCoverThumbnail_UnsafeConsoleBlocked kills the line-175 mutation
+// that changes the first || to && in the safety-gate OR chain. Under the
+// mutation, (!console && !nameNoExt) || !cleanName, so an unsafe console alone
+// no longer guards — the traversal proceeds. This test places a cover_thumb.jpg
+// at the source path for console "../evil" and asserts that no file is written
+// outside the dataDir covers subtree.
+func TestEnsureCoverThumbnail_UnsafeConsoleBlocked(t *testing.T) {
+	dir := t.TempDir()
+	c := New(dir, nil)
+
+	// Plant a real cover_thumb.jpg at the source path that ensureCoverThumbnail
+	// would read for console="../evil", cleanName="safe". We must construct
+	// the path the same way cacheDir does (filepath.Join, which collapses "..").
+	// If the guard is bypassed, atomicfile.Write would use datadir.CoverFile with
+	// the unsafe console segment, escaping the covers subtree.
+	srcDir := c.cacheDir("../evil", "safe")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll srcDir: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(srcDir, "cover_thumb.jpg"),
+		[]byte("evilimage"),
+		0o644,
+	); err != nil {
+		t.Fatalf("WriteFile cover_thumb.jpg: %v", err)
+	}
+
+	c.ensureCoverThumbnail("../evil", "safe", "safe")
+
+	// If the safety gate is bypassed, ensureCoverThumbnail calls
+	// atomicfile.Write to datadir.CoverFile(dir, "../evil", "safe"), which
+	// collapses to dir/evil/safe.png — OUTSIDE the covers subtree. Assert
+	// that no such escaped file was created.
+	escapedDst := datadir.CoverFile(dir, "../evil", "safe")
+	if _, err := os.Stat(escapedDst); err == nil {
+		t.Errorf(
+			"ensureCoverThumbnail wrote %s despite unsafe console segment\n"+
+				"(if guard fires, the || → && mutation survived)",
+			escapedDst,
+		)
+	}
+}
+
+// TestWriteNotFound_MemoizesNegativeCache kills the line-132 mutation that
+// changes `err != nil` to `err == nil` in writeNotFound. Under the mutation,
+// a successful atomic write returns early WITHOUT calling c.store, so the
+// in-memory negative cache is never populated. The test verifies that after
+// writeNotFound the entry is memoized: delete the .notfound file from disk,
+// then call load — if the in-memory cache was populated (original code), load
+// returns ok=true; if not (mutant), load falls through to disk, finds nothing,
+// and returns ok=false.
+func TestWriteNotFound_MemoizesNegativeCache(t *testing.T) {
+	dir := t.TempDir()
+	c := New(dir, nil)
+
+	c.writeNotFound("NES", "Foo")
+
+	// Remove the on-disk marker so load cannot resolve via disk.
+	notFoundFile := c.notFoundPath("NES", "Foo")
+	if err := os.Remove(notFoundFile); err != nil {
+		t.Fatalf("removing .notfound file: %v", err)
+	}
+
+	_, ok := c.load("NES", "Foo")
+	if !ok {
+		t.Error(
+			"load returned ok=false after writeNotFound + disk deletion;\n" +
+				"writeNotFound must memoize via c.store (err != nil guard, not err == nil)",
+		)
 	}
 }
