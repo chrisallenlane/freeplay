@@ -2,10 +2,11 @@
 package scanner
 
 import (
+	"cmp"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,6 +20,10 @@ type Scanner struct {
 	dataDir string
 	catalog atomic.Pointer[Catalog]
 	mu      sync.Mutex
+	// lastGameCount hints at the capacity of the games slice on the next
+	// scan. Zero on first scan; after that it tracks the previous
+	// catalog size so re-scans start with a correctly-sized allocation.
+	lastGameCount int
 }
 
 // New creates a Scanner.
@@ -49,7 +54,7 @@ func (s *Scanner) ScanBlocking() {
 }
 
 func (s *Scanner) scan() {
-	var games []Game
+	games := make([]Game, 0, s.lastGameCount)
 	consoleSet := make(map[string]bool)
 
 	for consoleName, rom := range s.cfg.ROMs {
@@ -105,19 +110,19 @@ func (s *Scanner) scan() {
 	for c := range consoleSet {
 		consoles = append(consoles, c)
 	}
-	sort.Strings(consoles)
+	slices.Sort(consoles)
 
-	// Sort games by console then filename
-	sort.Slice(games, func(i, j int) bool {
-		if games[i].Console != games[j].Console {
-			return games[i].Console < games[j].Console
+	// Sort games by console then filename. Key collisions require two
+	// ROMs with identical filenames under the same console directory —
+	// the filesystem prevents that, so sort stability is not required.
+	slices.SortFunc(games, func(a, b Game) int {
+		if c := cmp.Compare(a.Console, b.Console); c != 0 {
+			return c
 		}
-		return games[i].Filename < games[j].Filename
+		return cmp.Compare(a.Filename, b.Filename)
 	})
 
-	if games == nil {
-		games = []Game{}
-	}
+	s.lastGameCount = len(games)
 
 	catalog := &Catalog{Consoles: consoles, Games: games}
 	s.catalog.Store(catalog)
