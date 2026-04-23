@@ -629,6 +629,7 @@ func TestTransformImageURLRejectsUntrustedHosts(t *testing.T) {
 		{"empty", "", ""},
 		{"bare images host no path", "https://images.igdb.com", ""},
 		{"host-prefix lookalike", "https://images.igdb.com.evil.example/x.jpg", ""},
+		{"protocol-relative host-prefix lookalike", "//images.igdb.com.evil.example/x.jpg", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

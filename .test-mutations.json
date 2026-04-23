@@ -226,8 +226,37 @@
       ]
     },
     "internal/igdb/url.go": {
-      "status": "pending",
-      "covering_tests": ["internal/igdb/name_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/igdb/fetcher_test.go"],
+      "last_tested": "2026-04-23T17:05:00Z",
+      "mutations_applied": 20,
+      "killed": 16,
+      "survived_accepted": 3,
+      "mutation_score": 80.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added protocol-relative host-prefix lookalike test case ('//images.igdb.com.evil.example/x.jpg'). Kills the line-21 mutation that removes the trailing slash — a true SSRF bypass that would let 'images.igdb.com.evil.com' traffic through."
+      ],
+      "accepted_survivors": [
+        {
+          "line": 26,
+          "mutation": "default: return \"\" -> (deleted)",
+          "category": "equivalent mutant",
+          "reason": "When the switch falls through to the unconditional strings.Replace at line 28, canonical is \"\" (zero value), and strings.Replace(\"\", ...) returns \"\". Observable output is identical to an explicit return \"\"."
+        },
+        {
+          "line": 28,
+          "mutation": "strings.Replace(..., 1) -> strings.Replace(..., 2)",
+          "category": "equivalent mutant for real IGDB URLs",
+          "reason": "IGDB image URLs contain exactly one occurrence of 't_thumb' (the size slug). count=1 and count=2 produce identical outputs for all canonical IGDB URLs."
+        },
+        {
+          "line": 28,
+          "mutation": "strings.Replace -> strings.ReplaceAll",
+          "category": "equivalent mutant for real IGDB URLs",
+          "reason": "Same as above — single 't_thumb' occurrence means Replace and ReplaceAll produce identical outputs."
+        }
+      ]
     },
     "internal/library/library.go": {
       "status": "pending",
