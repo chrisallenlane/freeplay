@@ -197,20 +197,6 @@ func TestScanMissingDirectory(t *testing.T) {
 	}
 }
 
-func TestScanConcurrentPrevention(t *testing.T) {
-	dir, cfg := setupTestDir(t)
-	s := New(cfg, dir)
-
-	// Hold the scanner's mutex directly to simulate an in-progress scan.
-	s.mu.Lock()
-	ran := s.Scan()
-	s.mu.Unlock()
-
-	if ran {
-		t.Error("Scan should have returned false when another scan is in progress")
-	}
-}
-
 func TestCatalogJSON(t *testing.T) {
 	dir, cfg := setupTestDir(t)
 	s := New(cfg, dir)
@@ -265,20 +251,6 @@ func TestScanBIOSDetection(t *testing.T) {
 		if g.Console == "Genesis" && g.HasBios {
 			t.Errorf("Genesis game %s should have HasBios=false", g.Filename)
 		}
-	}
-}
-
-func TestScanReturnsTrue(t *testing.T) {
-	dir, cfg := setupTestDir(t)
-	s := New(cfg, dir)
-
-	if !s.Scan() {
-		t.Error("Scan should return true when no scan is in progress")
-	}
-
-	cat := s.catalog.Load()
-	if len(cat.Games) != 3 {
-		t.Errorf("got %d games, want 3", len(cat.Games))
 	}
 }
 

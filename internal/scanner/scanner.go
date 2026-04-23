@@ -38,19 +38,9 @@ func New(cfg *config.Config, dataDir string) *Scanner {
 	return s
 }
 
-// Scan rebuilds the catalog by reading ROM directories.
-// Returns true if the scan ran, false if another scan is in progress.
-func (s *Scanner) Scan() bool {
-	if !s.mu.TryLock() {
-		return false
-	}
-	defer s.mu.Unlock()
-
-	s.scan()
-	return true
-}
-
 // ScanBlocking acquires the lock (waiting if needed) and scans.
+// Concurrent rescans are gated by internal/library.Library; the
+// scanner's own mutex exists only to serialize the catalog rebuild.
 func (s *Scanner) ScanBlocking() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

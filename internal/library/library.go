@@ -17,11 +17,12 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
-// maxRescanIterations caps the scan → fetch → rescan loop. A bound
-// prevents a pathological case where FetchAll repeatedly reports saved > 0
-// (for example, if disk writes keep failing silently) from spinning
-// forever. In normal operation the loop completes after one or two
-// iterations.
+// maxRescanIterations caps the scan → fetch → rescan loop. With
+// details.Cache's in-memory layer (PERF-4), a successful saveDetails
+// records the entry so the next isCached returns true — the loop
+// naturally terminates in one or two iterations. This cap is a
+// defensive backstop for any future regression that bypasses the
+// memoization and would otherwise spin forever.
 const maxRescanIterations = 3
 
 // DetailsCache is the subset of details.Cache the library uses.
