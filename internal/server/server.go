@@ -76,7 +76,10 @@ func New(
 		mux:           http.NewServeMux(),
 	}
 	s.routes()
-	s.handler = securityHeaders(s.mux)
+	// gzip is outermost so it sees all responses (including those
+	// emitted by securityHeaders short-circuits); securityHeaders
+	// stays inside so its headers apply to both paths.
+	s.handler = gzipMiddleware(securityHeaders(s.mux))
 	return s, nil
 }
 
