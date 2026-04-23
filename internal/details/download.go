@@ -158,9 +158,9 @@ func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
 	// isCached() also calls this on the early-return path, so we re-check
 	// here. A segment slip would let dst escape the covers subtree
 	// (see SEC-5).
-	if !safePathSegment(console) ||
-		!safePathSegment(nameNoExt) ||
-		!safePathSegment(cleanName) {
+	if !SafePathSegment(console) ||
+		!SafePathSegment(nameNoExt) ||
+		!SafePathSegment(cleanName) {
 		return
 	}
 	dst := coverPath(c.dataDir, console, nameNoExt)
@@ -169,7 +169,7 @@ func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
 	}
 
 	srcPath := filepath.Join(c.cacheDir(console, cleanName), "cover_thumb.jpg")
-	// #nosec G304 -- safePathSegment on console/nameNoExt/cleanName above (SEC-5).
+	// #nosec G304 -- SafePathSegment on console/nameNoExt/cleanName above (SEC-5).
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
 		return // no cached cover yet

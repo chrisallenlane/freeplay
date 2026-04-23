@@ -87,7 +87,7 @@ func (c *Cache) cacheDir(console, cleanName string) string {
 // Get returns cached GameDetails for the given console and ROM filename,
 // or nil if not cached. Defense-in-depth path-traversal check: refuses
 // to read any file outside CacheDir(dataDir), even if the HTTP boundary
-// validator (server.safeName) is bypassed.
+// validator (SafePathSegment) is bypassed.
 func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
 	_, cleanName := igdb.CleanFilename(romFilename)
 	if cleanName == "" {
@@ -185,9 +185,9 @@ func (c *Cache) fetchOne(g igdb.GameEntry, ticker *time.Ticker) bool {
 	// a ROM named "../../pwned.nes" yields nameNoExt="../../pwned". Tombstone
 	// these at the cache-population boundary so no downstream write path
 	// has to re-validate (see SEC-5).
-	if !safePathSegment(g.Console) ||
-		!safePathSegment(cleanName) ||
-		!safePathSegment(nameNoExt) {
+	if !SafePathSegment(g.Console) ||
+		!SafePathSegment(cleanName) ||
+		!SafePathSegment(nameNoExt) {
 		slog.Warn(
 			"skipping game with unsafe path segment",
 			"console", g.Console,

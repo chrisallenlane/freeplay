@@ -180,8 +180,8 @@ func TestSafePathSegment(t *testing.T) {
 		{"normal.nes", true},
 	}
 	for _, tt := range tests {
-		if got := safePathSegment(tt.in); got != tt.want {
-			t.Errorf("safePathSegment(%q) = %v, want %v", tt.in, got, tt.want)
+		if got := SafePathSegment(tt.in); got != tt.want {
+			t.Errorf("SafePathSegment(%q) = %v, want %v", tt.in, got, tt.want)
 		}
 	}
 }

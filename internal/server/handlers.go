@@ -63,10 +63,11 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 
 	console := r.URL.Query().Get("console")
 	rom := r.URL.Query().Get("rom")
-	if !safeName(console) || !safeName(rom) {
-		// safeName rejects empty, "..", "/", "\\", and NUL. Blocks the
-		// SEC-3 path-traversal PoC (console=../../../../tmp/evil) at
-		// the HTTP boundary; defense-in-depth lives in Cache.Get.
+	if !details.SafePathSegment(console) || !details.SafePathSegment(rom) {
+		// SafePathSegment rejects empty, ".", "..", any traversal
+		// substring, path separators, and NUL. Blocks the SEC-3
+		// path-traversal PoC (console=../../../../tmp/evil) at the
+		// HTTP boundary; defense-in-depth lives in Cache.Get.
 		writeJSONError(w, "invalid console or rom parameter", http.StatusBadRequest)
 		return
 	}

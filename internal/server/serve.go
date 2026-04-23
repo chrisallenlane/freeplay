@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/chrisallenlane/freeplay/internal/details"
 	"github.com/chrisallenlane/freeplay/internal/saves"
 )
 
@@ -57,16 +58,6 @@ func (s *Server) servePage(filename string) http.HandlerFunc {
 	}
 }
 
-// safeName reports whether s is usable as a single path segment. It must be
-// non-empty, contain no traversal tokens, no path separators, and no NUL bytes.
-func safeName(s string) bool {
-	return s != "" &&
-		!strings.Contains(s, "..") &&
-		!strings.Contains(s, "/") &&
-		!strings.Contains(s, "\\") &&
-		!strings.ContainsRune(s, 0)
-}
-
 // parseSaveParams extracts and validates the {console}/{game}/{type} path
 // parameters for save routes. The bool is true only when all three values
 // are safe filenames and the save type is recognized.
@@ -74,7 +65,9 @@ func parseSaveParams(r *http.Request) (string, string, string, bool) {
 	console := r.PathValue("console")
 	game := r.PathValue("game")
 	saveType := r.PathValue("type")
-	ok := safeName(console) && safeName(game) && saves.ValidType(saveType)
+	ok := details.SafePathSegment(console) &&
+		details.SafePathSegment(game) &&
+		saves.ValidType(saveType)
 	return console, game, saveType, ok
 }
 

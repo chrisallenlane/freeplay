@@ -14,6 +14,7 @@ import (
 	"testing/fstest"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
+	"github.com/chrisallenlane/freeplay/internal/details"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
@@ -584,7 +585,7 @@ func FuzzServeSecureFile(f *testing.F) {
 	})
 }
 
-func FuzzSafeName(f *testing.F) {
+func FuzzSafePathSegment(f *testing.F) {
 	f.Add("game1")
 	f.Add("")
 	f.Add("..")
@@ -593,23 +594,23 @@ func FuzzSafeName(f *testing.F) {
 	f.Add("name\x00evil")
 
 	f.Fuzz(func(t *testing.T, input string) {
-		result := safeName(input)
+		result := details.SafePathSegment(input)
 		if result {
-			// If safeName says it's safe, verify the invariants hold
-			if input == "" {
-				t.Error("safeName returned true for empty string")
+			// If SafePathSegment says it's safe, verify the invariants hold.
+			if input == "" || input == "." || input == ".." {
+				t.Errorf("SafePathSegment returned true for reserved name: %q", input)
 			}
 			if strings.Contains(input, "..") {
-				t.Errorf("safeName returned true for input containing '..': %q", input)
+				t.Errorf("SafePathSegment returned true for input containing '..': %q", input)
 			}
 			if strings.Contains(input, "/") {
-				t.Errorf("safeName returned true for input containing '/': %q", input)
+				t.Errorf("SafePathSegment returned true for input containing '/': %q", input)
 			}
 			if strings.Contains(input, "\\") {
-				t.Errorf("safeName returned true for input containing '\\': %q", input)
+				t.Errorf("SafePathSegment returned true for input containing '\\': %q", input)
 			}
 			if strings.ContainsRune(input, 0) {
-				t.Errorf("safeName returned true for input containing null byte: %q", input)
+				t.Errorf("SafePathSegment returned true for input containing null byte: %q", input)
 			}
 		}
 	})
@@ -645,15 +646,15 @@ func FuzzParseSaveParams(f *testing.F) {
 
 		if ok {
 			// When parseSaveParams reports success, the invariants must hold.
-			if !safeName(gotConsole) {
+			if !details.SafePathSegment(gotConsole) {
 				t.Errorf(
-					"ok=true but gotConsole %q fails safeName",
+					"ok=true but gotConsole %q fails SafePathSegment",
 					gotConsole,
 				)
 			}
-			if !safeName(gotGame) {
+			if !details.SafePathSegment(gotGame) {
 				t.Errorf(
-					"ok=true but gotGame %q fails safeName",
+					"ok=true but gotGame %q fails SafePathSegment",
 					gotGame,
 				)
 			}

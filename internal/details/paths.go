@@ -19,13 +19,17 @@ func pathInside(child, parent string) bool {
 		strings.HasPrefix(cleanChild, cleanParent+string(filepath.Separator))
 }
 
-// safePathSegment reports whether s is safe to use as a single path
-// segment inside a trusted directory. Rejects empty, ".", "..",
-// anything containing a path separator, and NUL bytes. Callers should
-// skip (tombstone) offending inputs rather than trying to sanitize —
-// a ROM whose filename produces an unsafe segment is an attacker
-// signal, not an ergonomic concern.
-func safePathSegment(s string) bool {
+// SafePathSegment reports whether s is safe to use as a single path
+// segment inside a trusted directory. Rejects empty, ".", "..", any
+// traversal substring, any path separator, and NUL bytes. Callers
+// should skip (tombstone) offending inputs rather than trying to
+// sanitize — a ROM whose filename produces an unsafe segment is an
+// attacker signal, not an ergonomic concern.
+//
+// Exported so the HTTP boundary can share the same validator as the
+// cache's defense-in-depth segment check.
+func SafePathSegment(s string) bool {
 	return s != "" && s != "." && s != ".." &&
+		!strings.Contains(s, "..") &&
 		!strings.ContainsAny(s, `/\`+"\x00")
 }
