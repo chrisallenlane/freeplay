@@ -31,7 +31,7 @@ func (s *Server) handleROM(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	s.serveSecureFile(w, r, rom.Path, r.PathValue("file"))
+	s.serveSecureFile(w, r, rom.Path, r.PathValue("file"), longCacheImmutable)
 }
 
 func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
@@ -40,19 +40,21 @@ func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	serveFile(w, r, rom.Bios)
+	serveFile(w, r, rom.Bios, longCacheImmutable)
 }
 
 func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
-	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "covers"), r.PathValue("rest"))
+	// Covers are rewritten after IGDB rescans behind a stable URL.
+	// Drop `immutable` so browsers revalidate on cache expiry (PERF-10).
+	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "covers"), r.PathValue("rest"), longCacheMutable)
 }
 
 func (s *Server) handleCacheFiles(w http.ResponseWriter, r *http.Request) {
-	s.serveSecureFile(w, r, details.CacheDir(s.dataDir), r.PathValue("rest"))
+	s.serveSecureFile(w, r, details.CacheDir(s.dataDir), r.PathValue("rest"), longCacheMutable)
 }
 
 func (s *Server) handleManuals(w http.ResponseWriter, r *http.Request) {
-	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "manuals"), r.PathValue("rest"))
+	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "manuals"), r.PathValue("rest"), longCacheMutable)
 }
 
 func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
