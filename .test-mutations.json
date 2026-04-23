@@ -281,8 +281,18 @@
       ]
     },
     "internal/saves/saves.go": {
-      "status": "pending",
-      "covering_tests": ["internal/saves/saves_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/saves/saves_test.go"],
+      "last_tested": "2026-04-23T17:30:00Z",
+      "mutations_applied": 30,
+      "killed": 30,
+      "survived_accepted": 0,
+      "mutation_score": 100.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "TestPutCreatesDirectories now stats the expected on-disk path (kills dataDir -> \"\" mutations that roundtrip correctly but write to wrong location)",
+        "TestPutReaderError adds errors.Is(err, iotest.ErrTimeout) check (kills %w wrap drop that still passes the substring check)"
+      ]
     },
     "internal/scanner/catalog.go": {
       "status": "pending",

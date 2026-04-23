@@ -2,6 +2,8 @@ package saves
 
 import (
 	"bytes"
+	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -65,8 +67,14 @@ func TestPutCreatesDirectories(t *testing.T) {
 		t.Fatalf("Put failed: %v", err)
 	}
 
-	// Verify the directory structure was created
+	// Verify the file was actually created at the path rooted in the
+	// manager's dataDir, not at a cwd-relative default. Also kills any
+	// mutation that drops the dataDir field in New() or Put() in favor
+	// of "" — both would still roundtrip via Get but fail this stat.
 	expected := filepath.Join(dir, "saves", "SNES", "game2", "sram")
+	if _, err := os.Stat(expected); err != nil {
+		t.Fatalf("save file not at expected path %s: %v", expected, err)
+	}
 	got := m.Get("SNES", "game2", "sram")
 	if got == nil {
 		t.Fatalf("save not found at expected path: %s", expected)
@@ -86,6 +94,13 @@ func TestPutReaderError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "reading save data") {
 		t.Errorf("error should mention %q, got: %v", "reading save data", err)
+	}
+	// Error must wrap the underlying reader error (%w), not drop it. A
+	// mutation that changes fmt.Errorf("reading save data: %w", err)
+	// to fmt.Errorf("reading save data") would still match the
+	// substring above but would lose errors.Is unwrapping.
+	if !errors.Is(err, iotest.ErrTimeout) {
+		t.Errorf("error should wrap iotest.ErrTimeout, got: %v", err)
 	}
 }
 
