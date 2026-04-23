@@ -147,7 +147,7 @@ func (c *Cache) saveDetails(
 	}); err != nil {
 		return err
 	}
-	c.storeDetails(console, cleanName, details)
+	c.store(console, cleanName, details)
 	return nil
 }
 

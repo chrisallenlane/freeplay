@@ -24,7 +24,7 @@ func (c *Cache) writeNotFound(console, cleanName string) {
 	}); err != nil {
 		return
 	}
-	c.storeNotFound(console, cleanName)
+	c.store(console, cleanName, nil)
 }
 
 // detailsPath returns the filesystem path for the game's details.json.

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -98,11 +97,6 @@ func (c *Cache) Get(console, romFilename string) *igdb.GameDetails {
 	return d
 }
 
-// memKey builds the in-memory cache key for (console, cleanName).
-func memKey(console, cleanName string) string {
-	return console + "/" + cleanName
-}
-
 // load resolves the lookup for (console, cleanName) — first against the
 // in-memory map, then falling through to disk. Returns the details
 // pointer (nil for a negative cache entry) and whether the lookup
@@ -148,39 +142,14 @@ func (c *Cache) load(console, cleanName string) (*igdb.GameDetails, bool) {
 	return nil, false
 }
 
-// storeDetails memoizes a successful details write. Callers pass a copy
-// so later mutations by the caller don't race with cache readers.
-func (c *Cache) storeDetails(console, cleanName string, d *igdb.GameDetails) {
+// store memoizes a resolved lookup. Pass non-nil details after a
+// successful write, or nil to record a negative cache entry
+// (.notfound marker). Callers must pass a copy of the details so
+// later mutations by the caller don't race with cache readers.
+func (c *Cache) store(console, cleanName string, d *igdb.GameDetails) {
 	c.mu.Lock()
 	c.mem[memKey(console, cleanName)] = d
 	c.mu.Unlock()
-}
-
-// storeNotFound memoizes a .notfound write (negative cache entry).
-func (c *Cache) storeNotFound(console, cleanName string) {
-	c.mu.Lock()
-	c.mem[memKey(console, cleanName)] = nil
-	c.mu.Unlock()
-}
-
-// pathInside reports whether the cleaned child path is rooted under
-// the cleaned parent directory. The same check used by server.serveSecureFile.
-func pathInside(child, parent string) bool {
-	cleanChild := filepath.Clean(child)
-	cleanParent := filepath.Clean(parent)
-	return cleanChild == cleanParent ||
-		strings.HasPrefix(cleanChild, cleanParent+string(filepath.Separator))
-}
-
-// safePathSegment reports whether s is safe to use as a single path
-// segment inside a trusted directory. Rejects empty, ".", "..",
-// anything containing a path separator, and NUL bytes. Callers should
-// skip (tombstone) offending inputs rather than trying to sanitize —
-// a ROM whose filename produces an unsafe segment is an attacker
-// signal, not an ergonomic concern.
-func safePathSegment(s string) bool {
-	return s != "" && s != "." && s != ".." &&
-		!strings.ContainsAny(s, `/\`+"\x00")
 }
 
 // FetchAll populates the cache for any games not yet cached.
