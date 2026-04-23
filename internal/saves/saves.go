@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/chrisallenlane/freeplay/internal/atomicfile"
+	"github.com/chrisallenlane/freeplay/internal/datadir"
 )
 
 // Manager handles save state persistence to disk.
@@ -21,7 +21,7 @@ func New(dataDir string) *Manager {
 }
 
 func (m *Manager) savePath(console, game, saveType string) string {
-	return filepath.Join(m.dataDir, "saves", console, game, saveType)
+	return datadir.SavePath(m.dataDir, console, game, saveType)
 }
 
 // Get reads a save file and returns its contents.

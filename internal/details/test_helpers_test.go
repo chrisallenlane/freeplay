@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/chrisallenlane/freeplay/internal/datadir"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
@@ -20,7 +21,7 @@ func seedCachedDetails(
 	d *igdb.GameDetails,
 ) {
 	t.Helper()
-	dir := filepath.Join(CacheDir(dataDir), console, cleanName)
+	dir := filepath.Join(datadir.IGDBCache(dataDir), console, cleanName)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +38,7 @@ func seedCachedDetails(
 // Creates parent directories. Fails the test on any error.
 func seedNotFound(t *testing.T, dataDir, console, cleanName string) {
 	t.Helper()
-	dir := filepath.Join(CacheDir(dataDir), console, cleanName)
+	dir := filepath.Join(datadir.IGDBCache(dataDir), console, cleanName)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		t.Fatal(err)
 	}

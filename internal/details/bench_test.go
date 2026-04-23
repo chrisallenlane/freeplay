@@ -7,11 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/chrisallenlane/freeplay/internal/datadir"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
 // populateCacheOnDisk writes `count` games' worth of details.json files
-// under CacheDir(dataDir). Returns the console name used and a function
+// under datadir.IGDBCache(dataDir). Returns the console name used and a function
 // that yields the rom filename for game index i.
 func populateCacheOnDisk(tb testing.TB, dataDir string, count int) (string, func(int) string) {
 	tb.Helper()
@@ -19,7 +20,7 @@ func populateCacheOnDisk(tb testing.TB, dataDir string, count int) (string, func
 	romFor := func(i int) string { return fmt.Sprintf("Game%04d.nes", i) }
 	for i := range count {
 		_, cleanName := igdb.CleanFilename(romFor(i))
-		dir := filepath.Join(CacheDir(dataDir), console, cleanName)
+		dir := filepath.Join(datadir.IGDBCache(dataDir), console, cleanName)
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			tb.Fatalf("mkdir: %v", err)
 		}

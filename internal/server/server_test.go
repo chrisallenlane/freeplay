@@ -14,7 +14,7 @@ import (
 	"testing/fstest"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
-	"github.com/chrisallenlane/freeplay/internal/details"
+	"github.com/chrisallenlane/freeplay/internal/datadir"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
@@ -594,7 +594,7 @@ func FuzzSafePathSegment(f *testing.F) {
 	f.Add("name\x00evil")
 
 	f.Fuzz(func(t *testing.T, input string) {
-		result := details.SafePathSegment(input)
+		result := datadir.SafePathSegment(input)
 		if result {
 			// If SafePathSegment says it's safe, verify the invariants hold.
 			if input == "" || input == "." || input == ".." {
@@ -646,13 +646,13 @@ func FuzzParseSaveParams(f *testing.F) {
 
 		if ok {
 			// When parseSaveParams reports success, the invariants must hold.
-			if !details.SafePathSegment(gotConsole) {
+			if !datadir.SafePathSegment(gotConsole) {
 				t.Errorf(
 					"ok=true but gotConsole %q fails SafePathSegment",
 					gotConsole,
 				)
 			}
-			if !details.SafePathSegment(gotGame) {
+			if !datadir.SafePathSegment(gotGame) {
 				t.Errorf(
 					"ok=true but gotGame %q fails SafePathSegment",
 					gotGame,

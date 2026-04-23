@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"path/filepath"
 
-	"github.com/chrisallenlane/freeplay/internal/details"
+	"github.com/chrisallenlane/freeplay/internal/datadir"
 )
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -44,15 +43,15 @@ func (s *Server) handleBIOS(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCovers(w http.ResponseWriter, r *http.Request) {
 	// Covers are rewritten after IGDB rescans behind a stable URL.
 	// Drop `immutable` so browsers revalidate on cache expiry (PERF-10).
-	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "covers"), r.PathValue("rest"), longCacheMutable)
+	s.serveSecureFile(w, r, datadir.Covers(s.dataDir), r.PathValue("rest"), longCacheMutable)
 }
 
 func (s *Server) handleCacheFiles(w http.ResponseWriter, r *http.Request) {
-	s.serveSecureFile(w, r, details.CacheDir(s.dataDir), r.PathValue("rest"), longCacheMutable)
+	s.serveSecureFile(w, r, datadir.IGDBCache(s.dataDir), r.PathValue("rest"), longCacheMutable)
 }
 
 func (s *Server) handleManuals(w http.ResponseWriter, r *http.Request) {
-	s.serveSecureFile(w, r, filepath.Join(s.dataDir, "manuals"), r.PathValue("rest"), longCacheMutable)
+	s.serveSecureFile(w, r, datadir.Manuals(s.dataDir), r.PathValue("rest"), longCacheMutable)
 }
 
 func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +62,7 @@ func (s *Server) handleGameDetails(w http.ResponseWriter, r *http.Request) {
 
 	console := r.URL.Query().Get("console")
 	rom := r.URL.Query().Get("rom")
-	if !details.SafePathSegment(console) || !details.SafePathSegment(rom) {
+	if !datadir.SafePathSegment(console) || !datadir.SafePathSegment(rom) {
 		// SafePathSegment rejects empty, ".", "..", any traversal
 		// substring, path separators, and NUL. Blocks the SEC-3
 		// path-traversal PoC (console=../../../../tmp/evil) at the

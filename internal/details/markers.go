@@ -36,8 +36,3 @@ func (c *Cache) detailsPath(console, cleanName string) string {
 func (c *Cache) notFoundPath(console, cleanName string) string {
 	return filepath.Join(c.cacheDir(console, cleanName), ".notfound")
 }
-
-// coverPath returns the expected filesystem path for a game's cover art.
-func coverPath(dataDir, console, filenameWithoutExt string) string {
-	return filepath.Join(dataDir, "covers", console, filenameWithoutExt+".png")
-}

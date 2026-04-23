@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/chrisallenlane/freeplay/internal/datadir"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
@@ -534,7 +535,7 @@ func TestEnsureCoverThumbnail_NoCoverThumb(t *testing.T) {
 	c.ensureCoverThumbnail("NES", "Test Game", "Test Game")
 
 	// The cover path should not exist
-	coverPath := coverPath(dir, "NES", "Test Game")
+	coverPath := datadir.CoverFile(dir, "NES", "Test Game")
 	if _, err := os.Stat(coverPath); err == nil {
 		t.Errorf("cover should not exist when no cover_thumb.jpg exists")
 	}
@@ -560,7 +561,7 @@ func TestEnsureCoverThumbnail_AlreadyExists(t *testing.T) {
 	}
 
 	// Pre-create the destination cover
-	coverPath := coverPath(dir, "NES", "Test Game")
+	coverPath := datadir.CoverFile(dir, "NES", "Test Game")
 	if err := os.MkdirAll(filepath.Dir(coverPath), 0o755); err != nil {
 		t.Fatal(err)
 	}

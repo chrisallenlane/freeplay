@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
+	"github.com/chrisallenlane/freeplay/internal/datadir"
 )
 
 // Scanner builds and stores the game catalog.
@@ -59,16 +60,14 @@ func (s *Scanner) scan() {
 		// Build sets of existing cover/manual filenames for O(1) lookup,
 		// replacing per-ROM os.Stat calls.
 		covers := make(map[string]bool)
-		coverDir := filepath.Join(s.dataDir, "covers", consoleName)
-		if coverEntries, err := os.ReadDir(coverDir); err == nil {
+		if coverEntries, err := os.ReadDir(datadir.CoversConsole(s.dataDir, consoleName)); err == nil {
 			for _, ce := range coverEntries {
 				covers[ce.Name()] = true
 			}
 		}
 
 		manuals := make(map[string]bool)
-		manualDir := filepath.Join(s.dataDir, "manuals", consoleName)
-		if manualEntries, err := os.ReadDir(manualDir); err == nil {
+		if manualEntries, err := os.ReadDir(datadir.ManualsConsole(s.dataDir, consoleName)); err == nil {
 			for _, me := range manualEntries {
 				manuals[me.Name()] = true
 			}

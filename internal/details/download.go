@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/chrisallenlane/freeplay/internal/atomicfile"
+	"github.com/chrisallenlane/freeplay/internal/datadir"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
@@ -158,18 +159,18 @@ func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
 	// isCached() also calls this on the early-return path, so we re-check
 	// here. A segment slip would let dst escape the covers subtree
 	// (see SEC-5).
-	if !SafePathSegment(console) ||
-		!SafePathSegment(nameNoExt) ||
-		!SafePathSegment(cleanName) {
+	if !datadir.SafePathSegment(console) ||
+		!datadir.SafePathSegment(nameNoExt) ||
+		!datadir.SafePathSegment(cleanName) {
 		return
 	}
-	dst := coverPath(c.dataDir, console, nameNoExt)
+	dst := datadir.CoverFile(c.dataDir, console, nameNoExt)
 	if _, err := os.Stat(dst); err == nil {
 		return // already exists
 	}
 
 	srcPath := filepath.Join(c.cacheDir(console, cleanName), "cover_thumb.jpg")
-	// #nosec G304 -- SafePathSegment on console/nameNoExt/cleanName above (SEC-5).
+	// #nosec G304 -- datadir.SafePathSegment on console/nameNoExt/cleanName above (SEC-5).
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
 		return // no cached cover yet

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/chrisallenlane/freeplay/internal/datadir"
 	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
@@ -150,7 +151,7 @@ func TestFetchOneRejectsUnsafeFilenames(t *testing.T) {
 	// Files allowed ONLY under the per-game cache subdirectory. Any
 	// escape (e.g., <cacheDir>/details.json, <cacheDir>/.notfound,
 	// <dir>/covers/../pwned.png) means a segment check was missed.
-	cacheRoot := CacheDir(dir)
+	cacheRoot := datadir.IGDBCache(dir)
 	for _, suspect := range []string{
 		filepath.Join(cacheRoot, "details.json"),
 		filepath.Join(cacheRoot, ".notfound"),
@@ -164,31 +165,9 @@ func TestFetchOneRejectsUnsafeFilenames(t *testing.T) {
 	}
 }
 
-func TestSafePathSegment(t *testing.T) {
-	tests := []struct {
-		in   string
-		want bool
-	}{
-		{"Mega Man", true},
-		{"", false},
-		{".", false},
-		{"..", false},
-		{"../evil", false},
-		{"a/b", false},
-		{"a\\b", false},
-		{"a\x00b", false},
-		{"normal.nes", true},
-	}
-	for _, tt := range tests {
-		if got := SafePathSegment(tt.in); got != tt.want {
-			t.Errorf("SafePathSegment(%q) = %v, want %v", tt.in, got, tt.want)
-		}
-	}
-}
-
 // TestCacheGetRefusesPathsOutsideCacheDir pins the SEC-3 defense-in-depth:
 // even if the HTTP boundary validator is bypassed, Cache.Get must never
-// read a file outside CacheDir(dataDir).
+// read a file outside datadir.IGDBCache(dataDir).
 func TestCacheGetRefusesPathsOutsideCacheDir(t *testing.T) {
 	dir := t.TempDir()
 
@@ -343,7 +322,7 @@ func TestGet_ServesFromMemoryAfterDiskDelete(t *testing.T) {
 	c := New(dir, nil)
 
 	seedCachedDetails(t, dir, "NES", "Mega Man", &igdb.GameDetails{Name: "Mega Man"})
-	jsonPath := filepath.Join(CacheDir(dir), "NES", "Mega Man", "details.json")
+	jsonPath := filepath.Join(datadir.IGDBCache(dir), "NES", "Mega Man", "details.json")
 
 	// Prime the in-memory layer via a disk read.
 	if got := c.Get("NES", "Mega Man (USA).nes"); got == nil || got.Name != "Mega Man" {
@@ -368,7 +347,7 @@ func TestGet_NegativeCacheMemoizesNotFound(t *testing.T) {
 	c := New(dir, nil)
 
 	seedNotFound(t, dir, "NES", "Unknown")
-	notFoundPath := filepath.Join(CacheDir(dir), "NES", "Unknown", ".notfound")
+	notFoundPath := filepath.Join(datadir.IGDBCache(dir), "NES", "Unknown", ".notfound")
 
 	if got := c.Get("NES", "Unknown.nes"); got != nil {
 		t.Fatalf("first Get = %+v, want nil", got)
@@ -432,7 +411,7 @@ func TestFetchAll_PopulatesCache(t *testing.T) {
 	}
 
 	// Cover thumbnail should exist at standard cover path
-	coverPath := coverPath(dir, "NES", "Mega Man (USA)")
+	coverPath := datadir.CoverFile(dir, "NES", "Mega Man (USA)")
 	if _, err := os.Stat(coverPath); err != nil {
 		t.Errorf("expected cover at %q, got: %v", coverPath, err)
 	}
@@ -530,7 +509,7 @@ func TestFetchAll_RegionalVariantsShareCache(t *testing.T) {
 
 	// Both ROMs should have cover thumbnails
 	for _, name := range []string{"Mega Man (USA)", "Mega Man (Japan)"} {
-		cp := coverPath(dir, "NES", name)
+		cp := datadir.CoverFile(dir, "NES", name)
 		if _, err := os.Stat(cp); err != nil {
 			t.Errorf("expected cover at %q, got: %v", cp, err)
 		}

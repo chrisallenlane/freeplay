@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/chrisallenlane/freeplay/internal/details"
+	"github.com/chrisallenlane/freeplay/internal/datadir"
 	"github.com/chrisallenlane/freeplay/internal/saves"
 )
 
@@ -65,8 +65,8 @@ func parseSaveParams(r *http.Request) (string, string, string, bool) {
 	console := r.PathValue("console")
 	game := r.PathValue("game")
 	saveType := r.PathValue("type")
-	ok := details.SafePathSegment(console) &&
-		details.SafePathSegment(game) &&
+	ok := datadir.SafePathSegment(console) &&
+		datadir.SafePathSegment(game) &&
 		saves.ValidType(saveType)
 	return console, game, saveType, ok
 }
