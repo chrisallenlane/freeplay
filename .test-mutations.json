@@ -164,8 +164,32 @@
       ]
     },
     "internal/igdb/fetcher.go": {
-      "status": "pending",
-      "covering_tests": ["internal/igdb/fetcher_test.go"]
+      "status": "completed",
+      "covering_tests": ["internal/igdb/fetcher_test.go"],
+      "last_tested": "2026-04-23T16:40:00Z",
+      "mutations_applied": 25,
+      "killed": 23,
+      "survived_accepted": 2,
+      "mutation_score": 92.0,
+      "addressable_mutation_score": 100.0,
+      "insights": [
+        "Added TestGetTokenExpiry (kills token-cache && -> || — expired token with non-empty value must refetch)",
+        "Added TestSearchGamePlatformNoGamesNoFallback (kills platform-fallback && -> || via recover() — mutant panics on games[0] when games is empty)"
+      ],
+      "accepted_survivors": [
+        {
+          "line": 45,
+          "mutation": "Timeout: 10 * time.Second -> 11 * time.Second",
+          "category": "structurally untestable without slow-test burden",
+          "reason": "Distinguishing 10s vs 11s timeouts requires a real slow-response test. Not practical in unit-test runtime; functional impact is 1s of wait difference."
+        },
+        {
+          "line": 113,
+          "mutation": "io.LimitReader(..., 1<<20) -> 1<<21",
+          "category": "structurally untestable without large-payload burden",
+          "reason": "Distinguishing 1MB vs 2MB caps requires serving >1MB from the test server and asserting truncation. Adds slow, allocation-heavy test for defense-in-depth DoS guard; accepted given IGDB responses are well below 1MB in practice."
+        }
+      ]
     },
     "internal/igdb/name.go": {
       "status": "pending",

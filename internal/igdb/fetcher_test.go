@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // rewriteTransport redirects all HTTP requests to a test server URL.
@@ -752,6 +753,89 @@ func FuzzGameDetailsFromIGDB(f *testing.F) {
 			}
 		}
 	})
+}
+
+// TestGetTokenExpiry verifies that an expired cached token is not reused:
+// the second call to getToken must hit the token endpoint again rather than
+// returning the stale cached value.
+//
+// Kills the `&&` → `||` mutation on line 54: under mutation the condition
+// becomes `f.token != "" || time.Now().Before(f.tokenExpiry)`, which is true
+// when the token is non-empty even if it has expired, causing the stale token
+// to be returned without a second network request.
+func TestGetTokenExpiry(t *testing.T) {
+	var tokenHits atomic.Int32
+
+	searchResp, _ := json.Marshal([]map[string]any{
+		{"id": 1, "name": "Tetris"},
+	})
+	f := newTestFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/oauth2/token"):
+			tokenHits.Add(1)
+			writeTokenResponse(w)
+		case strings.HasSuffix(r.URL.Path, "/v4/games"):
+			_, _ = w.Write(searchResp)
+		}
+	})
+
+	// First call populates f.token and f.tokenExpiry.
+	if _, err := f.SearchGame("Tetris", nil); err != nil {
+		t.Fatalf("first SearchGame error: %v", err)
+	}
+	if tokenHits.Load() != 1 {
+		t.Fatalf("expected 1 token request after first call, got %d", tokenHits.Load())
+	}
+
+	// Expire the token by backdating f.tokenExpiry.
+	f.mu.Lock()
+	f.tokenExpiry = time.Now().Add(-1 * time.Second)
+	f.mu.Unlock()
+
+	// Second call: the cached token is expired, so a fresh token must be
+	// fetched. tokenHits should reach 2.
+	if _, err := f.SearchGame("Tetris", nil); err != nil {
+		t.Fatalf("second SearchGame error: %v", err)
+	}
+	if tokenHits.Load() != 2 {
+		t.Errorf(
+			"expected 2 token requests after expiry, got %d",
+			tokenHits.Load(),
+		)
+	}
+}
+
+// TestSearchGamePlatformNoGamesNoFallback verifies that when platform IDs are
+// provided but IGDB returns zero games (no exact/diacritics match, empty
+// result set), SearchGame returns 0 rather than panicking.
+//
+// Kills the `&&` → `||` mutation on line 192: under mutation the condition
+// becomes `len(platformIDs) > 0 || len(games) > 0`, which is true when
+// platformIDs is non-empty even if games is empty, causing an index-out-of-
+// range panic on `games[0]`.
+func TestSearchGamePlatformNoGamesNoFallback(t *testing.T) {
+	// The games endpoint returns an empty array: no results at all.
+	f := newIGDBFetcherStatic(t, []byte("[]"))
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf(
+				"SearchGame panicked with platform IDs and empty result: %v",
+				r,
+			)
+		}
+	}()
+
+	id, err := f.SearchGame("Some Game", []int{18})
+	if err != nil {
+		t.Fatalf("SearchGame returned error: %v", err)
+	}
+	if id != 0 {
+		t.Errorf(
+			"SearchGame() = %d, want 0 (no games returned, nothing to fall back to)",
+			id,
+		)
+	}
 }
 
 // FuzzSearchGame verifies that SearchGame never panics on arbitrary game name
