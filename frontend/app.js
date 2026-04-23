@@ -290,10 +290,7 @@
 		const clamped = Math.max(0, Math.min(index, cards.length - 1));
 		const card = cards[clamped];
 		card.focus({ preventScroll: true });
-		card.scrollIntoView({
-			behavior: FP.prefersReducedMotion() ? "instant" : "smooth",
-			block: "nearest",
-		});
+		FP.scrollElementIntoView(card);
 		highlightCard(card);
 		focusedKey = card.dataset.key ?? null;
 	}

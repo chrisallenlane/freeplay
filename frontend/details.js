@@ -30,10 +30,7 @@
 				}
 				if (el) {
 					el.classList.add("highlighted");
-					el.scrollIntoView({
-						behavior: FP.prefersReducedMotion() ? "instant" : "smooth",
-						block: "nearest",
-					});
+					FP.scrollElementIntoView(el);
 				}
 			}
 

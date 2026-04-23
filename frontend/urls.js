@@ -1,4 +1,8 @@
 ((exports) => {
+	const enc = encodeURIComponent;
+	const gameQuery = (consoleName, rom) =>
+		`?console=${enc(consoleName)}&rom=${enc(rom)}`;
+
 	exports.stripExt = (filename) => {
 		const dot = filename.lastIndexOf(".");
 		return dot > 0 ? filename.substring(0, dot) : filename;
@@ -7,27 +11,26 @@
 	exports.favKey = (game) => `${game.console}/${game.filename}`;
 
 	exports.coverUrl = (game) =>
-		`/covers/${encodeURIComponent(game.console)}/${encodeURIComponent(exports.stripExt(game.filename))}.png`;
+		`/covers/${enc(game.console)}/${enc(exports.stripExt(game.filename))}.png`;
 
 	exports.manualUrl = (game) =>
-		`/manuals/${encodeURIComponent(game.console)}/${encodeURIComponent(exports.stripExt(game.filename))}.pdf`;
+		`/manuals/${enc(game.console)}/${enc(exports.stripExt(game.filename))}.pdf`;
 
-	exports.playUrl = (game) =>
-		`/play?console=${encodeURIComponent(game.console)}&rom=${encodeURIComponent(game.filename)}`;
+	exports.playUrl = (game) => `/play${gameQuery(game.console, game.filename)}`;
 
 	exports.detailsUrl = (game) =>
-		`/details?console=${encodeURIComponent(game.console)}&rom=${encodeURIComponent(game.filename)}`;
+		`/details${gameQuery(game.console, game.filename)}`;
 
 	exports.romUrl = (consoleName, rom) =>
-		`/roms/${encodeURIComponent(consoleName)}/${encodeURIComponent(rom)}`;
+		`/roms/${enc(consoleName)}/${enc(rom)}`;
 
-	exports.biosUrl = (consoleName) => `/bios/${encodeURIComponent(consoleName)}`;
+	exports.biosUrl = (consoleName) => `/bios/${enc(consoleName)}`;
 
 	exports.saveBasePath = (consoleName, gameSlug) =>
-		`/api/saves/${encodeURIComponent(consoleName)}/${encodeURIComponent(gameSlug)}`;
+		`/api/saves/${enc(consoleName)}/${enc(gameSlug)}`;
 
 	exports.gameDetailsUrl = (consoleName, rom) =>
-		`/api/game-details?console=${encodeURIComponent(consoleName)}&rom=${encodeURIComponent(rom)}`;
+		`/api/game-details${gameQuery(consoleName, rom)}`;
 })(
 	typeof module !== "undefined"
 		? (module.exports = globalThis.Freeplay = globalThis.Freeplay || {})
