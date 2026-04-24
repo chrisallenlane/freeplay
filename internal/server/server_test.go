@@ -1072,6 +1072,9 @@ func TestNoCacheMiddleware(t *testing.T) {
 }
 
 func TestPostSavePutError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses filesystem mode bits; test requires non-root")
+	}
 	srv, dir := testServer(t)
 	srv.scanner.ScanBlocking()
 

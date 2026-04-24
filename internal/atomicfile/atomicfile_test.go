@@ -106,6 +106,9 @@ func TestWriteDirectoryCreationFails(t *testing.T) {
 }
 
 func TestWriteReadOnlyDirectory(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses filesystem mode bits; test requires non-root")
+	}
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0o444); err != nil {
 		t.Fatal(err)
