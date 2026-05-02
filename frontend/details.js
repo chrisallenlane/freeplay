@@ -85,14 +85,7 @@
 		const title = FP.el("h2", "details-title", displayName);
 		meta.appendChild(title);
 
-		const rows = [
-			["Console", consoleName],
-			["Year", details?.firstReleaseDate?.substring(0, 4)],
-			["Developer", details?.developers?.join(", ")],
-			["Publisher", details?.publishers?.join(", ")],
-			["Platforms", details?.platforms?.join(", ")],
-			["Series", details?.collection],
-		].filter(([, v]) => v);
+		const rows = FP.buildMetaRows(consoleName, details);
 
 		const table = FP.el("table", "details-meta-table");
 		for (const [label, value] of rows) {
@@ -178,10 +171,8 @@
 		const section = FP.el("section", "details-section");
 		section.appendChild(FP.el("h3", null, heading));
 		if (typeof content === "string") {
-			for (const para of content.split(/\n\n+/)) {
-				const text = para.trim();
-				if (!text) continue;
-				section.appendChild(FP.el("p", null, text));
+			for (const para of FP.splitParagraphs(content)) {
+				section.appendChild(FP.el("p", null, para));
 			}
 		} else {
 			section.appendChild(content);
@@ -191,23 +182,14 @@
 
 	function buildGallery(heading, refs, galleryClass) {
 		const gallery = FP.el("div", galleryClass || "details-gallery");
-		for (let i = 0; i < refs.length; i++) {
-			// Each ref is {url, thumbUrl?}. Older details.json written
-			// before PERF-6 decode to {url: "..."} with no thumbUrl;
-			// fall back to url in that case.
-			const ref = refs[i];
-			const fullUrl = ref.url;
-			const thumbUrl = ref.thumbUrl || ref.url;
+		for (const entry of FP.buildGalleryEntries(heading, refs)) {
 			const link = FP.el("a");
-			link.href = fullUrl;
-			link.setAttribute(
-				"aria-label",
-				`View full image: ${heading} ${i + 1} of ${refs.length}`,
-			);
+			link.href = entry.href;
+			link.setAttribute("aria-label", entry.ariaLabel);
 			const img = FP.el("img");
-			img.src = thumbUrl;
+			img.src = entry.src;
 			img.loading = "lazy";
-			img.alt = `${heading} ${i + 1} of ${refs.length}`;
+			img.alt = entry.alt;
 			link.appendChild(img);
 			gallery.appendChild(link);
 		}

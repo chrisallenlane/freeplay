@@ -37,6 +37,8 @@ func New(cfg *config.Config, dataDir string) *Scanner {
 // ScanBlocking acquires the lock (waiting if needed) and scans.
 // Concurrent rescans are gated by internal/library.Library; the
 // scanner's own mutex exists only to serialize the catalog rebuild.
+// library.Library.Start calls this synchronously at startup so the
+// HTTP listener never observes an empty catalog.
 func (s *Scanner) ScanBlocking() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

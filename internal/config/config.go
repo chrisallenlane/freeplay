@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -9,6 +10,20 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+)
+
+// Sentinel errors for the validation rules in Load. Wrapped via
+// fmt.Errorf "%w: <details>" so callers can match a specific failure
+// mode with errors.Is and tests don't couple to the human-readable
+// part of the error message.
+var (
+	ErrLoadingConfig    = errors.New("loading config")
+	ErrInvalidPort      = errors.New("port must be between 1 and 65535")
+	ErrROMPathRequired  = errors.New("rom path is required")
+	ErrROMCoreRequired  = errors.New("rom core is required")
+	ErrInvalidCoverAPI  = errors.New(`cover_art_api must be "igdb" or empty`)
+	ErrCoverKeyRequired = errors.New("cover_art_api_key is required when cover_art_api is set")
+	ErrInvalidIGDBKey   = errors.New(`cover_art_api_key for igdb must be in "client_id:client_secret" format`)
 )
 
 // Config holds the application configuration.
@@ -33,7 +48,7 @@ func Load(dataDir string) (*Config, error) {
 
 	var cfg Config
 	if _, err := toml.DecodeFile(path, &cfg); err != nil {
-		return nil, fmt.Errorf("loading config %s: %w", path, err)
+		return nil, fmt.Errorf("%w %s: %w", ErrLoadingConfig, path, err)
 	}
 
 	if cfg.Port == 0 {
@@ -52,15 +67,15 @@ func Load(dataDir string) (*Config, error) {
 
 func (c *Config) validate() error {
 	if c.Port < 1 || c.Port > 65535 {
-		return fmt.Errorf("port must be between 1 and 65535, got %d", c.Port)
+		return fmt.Errorf("%w: got %d", ErrInvalidPort, c.Port)
 	}
 
 	for name, rom := range c.ROMs {
 		if rom.Path == "" {
-			return fmt.Errorf("rom %q: path is required", name)
+			return fmt.Errorf("rom %q: %w", name, ErrROMPathRequired)
 		}
 		if rom.Core == "" {
-			return fmt.Errorf("rom %q: core is required", name)
+			return fmt.Errorf("rom %q: %w", name, ErrROMCoreRequired)
 		}
 	}
 
@@ -68,17 +83,17 @@ func (c *Config) validate() error {
 	case "", "igdb":
 		// valid
 	default:
-		return fmt.Errorf("cover_art_api must be \"igdb\" or empty; got %q", c.CoverArtAPI)
+		return fmt.Errorf("%w: got %q", ErrInvalidCoverAPI, c.CoverArtAPI)
 	}
 
 	if c.CoverArtAPI != "" && c.CoverArtKey == "" {
-		return fmt.Errorf("cover_art_api_key is required when cover_art_api is set")
+		return ErrCoverKeyRequired
 	}
 
 	if c.CoverArtAPI == "igdb" {
 		parts := strings.SplitN(c.CoverArtKey, ":", 2)
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			return fmt.Errorf("cover_art_api_key for igdb must be in \"client_id:client_secret\" format")
+			return ErrInvalidIGDBKey
 		}
 	}
 

@@ -1,10 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/chrisallenlane/freeplay/internal/config"
@@ -253,6 +255,324 @@ func TestServeSecureFile_ValidSubdirectoryFile(t *testing.T) {
 	}
 	if w.Body.String() != "png" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "png")
+	}
+}
+
+// TestServeSecureFile_EncodedDotDotBlocked exercises the bypass class the
+// existing FuzzServeSecureFile seed doesn't cover well: a URL that
+// percent-encodes the '/' so http.ServeMux's path-cleaning step does NOT
+// strip the traversal segment before the handler is invoked. The encoded
+// rest reaches the handler containing literal "../" and must still be
+// rejected — first by http.ServeFile's r.URL.Path check (400) when the
+// decoded path contains "..", or by PathInside as defense-in-depth when it
+// stays in baseDir. Either way: never 200 with content from outside.
+//
+// The NotFound and BadRequest both encode "did not serve outside file"; we
+// pin the negative behavior (no escape) since the precise status varies
+// with which layer fires first.
+func TestServeSecureFile_EncodedDotDotBlocked(t *testing.T) {
+	srv, dir := testServer(t)
+
+	// Plant content outside covers that we definitely never want served
+	// through the covers handler.
+	outside := filepath.Join(dir, "outside-secret.txt")
+	writeTestFile(t, outside, []byte("OUTSIDE-SECRET-CONTENT"))
+
+	// And a real cover, so a path that lexically resolves inside still
+	// has *something* to return without being a false-positive 404.
+	writeTestFile(t, filepath.Join(dir, "covers", "NES", "real.png"), []byte("nes-content"))
+
+	// All of these are URL shapes that can survive http.ServeMux path
+	// cleaning by encoding '/' as %2F. The handler receives a `rest`
+	// containing literal "../" segments.
+	cases := []string{
+		"/covers/NES%2F..%2F..%2Foutside-secret.txt",
+		"/covers/NES%2F..%2F..%2F..%2Foutside-secret.txt",
+		"/covers/..%2F..%2Foutside-secret.txt",
+		"/covers/foo%2F..%2F..%2Foutside-secret.txt",
+		// Encoded mixed with literal slashes
+		"/covers/NES/..%2F..%2Foutside-secret.txt",
+	}
+
+	for _, p := range cases {
+		t.Run(p, func(t *testing.T) {
+			w := doRequest(t, srv, http.MethodGet, p, nil)
+			// The negative invariant: the body must never contain the
+			// outside-secret content. We don't pin a specific status
+			// because either http.ServeFile (400) or PathInside (404)
+			// could fire first depending on Go runtime version.
+			if strings.Contains(w.Body.String(), "OUTSIDE-SECRET-CONTENT") {
+				t.Errorf(
+					"path %q served outside content (status=%d body=%q)",
+					p, w.Code, w.Body.String(),
+				)
+			}
+		})
+	}
+}
+
+// TestServeSecureFile_LexicallyInsideButCrossesNamespace pins a subtle
+// behavior of PathInside + filepath.Clean: a request like
+// "a/b/../../etc/passwd" cleans to "etc/passwd" and stays *inside*
+// baseDir — it does NOT escape to "/etc/passwd". The handler will look
+// for a file literally at "<baseDir>/etc/passwd" and serve it if and
+// only if such a file exists. The relevant correctness property: an
+// attacker cannot exfiltrate files outside baseDir via this shape, but
+// a request with this shape DOES land at a different in-baseDir file
+// than the URL appears to ask for. Pin both halves.
+func TestServeSecureFile_LexicallyInsideButCrossesNamespace(t *testing.T) {
+	srv, dir := testServer(t)
+
+	covers := filepath.Join(dir, "covers")
+	if err := os.MkdirAll(covers, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Plant a file at <covers>/etc/passwd to demonstrate the resolution.
+	weirdPath := filepath.Join(covers, "etc", "passwd")
+	writeTestFile(t, weirdPath, []byte("inside-but-weird"))
+
+	// "a/b/../../etc/passwd" → filepath.Clean → "etc/passwd"
+	// → filepath.Join(covers, "etc/passwd") → <covers>/etc/passwd
+	req := httptest.NewRequest("GET", "/covers/", nil)
+	w := httptest.NewRecorder()
+	srv.serveSecureFile(w, req, covers, "a/b/../../etc/passwd", longCacheImmutable)
+
+	// In-baseDir resolution is fine; PathInside correctly accepts.
+	if w.Code != http.StatusOK {
+		t.Errorf(
+			"expected 200 (file exists at <covers>/etc/passwd), got %d body=%q",
+			w.Code, w.Body.String(),
+		)
+	}
+	if w.Body.String() != "inside-but-weird" {
+		t.Errorf("body = %q, want %q", w.Body.String(), "inside-but-weird")
+	}
+
+	// Negative invariant: confirm no file system traversal escaped baseDir.
+	// Even though the request looked traversal-shaped, the served bytes
+	// MUST be the in-baseDir file (or 404), never /etc/passwd.
+	outsideEtcPasswd, err := os.ReadFile("/etc/passwd")
+	if err == nil && bytes.Equal(w.Body.Bytes(), outsideEtcPasswd) {
+		t.Errorf("served real /etc/passwd content — escape!")
+	}
+}
+
+// TestServeSecureFile_SymlinkInsideBaseDirFollowsTarget pins current
+// behavior: a symlink within baseDir whose target is OUTSIDE baseDir
+// is followed by os.Stat and http.ServeFile, and the outside content
+// is served. PathInside checks the lexical request path, not the
+// resolved-symlink path.
+//
+// This is intentionally pinned (not flagged as a bug) because:
+//   - dataDir is operator-controlled; planting a symlink there is
+//     equivalent to filesystem write access, which already grants the
+//     attacker direct read.
+//   - Operators legitimately use symlinks to consolidate covers and
+//     manuals across consoles (e.g., one cover for a multi-platform
+//     game symlinked from each console subdirectory).
+//
+// A future hardening pass that adds O_NOFOLLOW or filepath.EvalSymlinks
+// gating would break those workflows. This test catches that regression
+// in either direction — a fresh maintainer who tightens the check
+// without thinking through legit operator setups will see this fail.
+//
+// Documented as out-of-scope-but-flagged in the bug-hunt synthesis:
+// it's a defense-in-depth gap, not an exploitable bug given threat
+// model.
+func TestServeSecureFile_SymlinkInsideBaseDirFollowsTarget(t *testing.T) {
+	srv, dir := testServer(t)
+
+	// Plant a target outside baseDir.
+	outside := filepath.Join(dir, "outside-target.png")
+	writeTestFile(t, outside, []byte("symlink-target-content"))
+
+	// Create the covers tree.
+	covers := filepath.Join(dir, "covers", "NES")
+	if err := os.MkdirAll(covers, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Symlink inside covers pointing to the outside target.
+	link := filepath.Join(covers, "linked.png")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+
+	w := doRequest(t, srv, http.MethodGet, "/covers/NES/linked.png", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("got status %d, want 200 (symlink should be followed)", w.Code)
+	}
+	if w.Body.String() != "symlink-target-content" {
+		t.Errorf(
+			"body = %q, want %q (symlink target)",
+			w.Body.String(), "symlink-target-content",
+		)
+	}
+}
+
+// TestHandleROM_FilePathValueIsSingleSegment pins that the {file} mux
+// placeholder rejects multi-segment paths. handleROM trusts that {file}
+// is a single segment (no '/'), so a regression that switched the
+// pattern to {file...} would expand the attack surface to allow
+// per-ROM-dir traversal — at which point SafePathSegment would belong
+// on this handler too.
+func TestHandleROM_FilePathValueIsSingleSegment(t *testing.T) {
+	srv, dir := testServer(t)
+
+	// Plant a file outside the NES ROM dir but inside the same parent.
+	otherROM := filepath.Join(dir, "roms", "SNES", "OtherGame.sfc")
+	writeTestFile(t, otherROM, []byte("snes-rom"))
+
+	// /roms/NES/<file> — a {file} of "../SNES/OtherGame.sfc" must NOT
+	// match the route (mux requires single segment) or, if it did, must
+	// not serve OtherGame.sfc.
+	w := doRequest(t, srv, http.MethodGet, "/roms/NES/..%2FSNES%2FOtherGame.sfc", nil)
+	if w.Body.String() == "snes-rom" {
+		t.Errorf(
+			"served SNES ROM through NES route: status=%d body=%q",
+			w.Code, w.Body.String(),
+		)
+	}
+	// The {file} placeholder is single-segment so encoded slash gets
+	// passed through as part of the literal filename. The on-disk file
+	// "../SNES/OtherGame.sfc" doesn't exist under <romDir>, so 404.
+	// Non-200 is the contract; specific code is implementation detail.
+	if w.Code == http.StatusOK {
+		t.Errorf("traversal-shaped {file} returned 200")
+	}
+}
+
+// TestHandleROM_UnknownConsoleNeverReachesServeSecureFile pins the
+// defense-by-membership behavior of handleROM: if the console isn't in
+// s.cfg.ROMs, the handler short-circuits to 404 without consulting the
+// filesystem. Belt-and-suspenders for a regression that swapped the
+// order of the map lookup and serveSecureFile call.
+//
+// Distinct from TestROMServingUnknownConsole, which pins only the
+// status code. This pins the side effect: nothing in <dataDir> or the
+// ROM dirs is touched.
+func TestHandleROM_UnknownConsoleNeverReachesServeSecureFile(t *testing.T) {
+	srv, dir := testServer(t)
+
+	// Plant a sentinel file with a known-attractive name in dataDir
+	// itself. If a future regression let an unknown-console request
+	// fall through to serveSecureFile with some default baseDir, we
+	// want the test to fail loudly.
+	sentinel := filepath.Join(dir, "shouldnt-be-served.txt")
+	writeTestFile(t, sentinel, []byte("sentinel"))
+
+	// Unknown console. Map lookup returns ok=false, handler 404s.
+	w := doRequest(t, srv, http.MethodGet, "/roms/UNKNOWN/foo.bin", nil)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("got status %d, want 404", w.Code)
+	}
+	if strings.Contains(w.Body.String(), "sentinel") {
+		t.Errorf(
+			"unknown-console request leaked sentinel content: body=%q",
+			w.Body.String(),
+		)
+	}
+}
+
+// TestHandleCovers_NoConsoleMembershipGate pins the asymmetry the
+// hotspot brief flagged: handleCovers does NOT validate {rest} via
+// SafePathSegment (handleROM uses defense-by-membership in s.cfg.ROMs).
+// Instead it trusts PathInside as the sole boundary. A request for a
+// console that isn't configured (e.g. /covers/SegaCD/foo.png with no
+// SegaCD in config) is served if and only if the file happens to exist
+// on disk.
+//
+// This is current contract — covers/manuals/cache live outside config
+// so an unknown-but-on-disk console subdirectory is legitimate. Pin
+// the contract so a future commit that adds a membership gate doesn't
+// silently break operator workflows where covers/ contains directories
+// for consoles not in the active config.
+func TestHandleCovers_NoConsoleMembershipGate(t *testing.T) {
+	srv, dir := testServer(t)
+
+	// Plant a cover for a console that is NOT in s.cfg.ROMs (which
+	// only has NES per testServer).
+	writeTestFile(
+		t,
+		filepath.Join(dir, "covers", "SegaCD", "Sonic.png"),
+		[]byte("segacd-cover"),
+	)
+
+	w := doRequest(t, srv, http.MethodGet, "/covers/SegaCD/Sonic.png", nil)
+	if w.Code != http.StatusOK {
+		t.Errorf(
+			"got status %d, want 200 — covers handler must not gate "+
+				"on s.cfg.ROMs membership",
+			w.Code,
+		)
+	}
+	if w.Body.String() != "segacd-cover" {
+		t.Errorf("body = %q, want %q", w.Body.String(), "segacd-cover")
+	}
+}
+
+// TestServeSecureFile_NestedSubdirAllowed confirms multi-level
+// subdirectories under baseDir are reachable. The {rest...} wildcard
+// supports arbitrary depth; a regression that started rejecting
+// multi-segment paths would silently break the IGDB cache layout
+// (cache/igdb/<console>/<cleanName>/<file>).
+func TestServeSecureFile_NestedSubdirAllowed(t *testing.T) {
+	srv, dir := testServer(t)
+
+	// 4 levels of subdirectory under cache/igdb to mimic real layout.
+	deep := filepath.Join(dir, "cache", "igdb", "NES", "Mega Man", "extra", "deep.json")
+	writeTestFile(t, deep, []byte("deep-content"))
+
+	w := doRequest(
+		t, srv, http.MethodGet,
+		"/cache/igdb/NES/Mega%20Man/extra/deep.json", nil,
+	)
+	if w.Code != http.StatusOK {
+		t.Fatalf("got status %d, want 200", w.Code)
+	}
+	if w.Body.String() != "deep-content" {
+		t.Errorf("body = %q, want %q", w.Body.String(), "deep-content")
+	}
+}
+
+// TestHandleCovers_BackslashNotTraversalOnLinux pins that a backslash
+// in {rest} on Linux is treated as a literal filename character (Linux
+// filesystems allow it). filepath.Clean does not interpret '\' as a
+// separator on Linux, so PathInside resolves the request inside
+// baseDir and the file is served if it exists. The current asymmetry
+// versus parseSaveParams (which rejects '\' via SafePathSegment) is
+// load-bearing: backslashes in legitimate cover/manual filenames must
+// not be rejected. A regression that added SafePathSegment-style
+// rejection here would refuse to serve files with '\' in their names.
+//
+// On Windows this test would behave differently (filepath.Separator =
+// '\'), but Freeplay targets Linux servers; the GOOS=linux assumption
+// is documented in CLAUDE.md / Makefile.
+func TestHandleCovers_BackslashNotTraversalOnLinux(t *testing.T) {
+	if filepath.Separator != '/' {
+		t.Skipf("Linux-only test (separator = %q)", filepath.Separator)
+	}
+	srv, dir := testServer(t)
+
+	// "Game\Special.png" — a literal backslash in the filename. On
+	// Linux this is a single filename, not a traversal sequence.
+	const fname = "Game\\Special.png"
+	writeTestFile(
+		t, filepath.Join(dir, "covers", "NES", fname),
+		[]byte("backslash-png"),
+	)
+
+	w := doRequest(t, srv, http.MethodGet, "/covers/NES/Game%5CSpecial.png", nil)
+	if w.Code != http.StatusOK {
+		t.Errorf(
+			"got status %d, want 200 — backslash in filename must "+
+				"not be treated as traversal on Linux (body=%q)",
+			w.Code, w.Body.String(),
+		)
+	}
+	if w.Body.String() != "backslash-png" {
+		t.Errorf("body = %q, want %q", w.Body.String(), "backslash-png")
 	}
 }
 

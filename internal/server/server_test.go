@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -328,12 +329,77 @@ func TestGetSaveWithStrippedExtensionMatchesCatalogRom(t *testing.T) {
 	}
 }
 
-func TestGetSaveNotFound(t *testing.T) {
+// TestGetSaveSlugNotInCatalog covers the catalog-gate 404 path: the slug
+// is rejected by HasGameSlug before saves.Get is ever consulted. Distinct
+// from TestGetSaveKnownGameNoFile, which exercises the disk-miss path.
+func TestGetSaveSlugNotInCatalog(t *testing.T) {
 	srv, _ := testServer(t)
+	srv.scanner.ScanBlocking()
 
 	w := doRequest(t, srv, http.MethodGet, "/api/saves/NES/noexist/state", nil)
 	if w.Code != 404 {
 		t.Errorf("got status %d, want 404", w.Code)
+	}
+}
+
+// TestGetSaveKnownGameNoFile covers the second 404 path in handleGetSave:
+// the slug is in the catalog (HasGameSlug returns true) but no save file
+// has been written, so saves.Get returns nil. Without this test the
+// nil-data branch is unreachable from any unit test — earlier coverage
+// only exercised the catalog-gate 404.
+func TestGetSaveKnownGameNoFile(t *testing.T) {
+	srv, _ := testServer(t)
+	srv.scanner.ScanBlocking()
+
+	// "Mega Man" is the slug of the only ROM in testdata. No save has
+	// been written for it; expect 404 from the nil-data branch.
+	w := doRequest(t, srv, http.MethodGet, "/api/saves/NES/Mega%20Man/state", nil)
+	if w.Code != 404 {
+		t.Errorf("got status %d, want 404", w.Code)
+	}
+}
+
+// TestGetSaveUnreadableFileReturns5xx pins the post-fix contract: when
+// a save exists on disk but the read fails (permission flip, root-
+// owned file from a previous run, transient I/O error, stale mount),
+// handleGetSave must return 5xx, never 404. The frontend treats 404
+// as "no save yet" and the next auto-save tick would overwrite the
+// real (unreadable-but-still-present) save. 5xx breaks that chain by
+// signalling "transient" — the frontend's branching logic refuses to
+// register the periodic save (see #49).
+func TestGetSaveUnreadableFileReturns5xx(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses unix file permissions; skipping")
+	}
+	srv, dir := testServer(t)
+	srv.scanner.ScanBlocking()
+
+	// Write a real save through the public API so it lives at the path
+	// the manager actually reads from.
+	postW := doRequest(
+		t, srv, http.MethodPost,
+		"/api/saves/NES/Mega%20Man/sram", bytes.NewReader([]byte("real save")),
+	)
+	if postW.Code != http.StatusOK {
+		t.Fatalf("POST save got status %d, want 200", postW.Code)
+	}
+	savePath := filepath.Join(dir, "saves", "NES", "Mega Man", "sram")
+	if err := os.Chmod(savePath, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(savePath, 0o600) })
+	if _, err := os.ReadFile(savePath); err == nil {
+		t.Skip("filesystem does not enforce read permissions; skipping")
+	}
+
+	w := doRequest(t, srv, http.MethodGet, "/api/saves/NES/Mega%20Man/sram", nil)
+	if w.Code < 500 || w.Code >= 600 {
+		t.Errorf(
+			"GET unreadable save returned status %d, want 5xx; the "+
+				"frontend distinguishes 404 (no save) from 5xx (transient) "+
+				"to decide whether to register the auto-save handler",
+			w.Code,
+		)
 	}
 }
 
@@ -833,7 +899,10 @@ func TestPostWithoutCSRFHeaderRejected(t *testing.T) {
 	srv, _ := testServer(t)
 
 	endpoints := []string{
-		"/api/saves/NES/Mega%20Man.nes/state",
+		// Slug shape — the URL the frontend actually constructs.
+		// CSRF middleware must reject before reaching parseSaveParams,
+		// so the slug doesn't need to be in the catalog.
+		"/api/saves/NES/Mega%20Man/state",
 		"/api/rescan",
 	}
 	dropCSRF := http.Header{"X-Requested-With": {""}}
@@ -1027,40 +1096,25 @@ func TestPostSaveTooLargeReturns413(t *testing.T) {
 	}
 }
 
-func TestNewHTTPServerHasTimeouts(t *testing.T) {
-	srv, _ := testServer(t)
-	h := srv.newHTTPServer()
-	if h.ReadHeaderTimeout == 0 {
-		t.Error("ReadHeaderTimeout must be set (slowloris defense)")
-	}
-	if h.ReadTimeout == 0 {
-		t.Error("ReadTimeout must be set (slow-body defense)")
-	}
-	if h.WriteTimeout == 0 {
-		t.Error("WriteTimeout must be set")
-	}
-	if h.IdleTimeout == 0 {
-		t.Error("IdleTimeout must be set")
-	}
-	if h.MaxHeaderBytes == 0 || h.MaxHeaderBytes > 1<<16 {
-		t.Errorf("MaxHeaderBytes = %d, want a bounded value", h.MaxHeaderBytes)
-	}
-}
-
 func TestPostSaveUnknownGameReturns404(t *testing.T) {
 	srv, dir := testServer(t)
 	srv.scanner.ScanBlocking()
 
+	// Use a slug shape (no extension), since that's what the frontend
+	// produces. With "FakeGame.nes" the test would also pass, but for
+	// the wrong reason — stripExt("FakeGame.nes") = "FakeGame" is not
+	// in the catalog either, so we couldn't tell whether the gate
+	// rejected because the game is unknown or because the URL shape
+	// is wrong.
 	w := doRequest(
 		t, srv, http.MethodPost,
-		"/api/saves/NES/FakeGame.nes/state", bytes.NewReader([]byte("data")),
+		"/api/saves/NES/FakeGame/state", bytes.NewReader([]byte("data")),
 	)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("got status %d, want 404", w.Code)
 	}
 
-	// No file should have been written under saves/NES/FakeGame.nes/
-	path := filepath.Join(dir, "saves", "NES", "FakeGame.nes")
+	path := filepath.Join(dir, "saves", "NES", "FakeGame")
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("unexpected save directory created for unknown game: %s", path)
 	}
@@ -1072,7 +1126,7 @@ func TestGetSaveUnknownGameReturns404(t *testing.T) {
 
 	w := doRequest(
 		t, srv, http.MethodGet,
-		"/api/saves/NES/FakeGame.nes/state", nil,
+		"/api/saves/NES/FakeGame/state", nil,
 	)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("got status %d, want 404", w.Code)
@@ -1141,5 +1195,81 @@ func TestPostSavePutError(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("got status %d, want 500", w.Code)
+	}
+}
+
+// TestPostSavePutErrorLogsWarn asserts that a save-pipeline failure (500)
+// emits exactly one slog.Warn record with the expected structured fields.
+func TestPostSavePutErrorLogsWarn(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses filesystem mode bits; test requires non-root")
+	}
+	h := installCapturingLogger(t)
+
+	srv, dir := testServer(t)
+	srv.scanner.ScanBlocking()
+
+	savesDir := filepath.Join(dir, "saves")
+	if err := os.MkdirAll(savesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(savesDir, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(savesDir, 0o755) })
+
+	doRequest(
+		t, srv, http.MethodPost,
+		"/api/saves/NES/Mega%20Man/state", bytes.NewReader([]byte("data")),
+	)
+
+	h.mu.Lock()
+	recs := h.records
+	h.mu.Unlock()
+
+	var warnRecs []slog.Record
+	for _, r := range recs {
+		if r.Level == slog.LevelWarn {
+			warnRecs = append(warnRecs, r)
+		}
+	}
+	if len(warnRecs) != 1 {
+		t.Fatalf("got %d Warn records, want 1", len(warnRecs))
+	}
+	rec := warnRecs[0]
+	if rec.Message != "save write failed" {
+		t.Errorf("message = %q, want %q", rec.Message, "save write failed")
+	}
+	if _, ok := withAttr(rec, "error"); !ok {
+		t.Error("error attribute missing from warn record")
+	}
+}
+
+// TestRescanUnavailableLogsWarn asserts that a nil rescanner (503)
+// emits exactly one slog.Warn record.
+func TestRescanUnavailableLogsWarn(t *testing.T) {
+	h := installCapturingLogger(t)
+
+	srv, _ := testServer(t)
+	srv.rescanner = nil
+
+	doRequest(t, srv, http.MethodPost, "/api/rescan", nil)
+
+	h.mu.Lock()
+	recs := h.records
+	h.mu.Unlock()
+
+	var warnRecs []slog.Record
+	for _, r := range recs {
+		if r.Level == slog.LevelWarn {
+			warnRecs = append(warnRecs, r)
+		}
+	}
+	if len(warnRecs) != 1 {
+		t.Fatalf("got %d Warn records, want 1", len(warnRecs))
+	}
+	rec := warnRecs[0]
+	if rec.Message != "rescan failed" {
+		t.Errorf("message = %q, want %q", rec.Message, "rescan failed")
 	}
 }

@@ -190,6 +190,34 @@ func TestTriggerRescanHappyPath(t *testing.T) {
 	waitForFetchAllCalls(t, cache, 2)
 }
 
+// TestStartBlocksUntilCatalogPopulated verifies the contract documented
+// on Library.Start: the synchronous first scan must complete before
+// Start returns. Production relies on this so the HTTP listener never
+// observes an empty catalog after it comes up. A regression that
+// reverted Start to "go l.RunPipeline()" would race here — the
+// post-Start catalog read would land before the goroutine's scan
+// publishes a non-empty catalog.
+func TestStartBlocksUntilCatalogPopulated(t *testing.T) {
+	scn := newScanner(t)
+	cache := &stubCache{savedSeq: []int{0}}
+	lib := New(scn, cache)
+
+	if got := len(scn.Catalog().Games); got != 0 {
+		t.Fatalf("pre-Start catalog has %d games, want 0", got)
+	}
+
+	lib.Start()
+
+	if got := len(scn.Catalog().Games); got == 0 {
+		t.Errorf("post-Start catalog is empty; Start did not block on first scan")
+	}
+
+	// Drain the background pipeline goroutine so it doesn't leak into
+	// sibling tests. With savedSeq=[0], FetchAll fires once then the
+	// loop exits.
+	waitForFetchAllCalls(t, cache, 1)
+}
+
 // TestMetaLookupEnrichesCatalog verifies that metaLookup correctly maps
 // GameDetails fields into the scanner catalog (IGDBName, Developers,
 // Publishers, Year). A field-rename or reorder would silently drop

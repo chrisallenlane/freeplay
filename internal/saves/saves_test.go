@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"testing/iotest"
 )
@@ -39,7 +38,10 @@ func TestPutAndGet(t *testing.T) {
 		t.Fatalf("Put failed: %v", err)
 	}
 
-	got := m.Get("NES", "game1", "state")
+	got, err := m.Get("NES", "game1", "state")
+	if err != nil {
+		t.Fatalf("Get returned error for existing save: %v", err)
+	}
 	if got == nil {
 		t.Fatal("Get returned nil for existing save")
 	}
@@ -52,7 +54,10 @@ func TestGetNonexistent(t *testing.T) {
 	dir := t.TempDir()
 	m := New(dir)
 
-	got := m.Get("NES", "noexist", "state")
+	got, err := m.Get("NES", "noexist", "state")
+	if err != nil {
+		t.Errorf("ENOENT path returned error %v, want nil error", err)
+	}
 	if got != nil {
 		t.Errorf("expected nil for nonexistent save, got %d bytes", len(got))
 	}
@@ -75,7 +80,10 @@ func TestPutCreatesDirectories(t *testing.T) {
 	if _, err := os.Stat(expected); err != nil {
 		t.Fatalf("save file not at expected path %s: %v", expected, err)
 	}
-	got := m.Get("SNES", "game2", "sram")
+	got, err := m.Get("SNES", "game2", "sram")
+	if err != nil {
+		t.Fatalf("Get returned error: %v", err)
+	}
 	if got == nil {
 		t.Fatalf("save not found at expected path: %s", expected)
 	}
@@ -92,15 +100,56 @@ func TestPutReaderError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from ErrReader, got nil")
 	}
-	if !strings.Contains(err.Error(), "reading save data") {
-		t.Errorf("error should mention %q, got: %v", "reading save data", err)
+	if !errors.Is(err, ErrReadSaveData) {
+		t.Errorf("expected ErrReadSaveData, got: %v", err)
 	}
-	// Error must wrap the underlying reader error (%w), not drop it. A
-	// mutation that changes fmt.Errorf("reading save data: %w", err)
-	// to fmt.Errorf("reading save data") would still match the
-	// substring above but would lose errors.Is unwrapping.
+	// Error must also wrap the underlying reader error so callers can
+	// distinguish the cause (network vs. timeout vs. malformed body).
+	// A mutation that drops %w would break this check.
 	if !errors.Is(err, iotest.ErrTimeout) {
 		t.Errorf("error should wrap iotest.ErrTimeout, got: %v", err)
+	}
+}
+
+// TestGetUnreadableFile pins the contract that Manager.Get returns a
+// non-nil error for an existing-but-unreadable save file (permission
+// denied, stale mount, underlying IO error). Returning (nil, nil) here
+// would be indistinguishable from "save does not exist" — the failure
+// mode the prior version of this code admitted, where the next
+// auto-save tick silently overwrote the real save.
+func TestGetUnreadableFile(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses unix file permissions; skipping")
+	}
+	dir := t.TempDir()
+	m := New(dir)
+
+	// Write a real save and then make it unreadable.
+	if err := m.Put("NES", "game", "sram", bytes.NewReader([]byte("real save data"))); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	path := filepath.Join(dir, "saves", "NES", "game", "sram")
+	if err := os.Chmod(path, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+
+	// Sanity-check: os.ReadFile must actually fail under this chmod.
+	// If it doesn't (root, or some unusual filesystem), this test cannot
+	// say anything meaningful.
+	if _, err := os.ReadFile(path); err == nil {
+		t.Skip("filesystem does not enforce read permissions; skipping")
+	}
+
+	got, err := m.Get("NES", "game", "sram")
+	if err == nil {
+		t.Errorf(
+			"Get returned nil error for an existing but unreadable save " +
+				"file; caller cannot distinguish 'missing' from 'unreadable'",
+		)
+	}
+	if got != nil {
+		t.Errorf("Get returned %d bytes for unreadable file; want nil data on error", len(got))
 	}
 }
 
@@ -115,7 +164,10 @@ func TestPutOverwrites(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := m.Get("NES", "game", "state")
+	got, err := m.Get("NES", "game", "state")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
 	if string(got) != "new" {
 		t.Errorf("got %q, want %q", string(got), "new")
 	}

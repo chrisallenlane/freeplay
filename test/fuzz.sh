@@ -24,6 +24,8 @@ TESTS=(
     "FuzzNewFetcher:./internal/igdb:IGDB fetcher construction"
     "FuzzServeSecureFile:./internal/server:path traversal defense"
     "FuzzSafeName:./internal/server:filename sanitization"
+    "FuzzPathInside:./internal/datadir:trusted-root prefix check"
+    "FuzzSafeIGDBInfoURL:./internal/igdb:IGDB info-page URL XSS guard"
 )
 
 echo "Running fuzz tests ($DURATION each)..."

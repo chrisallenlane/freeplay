@@ -82,11 +82,23 @@ func New(
 		mux:           http.NewServeMux(),
 	}
 	s.routes()
-	// gzip is outermost so it sees all responses (including those
-	// emitted by securityHeaders short-circuits); securityHeaders
-	// stays inside so its headers apply to both paths.
-	s.handler = gzipMiddleware(securityHeaders(s.mux))
+	// logRequests is outermost so it observes every response, including
+	// panic-induced 500s. recoverPanic sits just inside so it normalises
+	// panics into 500s before the existing middleware chain runs.
+	// gzip wraps securityHeaders so it sees all responses including those
+	// emitted by securityHeaders short-circuits.
+	s.handler = logRequests(
+		recoverPanic(gzipMiddleware(securityHeaders(s.mux))),
+	)
 	return s, nil
+}
+
+// Handler returns the configured HTTP handler with all middleware
+// applied. Used by integration tests to wrap the real Server in
+// httptest.NewServer without going through ListenAndServe and a
+// fixed port.
+func (s *Server) Handler() http.Handler {
+	return s.handler
 }
 
 // ListenAndServe starts the HTTP server with production timeouts.

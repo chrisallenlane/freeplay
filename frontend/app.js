@@ -251,23 +251,8 @@
 		ACTION_NEXT_FILTER,
 	} = FP;
 
-	function gridColumns(cards) {
-		if (cards.length === 0) return 1;
-		const firstTop = cards[0].offsetTop;
-		let cols = 0;
-		for (const card of cards) {
-			if (card.offsetTop !== firstTop) break;
-			cols++;
-		}
-		return cols;
-	}
-
-	function findCardIndex(cards, predicate) {
-		for (let i = 0; i < cards.length; i++) {
-			if (predicate(cards[i])) return i;
-		}
-		return -1;
-	}
+	const gridColumns = FP.gridColumns;
+	const findCardIndex = FP.findCardIndex;
 
 	/**
 	 * Sets the `.highlighted` class on the given card, removing it from any

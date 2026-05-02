@@ -59,7 +59,7 @@ vet: $(EMULATORJS_SENTINEL)
 
 ## test: run unit tests
 .PHONY: test
-test: $(EMULATORJS_SENTINEL)
+test: build
 	$(GO) test ./...
 	node --test frontend/*_test.js
 
@@ -79,6 +79,11 @@ coverage: $(EMULATORJS_SENTINEL) .tmp
 coverage-text: $(EMULATORJS_SENTINEL) .tmp
 	$(GO) test ./... -coverprofile=.tmp/coverage.out && \
 	$(GO) tool cover -func=.tmp/coverage.out | sort -k3 -n
+
+## integration: run integration tests (boots the real server)
+.PHONY: integration
+integration: $(EMULATORJS_SENTINEL)
+	$(GO) test -tags=integration -count=1 ./internal/integration/...
 
 ## fuzz: run quick fuzz tests (15s each)
 .PHONY: fuzz

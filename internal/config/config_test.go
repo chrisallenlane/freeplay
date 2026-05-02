@@ -2,11 +2,11 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 )
@@ -107,20 +107,20 @@ core = "fceumm"
 
 func TestLoadValidationErrors(t *testing.T) {
 	tests := []struct {
-		name      string
-		config    string // empty means don't write a config file
-		wantInErr string // substring that must appear in the error message
+		name    string
+		config  string // empty means don't write a config file
+		wantErr error  // sentinel that errors.Is must match
 	}{
-		{"missing file", "", "loading config"},
-		{"missing path", "[roms.NES]\ncore = \"fceumm\"", "path is required"},
-		{"missing core", "[roms.NES]\npath = \"roms/nes\"", "core is required"},
-		{"invalid cover_art_api", "cover_art_api = \"invalid\"\ncover_art_api_key = \"key\"", "cover_art_api must be"},
-		{"cover_art_api missing key", "cover_art_api = \"igdb\"", "cover_art_api_key is required"},
-		{"IGDB key missing separator", "cover_art_api = \"igdb\"\ncover_art_api_key = \"missingcolon\"", "client_id:client_secret"},
-		{"invalid port", "port = 99999", "port must be"},
-		{"negative port", "port = -1", "port must be"},
-		{"IGDB key empty client_id", "cover_art_api = \"igdb\"\ncover_art_api_key = \":secret\"", "client_id:client_secret"},
-		{"IGDB key empty secret", "cover_art_api = \"igdb\"\ncover_art_api_key = \"clientid:\"", "client_id:client_secret"},
+		{"missing file", "", ErrLoadingConfig},
+		{"missing path", "[roms.NES]\ncore = \"fceumm\"", ErrROMPathRequired},
+		{"missing core", "[roms.NES]\npath = \"roms/nes\"", ErrROMCoreRequired},
+		{"invalid cover_art_api", "cover_art_api = \"invalid\"\ncover_art_api_key = \"key\"", ErrInvalidCoverAPI},
+		{"cover_art_api missing key", "cover_art_api = \"igdb\"", ErrCoverKeyRequired},
+		{"IGDB key missing separator", "cover_art_api = \"igdb\"\ncover_art_api_key = \"missingcolon\"", ErrInvalidIGDBKey},
+		{"invalid port", "port = 99999", ErrInvalidPort},
+		{"negative port", "port = -1", ErrInvalidPort},
+		{"IGDB key empty client_id", "cover_art_api = \"igdb\"\ncover_art_api_key = \":secret\"", ErrInvalidIGDBKey},
+		{"IGDB key empty secret", "cover_art_api = \"igdb\"\ncover_art_api_key = \"clientid:\"", ErrInvalidIGDBKey},
 	}
 
 	for _, tt := range tests {
@@ -133,8 +133,8 @@ func TestLoadValidationErrors(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			if !strings.Contains(err.Error(), tt.wantInErr) {
-				t.Errorf("error %q should contain %q", err.Error(), tt.wantInErr)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("error %v should match sentinel %v", err, tt.wantErr)
 			}
 		})
 	}

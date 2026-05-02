@@ -18,6 +18,22 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+// APIStatusError reports a non-2xx HTTP response from an IGDB-related
+// endpoint. Endpoint identifies the API being called ("IGDB" for the
+// IGDB v4 API, "token request" for the OAuth token endpoint), Status
+// is the HTTP status code, and Body is the raw response body (capped
+// in production to keep memory bounded). Tests use errors.As to assert
+// on Status without coupling to wording.
+type APIStatusError struct {
+	Endpoint string
+	Status   int
+	Body     string
+}
+
+func (e *APIStatusError) Error() string {
+	return fmt.Sprintf("%s returned %d: %s", e.Endpoint, e.Status, e.Body)
+}
+
 // Fetcher fetches game metadata from the IGDB API.
 type Fetcher struct {
 	clientID     string
@@ -69,7 +85,11 @@ func (f *Fetcher) getToken() (string, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("token request returned %d: %s", resp.StatusCode, string(body))
+		return "", &APIStatusError{
+			Endpoint: "token request",
+			Status:   resp.StatusCode,
+			Body:     string(body),
+		}
 	}
 
 	var result struct {
@@ -107,7 +127,11 @@ func (f *Fetcher) apiRequest(endpoint, body string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-		return nil, fmt.Errorf("IGDB returned %d: %s", resp.StatusCode, string(respBody))
+		return nil, &APIStatusError{
+			Endpoint: "IGDB",
+			Status:   resp.StatusCode,
+			Body:     string(respBody),
+		}
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))

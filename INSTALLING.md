@@ -54,8 +54,14 @@ services:
       - "8080:8080"
     volumes:
       - /path/to/data:/data
+    environment:
+      LOG_LEVEL: info       # debug | info (default) | warn | error
     restart: unless-stopped
 ```
+
+Logs are written to stdout in `slog` text format; Docker's log driver
+handles capture and rotation. Set `LOG_LEVEL=debug` for verbose output
+when troubleshooting.
 
 ### 4. Start the server
 
@@ -98,6 +104,13 @@ cp freeplay.example.toml /path/to/data/freeplay.toml
 
 The `-data` flag defaults to `/data` if omitted (which is only useful inside
 the Docker container).
+
+Logs go to stdout. Set the `LOG_LEVEL` environment variable to `debug`,
+`info` (default), `warn`, or `error` to control verbosity:
+
+```bash
+LOG_LEVEL=debug ./dist/freeplay -data /path/to/data
+```
 
 ## Configuration
 

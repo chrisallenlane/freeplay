@@ -2,6 +2,7 @@ package atomicfile
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,52 @@ import (
 	"strings"
 	"testing"
 )
+
+// TestWriteSyncFailureCleansUp exercises the tmp.Sync error branch
+// (lines 39-41 in atomicfile.go) by closing the underlying *os.File
+// inside the callback. The subsequent Sync call returns "file already
+// closed" — this is the only branch where Sync can be made to fail
+// without an injectable filesystem. The test verifies:
+//
+//  1. The Sync error is wrapped with "syncing temp file"
+//  2. No temp file is left behind in dir
+//  3. The target file was never created
+func TestWriteSyncFailureCleansUp(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "target.txt")
+
+	err := Write(path, func(w io.Writer) error {
+		f, ok := w.(*os.File)
+		if !ok {
+			return fmt.Errorf("expected *os.File, got %T", w)
+		}
+		if _, err := f.Write([]byte("data")); err != nil {
+			return err
+		}
+		// Close the temp file so the subsequent tmp.Sync() in Write
+		// fails with EBADF / "file already closed".
+		return f.Close()
+	})
+	if err == nil {
+		t.Fatal("expected error from Sync after callback closed the file")
+	}
+	if !errors.Is(err, ErrSync) {
+		t.Errorf("expected ErrSync, got: %v", err)
+	}
+
+	entries, readErr := os.ReadDir(dir)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".tmp-") {
+			t.Errorf("temp file left behind: %s", e.Name())
+		}
+		if e.Name() == "target.txt" {
+			t.Errorf("target file should not have been created on Sync failure")
+		}
+	}
+}
 
 // TestWriteRenameFailureCleansUp exercises the os.Rename error path
 // (lines 31-33), which was previously uncovered (86.7% -> 100%).
@@ -33,8 +80,8 @@ func TestWriteRenameFailureCleansUp(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when rename target is a non-empty directory")
 	}
-	if !strings.Contains(err.Error(), "renaming temp file") {
-		t.Errorf("expected 'renaming temp file' in error, got: %v", err)
+	if !errors.Is(err, ErrRename) {
+		t.Errorf("expected ErrRename, got: %v", err)
 	}
 
 	// Verify no temp files left behind.

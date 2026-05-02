@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/chrisallenlane/freeplay/internal/datadir"
@@ -96,7 +97,18 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := s.saves.Get(console, game, saveType)
+	data, err := s.saves.Get(console, game, saveType)
+	if err != nil {
+		slog.Warn(
+			"save read failed",
+			"console", console,
+			"slug", game,
+			"type", saveType,
+			"error", err,
+		)
+		writeJSONError(w, "save read failed", http.StatusInternalServerError)
+		return
+	}
 	if data == nil {
 		http.NotFound(w, r)
 		return
@@ -128,6 +140,13 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, "save too large", http.StatusRequestEntityTooLarge)
 			return
 		}
+		slog.Warn(
+			"save write failed",
+			"console", console,
+			"slug", game,
+			"type", saveType,
+			"error", err,
+		)
 		writeJSONError(w, "save failed", http.StatusInternalServerError)
 		return
 	}
@@ -145,6 +164,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleRescan(w http.ResponseWriter, _ *http.Request) {
 	if s.rescanner == nil {
+		slog.Warn("rescan failed", "error", "rescanner not configured")
 		writeJSONError(w, "rescan not available", http.StatusServiceUnavailable)
 		return
 	}

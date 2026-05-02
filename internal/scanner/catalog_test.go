@@ -1,6 +1,8 @@
 package scanner
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestStripExt(t *testing.T) {
 	tests := []struct {

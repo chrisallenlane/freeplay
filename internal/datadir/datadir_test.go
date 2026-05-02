@@ -2,6 +2,7 @@ package datadir
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -68,6 +69,60 @@ func TestPathInsideNormalizesParent(t *testing.T) {
 			t.Errorf("PathInside(%q, %q) = %v, want %v", tt.child, tt.parent, got, tt.want)
 		}
 	}
+}
+
+// FuzzPathInside probes the trust-boundary path-traversal guard.
+// SafePathSegment is fuzzed in internal/server/server_test.go;
+// PathInside is the second half of the same defense, and a regression
+// in either invariant (cleaned-prefix relationship; reflexivity)
+// silently widens the file-serving attack surface.
+func FuzzPathInside(f *testing.F) {
+	f.Add("/data/covers", "/data/covers")
+	f.Add("/data/covers/NES", "/data/covers")
+	f.Add("/data/covers/../etc/passwd", "/data/covers")
+	f.Add("/data/cover", "/data/covers")
+	f.Add("/data/coversNES", "/data/covers")
+	f.Add("/data/covers/.", "/data/covers")
+	f.Add("/data//covers", "/data/covers")
+	f.Add("", "")
+	f.Add("a/b/c", "a")
+	f.Add("a", "a/b/c")
+
+	f.Fuzz(func(t *testing.T, child, parent string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf(
+					"PathInside panicked on (%q, %q): %v",
+					child, parent, r,
+				)
+			}
+		}()
+
+		got := PathInside(child, parent)
+
+		// Reflexivity: any path is inside itself, even after Clean
+		// rewrites it. Skip for the tautological self-call we just
+		// made; do a fresh check with parent/parent.
+		if !PathInside(parent, parent) {
+			t.Errorf("PathInside(%q, %q) reflexivity broken", parent, parent)
+		}
+
+		// If PathInside reports true, the cleaned child must equal
+		// the cleaned parent or have it as a directory prefix. If
+		// this invariant breaks, callers like serveSecureFile would
+		// happily serve files outside their trusted root.
+		if got {
+			cleanChild := filepath.Clean(child)
+			cleanParent := filepath.Clean(parent)
+			if cleanChild != cleanParent &&
+				!strings.HasPrefix(cleanChild, cleanParent+string(filepath.Separator)) {
+				t.Errorf(
+					"PathInside(%q, %q) = true but cleaned forms (%q, %q) lack prefix relationship",
+					child, parent, cleanChild, cleanParent,
+				)
+			}
+		}
+	})
 }
 
 func TestLayoutConstructors(t *testing.T) {

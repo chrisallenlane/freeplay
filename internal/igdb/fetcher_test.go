@@ -2,6 +2,7 @@ package igdb
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -113,6 +114,48 @@ func FuzzTransformImageURL(f *testing.F) {
 			t.Errorf(
 				"transformImageURL(%q, %q) result length %d exceeds bound %d",
 				rawURL, size, len(result), maxLen,
+			)
+		}
+	})
+}
+
+// FuzzSafeIGDBInfoURL is the symmetric counterpart to
+// FuzzTransformImageURL: where transformImageURL guards image hosts,
+// safeIGDBInfoURL guards the "View on IGDB" link href that flows into
+// the DOM. Without a fuzzer here the SEC-2 / H-2 mitigation only
+// has table-driven coverage.
+func FuzzSafeIGDBInfoURL(f *testing.F) {
+	f.Add("https://www.igdb.com/games/super-mario-bros")
+	f.Add("javascript:alert(1)")
+	f.Add("data:text/html,xss")
+	f.Add("https://www.igdb.com")
+	f.Add("https://www.igdb.com.evil.com/")
+	f.Add("//www.igdb.com/games/x")
+	f.Add("")
+	f.Add("https://www.igdb.com/")
+
+	f.Fuzz(func(t *testing.T, rawURL string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("safeIGDBInfoURL panicked on %q: %v", rawURL, r)
+			}
+		}()
+
+		got := safeIGDBInfoURL(rawURL)
+		if got == "" {
+			return
+		}
+		// Invariant: a non-empty return must be exactly the input
+		// (the function never rewrites — it accepts or rejects)
+		// AND must start with the IGDB info-page prefix. Any
+		// deviation reopens the javascript:/data: XSS surface.
+		if got != rawURL {
+			t.Errorf("safeIGDBInfoURL(%q) rewrote to %q; expected pass-through or empty", rawURL, got)
+		}
+		if !strings.HasPrefix(got, igdbInfoURLPrefix) {
+			t.Errorf(
+				"safeIGDBInfoURL(%q) = %q: missing IGDB info prefix %q",
+				rawURL, got, igdbInfoURLPrefix,
 			)
 		}
 	})
@@ -467,8 +510,15 @@ func TestAPIRequestNon200Error(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "IGDB returned 500") {
-		t.Errorf("error should mention \"IGDB returned 500\", got: %v", err)
+	var apiErr *APIStatusError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected *APIStatusError, got: %v", err)
+	}
+	if apiErr.Endpoint != "IGDB" {
+		t.Errorf("Endpoint = %q, want %q", apiErr.Endpoint, "IGDB")
+	}
+	if apiErr.Status != 500 {
+		t.Errorf("Status = %d, want 500", apiErr.Status)
 	}
 }
 
@@ -515,8 +565,15 @@ func TestGetTokenOAuthError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from OAuth failure, got nil")
 	}
-	if !strings.Contains(err.Error(), "token request returned 400") {
-		t.Errorf("error should mention \"token request returned 400\", got: %v", err)
+	var apiErr *APIStatusError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected *APIStatusError, got: %v", err)
+	}
+	if apiErr.Endpoint != "token request" {
+		t.Errorf("Endpoint = %q, want %q", apiErr.Endpoint, "token request")
+	}
+	if apiErr.Status != 400 {
+		t.Errorf("Status = %d, want 400", apiErr.Status)
 	}
 }
 

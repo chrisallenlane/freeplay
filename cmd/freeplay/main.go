@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	freeplay "github.com/chrisallenlane/freeplay"
 	"github.com/chrisallenlane/freeplay/internal/config"
@@ -16,13 +17,48 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/server"
 )
 
+// parseLogLevel converts a LOG_LEVEL string to a slog.Level. Case-insensitive.
+// Unrecognised values fall back to slog.LevelInfo. The caller is responsible
+// for warning about the fallback.
+func parseLogLevel(s string) (slog.Level, bool) {
+	switch strings.ToLower(s) {
+	case "debug":
+		return slog.LevelDebug, true
+	case "info", "":
+		return slog.LevelInfo, true
+	case "warn":
+		return slog.LevelWarn, true
+	case "error":
+		return slog.LevelError, true
+	default:
+		return slog.LevelInfo, false
+	}
+}
+
 func fatal(err error) {
 	fmt.Fprintf(os.Stderr, "error: %s\n", err)
 	os.Exit(1)
 }
 
 func main() {
+	// Configure slog before any other calls so all startup messages use
+	// the correct handler. Level is controlled by LOG_LEVEL env var;
+	// unrecognised values fall back to info with a one-time warning.
+	logLevelStr := os.Getenv("LOG_LEVEL")
+	logLevel, ok := parseLogLevel(logLevelStr)
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: logLevel,
+	})
+	slog.SetDefault(slog.New(handler))
+	if !ok {
+		slog.Warn(
+			"unrecognised LOG_LEVEL value; defaulting to info",
+			"value", logLevelStr,
+		)
+	}
+
 	dataDir := flag.String("data", "/data", "path to data directory")
+	port := flag.Int("port", 0, "override port from config (0 = use config value)")
 	version := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
@@ -34,6 +70,9 @@ func main() {
 	cfg, err := config.Load(*dataDir)
 	if err != nil {
 		fatal(err)
+	}
+	if *port != 0 {
+		cfg.Port = *port
 	}
 
 	// Set up IGDB fetcher and details cache if configured

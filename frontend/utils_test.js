@@ -44,3 +44,48 @@ test("safeExternalHref", async (t) => {
 		assert.equal(FP.safeExternalHref(42), null);
 	});
 });
+
+test("parseSubpage", async (t) => {
+	await t.test("returns null when console and rom are absent", () => {
+		assert.equal(FP.parseSubpage(""), null);
+		assert.equal(FP.parseSubpage("?other=x"), null);
+	});
+
+	await t.test("returns null when only console is present", () => {
+		assert.equal(FP.parseSubpage("?console=NES"), null);
+	});
+
+	await t.test("returns null when only rom is present", () => {
+		assert.equal(FP.parseSubpage("?rom=Mega+Man.nes"), null);
+	});
+
+	await t.test(
+		"strips the extension to produce gameName (slug convention)",
+		() => {
+			assert.deepEqual(FP.parseSubpage("?console=NES&rom=Mega+Man.nes"), {
+				consoleName: "NES",
+				rom: "Mega Man.nes",
+				gameName: "Mega Man",
+			});
+		},
+	);
+
+	await t.test("preserves gameName when filename has no extension", () => {
+		assert.deepEqual(FP.parseSubpage("?console=NES&rom=PlainName"), {
+			consoleName: "NES",
+			rom: "PlainName",
+			gameName: "PlainName",
+		});
+	});
+
+	await t.test("URL-decodes parameters", () => {
+		assert.deepEqual(
+			FP.parseSubpage("?console=Game%20Boy&rom=Pok%C3%A9mon.gb"),
+			{
+				consoleName: "Game Boy",
+				rom: "Pokémon.gb",
+				gameName: "Pokémon",
+			},
+		);
+	});
+});

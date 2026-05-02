@@ -47,11 +47,13 @@ func New(scn *scanner.Scanner, cache DetailsCache) *Library {
 	return &Library{scanner: scn, cache: cache}
 }
 
-// Start performs the initial scan and then runs the enrich/fetch pipeline
-// in a background goroutine. It returns immediately; callers that need
-// the pipeline to finish before proceeding should call RunPipeline
-// directly.
+// Start performs the initial scan synchronously, then runs the
+// enrich/fetch pipeline (and any subsequent rescan iterations) in a
+// background goroutine. It blocks until the catalog has a published
+// shape so HTTP handlers never observe an empty catalog after the
+// listener comes up.
 func (l *Library) Start() {
+	l.scanner.ScanBlocking()
 	go l.RunPipeline()
 }
 

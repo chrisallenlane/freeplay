@@ -12,9 +12,10 @@ On startup, Freeplay:
 2. Scans each configured ROM directory and builds an in-memory game catalog
 3. Starts an HTTP server that serves the frontend, emulator, ROMs, and API
 
-The scan runs asynchronously. If cover art is configured, missing covers are
-fetched from IGDB after each scan, and a follow-up scan picks up the new
-images.
+The initial scan completes synchronously before the HTTP listener starts,
+so handlers never observe an empty catalog. If cover art is configured,
+missing covers are fetched from IGDB in the background after each scan,
+and a follow-up scan picks up the new images.
 
 ## Data flow
 
@@ -62,7 +63,7 @@ change without notice.
 | `GET`  | `/api/status`                        | `no-store`                 | IGDB fetch status (`{"fetchingDetails":bool}`)           |
 | `GET`  | `/api/game-details`                  | `private, max-age=300`     | IGDB metadata for a single game (`?console=&rom=`)       |
 | `POST` | `/api/rescan`                        | `no-store`                 | Trigger a ROM directory rescan                           |
-| `GET`  | `/api/saves/{console}/{game}/{type}` | `no-store`                 | Download a save file (`type`: `state` or `sram`)         |
+| `GET`  | `/api/saves/{console}/{game}/{type}` | `no-store`                 | Download a save file (`type`: `state` or `sram`); 404 for missing, 5xx for existing-but-unreadable |
 | `POST` | `/api/saves/{console}/{game}/{type}` | `no-store`                 | Upload a save file (64 MiB max)                          |
 
 ## Static file routes

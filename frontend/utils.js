@@ -4,15 +4,25 @@ if (typeof module !== "undefined") {
 }
 
 ((exports) => {
-	exports.initSubpage = () => {
-		const params = new URLSearchParams(window.location.search);
+	// parseSubpage parses a URL search string (e.g. window.location.search)
+	// and returns the {consoleName, rom, gameName} triple a subpage needs.
+	// gameName is rom with the final extension stripped — the slug
+	// convention used everywhere (URLs, on-disk save paths, IGDB cache).
+	// Returns null when console or rom is missing.
+	exports.parseSubpage = (search) => {
+		const params = new URLSearchParams(search);
 		const consoleName = params.get("console");
 		const rom = params.get("rom");
 		if (!consoleName || !rom) return null;
-		const gameName = exports.stripExt(rom);
-		document.title = `Freeplay - ${gameName}`;
+		return { consoleName, rom, gameName: exports.stripExt(rom) };
+	};
+
+	exports.initSubpage = () => {
+		const sub = exports.parseSubpage(window.location.search);
+		if (!sub) return null;
+		document.title = `Freeplay - ${sub.gameName}`;
 		exports.initThemeToggle();
-		return { consoleName, rom, gameName };
+		return sub;
 	};
 
 	// Called per-invocation rather than cached: the user may toggle the

@@ -55,59 +55,70 @@
 			window.EJS_biosUrl = FP.biosUrl(consoleName);
 		}
 
-		// fetch() resolves on 4xx/5xx — only network errors land in
-		// .catch — so check res.ok explicitly to surface server-side
-		// failures instead of swallowing them.
-		function postSave(type, data) {
-			if (data)
-				fetch(`${saveBase}/${type}`, {
-					method: "POST",
-					headers: { "X-Requested-With": "freeplay" },
-					body: new Blob([data]),
-				})
-					.then((res) => {
-						if (!res.ok)
-							console.error(`Save failed (${type}): HTTP ${res.status}`);
-					})
-					.catch((err) => console.error(`Save failed (${type}):`, err));
-		}
-
 		window.EJS_onSaveState = (data) => {
-			postSave("state", data.state);
+			FP.postSave(saveBase, "state", data.state);
 		};
 
-		// Load SRAM save from server (if exists), then register periodic saves
+		// Load SRAM save from server (if exists), then register periodic
+		// saves. Branch on response shape:
+		//   - 2xx: restore the bytes, then register the periodic save
+		//   - 404: no save on disk (legitimate fresh game), register
+		//     the periodic save so the user's progress is captured
+		//   - other non-2xx (5xx, 503, etc.): server can't tell us
+		//     whether a save exists; refuse to register the periodic
+		//     save so the next auto-save tick doesn't overwrite a
+		//     still-on-disk-but-unreadable real save
+		//   - fetch threw (network down): same — don't register
 		let sramHandlerRegistered = false;
 		window.EJS_onGameStart = async () => {
 			if (!window.EJS_emulator) return;
 
+			let safeToRegister = false;
 			try {
 				const res = await fetch(`${saveBase}/sram`);
 				if (res.ok) {
 					const buf = await res.arrayBuffer();
 					FP.restoreSaveToFS(window.EJS_emulator.gameManager, buf);
+					safeToRegister = true;
+				} else if (res.status === 404) {
+					safeToRegister = true;
+				} else {
+					console.error(
+						"SRAM restore: server returned non-2xx, non-404; " +
+							"refusing to register periodic save to avoid " +
+							"overwriting an existing on-disk save",
+						res.status,
+					);
 				}
 			} catch (err) {
 				console.error("SRAM restore failed:", err);
 			}
 
-			// Register periodic SRAM save (once only)
-			if (!sramHandlerRegistered) {
+			if (safeToRegister && !sramHandlerRegistered) {
 				sramHandlerRegistered = true;
 				window.EJS_emulator.on("saveSaveFiles", (data) => {
-					postSave("sram", data);
+					FP.postSave(saveBase, "sram", data);
 				});
 			}
 		};
 
-		// Load save state if one exists, then start the emulator
+		// Probe for a save state. Same branching shape as the SRAM
+		// restore: only set EJS_loadStateURL when the server confirms a
+		// state exists; on transient failures, leave it unset and log
+		// so operators can correlate against server-side logs.
 		try {
 			const res = await fetch(`${saveBase}/state`, { method: "HEAD" });
 			if (res.ok) {
 				window.EJS_loadStateURL = `${saveBase}/state`;
+			} else if (res.status !== 404) {
+				console.error(
+					"save-state probe: server returned non-2xx, non-404; " +
+						"skipping state load",
+					res.status,
+				);
 			}
-		} catch {
-			// Ignore — save state is optional.
+		} catch (err) {
+			console.error("save-state probe failed:", err);
 		}
 
 		const script = document.createElement("script");

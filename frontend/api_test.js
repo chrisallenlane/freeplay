@@ -217,3 +217,125 @@ describe("findGame", () => {
 		assert.equal(FP.findGame(games, "SNES", "Zelda.nes"), null);
 	});
 });
+
+describe("loadGame", () => {
+	let origFetch, origShowError;
+	let showErrorCalls;
+
+	const setFetch = (impl) => {
+		globalThis.fetch = impl;
+	};
+
+	const beforeEach = () => {
+		origFetch = globalThis.fetch;
+		origShowError = FP.showError;
+		showErrorCalls = [];
+		FP.showError = (id, msg) => showErrorCalls.push({ id, msg });
+	};
+
+	const afterEach = () => {
+		globalThis.fetch = origFetch;
+		FP.showError = origShowError;
+	};
+
+	it("returns the game on success", async () => {
+		beforeEach();
+		try {
+			setFetch(() =>
+				Promise.resolve({
+					ok: true,
+					json: () =>
+						Promise.resolve({
+							games: [{ console: "NES", filename: "Mega Man.nes" }],
+						}),
+				}),
+			);
+			const game = await FP.loadGame("NES", "Mega Man.nes", "content");
+			assert.equal(game.filename, "Mega Man.nes");
+			assert.equal(game.console, "NES");
+			assert.equal(showErrorCalls.length, 0);
+		} finally {
+			afterEach();
+		}
+	});
+
+	it("throws on non-ok HTTP response so callers can render an error", async () => {
+		beforeEach();
+		try {
+			setFetch(() => Promise.resolve({ ok: false, status: 500 }));
+			await assert.rejects(FP.loadGame("NES", "x", "content"), /HTTP 500/);
+			// Catalog itself failed to load — game-not-found error is not shown
+			// from loadGame; that's the caller's job via .catch.
+			assert.equal(showErrorCalls.length, 0);
+		} finally {
+			afterEach();
+		}
+	});
+
+	it("calls showError and returns null when game not in catalog", async () => {
+		beforeEach();
+		try {
+			setFetch(() =>
+				Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({ games: [] }),
+				}),
+			);
+			const game = await FP.loadGame("NES", "Missing.nes", "content");
+			assert.equal(game, null);
+			assert.equal(showErrorCalls.length, 1);
+			assert.equal(showErrorCalls[0].id, "content");
+			assert.match(showErrorCalls[0].msg, /Game not found/);
+		} finally {
+			afterEach();
+		}
+	});
+});
+
+describe("loadGameDetails", () => {
+	let origFetch;
+
+	const beforeEach = () => {
+		origFetch = globalThis.fetch;
+	};
+	const afterEach = () => {
+		globalThis.fetch = origFetch;
+	};
+
+	it("returns parsed JSON on success", async () => {
+		beforeEach();
+		try {
+			globalThis.fetch = () =>
+				Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({ name: "Mega Man" }),
+				});
+			const details = await FP.loadGameDetails("NES", "Mega Man.nes");
+			assert.deepEqual(details, { name: "Mega Man" });
+		} finally {
+			afterEach();
+		}
+	});
+
+	it("returns null on non-ok response (cache miss is not an error)", async () => {
+		beforeEach();
+		try {
+			globalThis.fetch = () => Promise.resolve({ ok: false, status: 404 });
+			const details = await FP.loadGameDetails("NES", "x");
+			assert.equal(details, null);
+		} finally {
+			afterEach();
+		}
+	});
+
+	it("returns null on fetch rejection (network error swallowed)", async () => {
+		beforeEach();
+		try {
+			globalThis.fetch = () => Promise.reject(new TypeError("network down"));
+			const details = await FP.loadGameDetails("NES", "x");
+			assert.equal(details, null);
+		} finally {
+			afterEach();
+		}
+	});
+});
