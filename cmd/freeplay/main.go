@@ -75,12 +75,17 @@ func main() {
 		cfg.Port = *port
 	}
 
-	// Set up IGDB fetcher and details cache if configured
-	var igdbFetcher *igdb.Fetcher
+	// Set up IGDB fetcher and details cache if configured. The if/else
+	// is load-bearing: passing a typed-nil *igdb.Fetcher to details.New
+	// would yield a typed-nil interface inside the Cache, and the
+	// (c.fetcher == nil) guard in FetchAll wouldn't catch it — the
+	// background pipeline would then dereference nil and crash.
+	var detailsCache *details.Cache
 	if cfg.CoverArtAPI == "igdb" {
-		igdbFetcher = igdb.NewFetcher(cfg.CoverArtKey)
+		detailsCache = details.New(*dataDir, igdb.NewFetcher(cfg.CoverArtKey))
+	} else {
+		detailsCache = details.New(*dataDir, nil)
 	}
-	detailsCache := details.New(*dataDir, igdbFetcher)
 
 	scn := scanner.New(cfg, *dataDir)
 	lib := library.New(scn, detailsCache)

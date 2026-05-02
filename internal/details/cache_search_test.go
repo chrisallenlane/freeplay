@@ -9,6 +9,23 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/igdb"
 )
 
+// TestFetchAll_NoFetcherReturnsZeroCleanly pins the contract that
+// when no IGDB fetcher is configured, FetchAll returns 0 without
+// dereferencing anything. The production caller (cmd/freeplay/main.go)
+// passes a literal nil to New when cover_art_api is unset; this
+// regression guard would have caught the typed-nil-interface bug
+// where passing a (*igdb.Fetcher)(nil) yielded an interface value
+// that wasn't == nil and crashed the pipeline goroutine.
+func TestFetchAll_NoFetcherReturnsZeroCleanly(t *testing.T) {
+	c := New(t.TempDir(), nil)
+	count := c.FetchAll([]igdb.GameEntry{
+		{Console: "NES", Filename: "Mega Man.nes"},
+	})
+	if count != 0 {
+		t.Errorf("FetchAll with nil fetcher = %d, want 0", count)
+	}
+}
+
 // TestSearch_ConstrainedMatchSkipsUnconstrained verifies that when the
 // platform-constrained search finds a match, the unconstrained search
 // is not attempted. This is the early-return path at line 169 of
