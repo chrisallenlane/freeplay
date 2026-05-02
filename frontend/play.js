@@ -55,13 +55,21 @@
 			window.EJS_biosUrl = FP.biosUrl(consoleName);
 		}
 
+		// fetch() resolves on 4xx/5xx — only network errors land in
+		// .catch — so check res.ok explicitly to surface server-side
+		// failures instead of swallowing them.
 		function postSave(type, data) {
 			if (data)
 				fetch(`${saveBase}/${type}`, {
 					method: "POST",
 					headers: { "X-Requested-With": "freeplay" },
 					body: new Blob([data]),
-				}).catch((err) => console.error(`Save failed (${type}):`, err));
+				})
+					.then((res) => {
+						if (!res.ok)
+							console.error(`Save failed (${type}): HTTP ${res.status}`);
+					})
+					.catch((err) => console.error(`Save failed (${type}):`, err));
 		}
 
 		window.EJS_onSaveState = (data) => {
