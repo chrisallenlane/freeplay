@@ -56,14 +56,12 @@ jobs:
       - name: html-validate
         run: npx --yes html-validate frontend/*.html
 
-      - name: go test
-        run: go test -count=1 ./...
-
-      - name: frontend test
-        run: node --test frontend/*_test.js
-
-      - name: go build
-        run: go build ./cmd/freeplay
+      # `make test` builds dist/freeplay first (test target depends on
+      # build). The frontend contract_test.js spawns that binary, so the
+      # build must happen before `node --test` runs. Listing go test and
+      # node --test as separate steps would skip the build dependency.
+      - name: go and frontend tests
+        run: make test
 
   build:
     needs: test
