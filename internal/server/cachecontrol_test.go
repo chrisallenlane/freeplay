@@ -23,7 +23,7 @@ func TestCacheControlAPIRoutes(t *testing.T) {
 
 	// Seed a save so GET /api/saves returns 200 rather than 404.
 	postW := doRequest(t, srv, http.MethodPost,
-		"/api/saves/NES/Mega%20Man.nes/sram", bytes.NewReader([]byte("save")))
+		"/api/saves/NES/Mega%20Man/sram", bytes.NewReader([]byte("save")))
 	if postW.Code != http.StatusOK {
 		t.Fatalf("seed POST status = %d, want 200", postW.Code)
 	}
@@ -37,7 +37,7 @@ func TestCacheControlAPIRoutes(t *testing.T) {
 		{http.MethodGet, "/api/health"},
 		{http.MethodGet, "/api/games"},
 		{http.MethodGet, "/api/status"},
-		{http.MethodGet, "/api/saves/NES/Mega%20Man.nes/sram"},
+		{http.MethodGet, "/api/saves/NES/Mega%20Man/sram"},
 	}
 	for _, r := range noStoreRoutes {
 		w := doRequest(t, srv, r.method, r.path, nil)

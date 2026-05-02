@@ -82,7 +82,7 @@ func TestLayoutConstructors(t *testing.T) {
 		{"CoverFile", CoverFile(dataDir, "NES", "Mega Man"), filepath.FromSlash("/data/covers/NES/Mega Man.png")},
 		{"Manuals", Manuals(dataDir), filepath.FromSlash("/data/manuals")},
 		{"ManualsConsole", ManualsConsole(dataDir, "NES"), filepath.FromSlash("/data/manuals/NES")},
-		{"SavePath", SavePath(dataDir, "NES", "Mega Man.nes", "sram"), filepath.FromSlash("/data/saves/NES/Mega Man.nes/sram")},
+		{"SavePath", SavePath(dataDir, "NES", "Mega Man", "sram"), filepath.FromSlash("/data/saves/NES/Mega Man/sram")},
 		{"IGDBCache", IGDBCache(dataDir), filepath.FromSlash("/data/cache/igdb")},
 		{"IGDBCacheGame", IGDBCacheGame(dataDir, "NES", "Mega Man"), filepath.FromSlash("/data/cache/igdb/NES/Mega Man")},
 	}

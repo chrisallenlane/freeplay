@@ -91,7 +91,7 @@ func (s *Server) handleGetSave(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, "invalid save parameters", http.StatusBadRequest)
 		return
 	}
-	if !s.scanner.HasGame(console, game) {
+	if !s.scanner.HasGameSlug(console, game) {
 		http.NotFound(w, r)
 		return
 	}
@@ -116,7 +116,7 @@ func (s *Server) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	// Gate on catalog membership: prevents unbounded disk growth via
 	// unique game names (see SEC-4). The check runs before body read,
 	// so attackers targeting unknown games never pay for file I/O.
-	if !s.scanner.HasGame(console, game) {
+	if !s.scanner.HasGameSlug(console, game) {
 		http.NotFound(w, r)
 		return
 	}

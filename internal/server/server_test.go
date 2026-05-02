@@ -262,14 +262,14 @@ func TestSaveRoundtrip(t *testing.T) {
 	// POST save
 	postW := doRequest(
 		t, srv, http.MethodPost,
-		"/api/saves/NES/Mega%20Man.nes/state", bytes.NewReader(saveData),
+		"/api/saves/NES/Mega%20Man/state", bytes.NewReader(saveData),
 	)
 	if postW.Code != 200 {
 		t.Fatalf("POST save got status %d, want 200", postW.Code)
 	}
 
 	// GET save
-	getW := doRequest(t, srv, http.MethodGet, "/api/saves/NES/Mega%20Man.nes/state", nil)
+	getW := doRequest(t, srv, http.MethodGet, "/api/saves/NES/Mega%20Man/state", nil)
 	if getW.Code != 200 {
 		t.Fatalf("GET save got status %d, want 200", getW.Code)
 	}
@@ -278,6 +278,53 @@ func TestSaveRoundtrip(t *testing.T) {
 	}
 	if !bytes.Equal(getW.Body.Bytes(), saveData) {
 		t.Errorf("save data mismatch: got %q, want %q", getW.Body.String(), string(saveData))
+	}
+}
+
+// TestPostSaveWithStrippedExtensionMatchesCatalogRom reproduces the production
+// save regression: the frontend strips the ROM extension before constructing
+// save URLs (stripExt("Mega Man.nes") → "Mega Man"), so it POSTs to
+// /api/saves/NES/Mega%20Man/sram — without the ".nes" — but HasGame was keyed
+// by the full filename, causing silent 404s on every save.
+func TestPostSaveWithStrippedExtensionMatchesCatalogRom(t *testing.T) {
+	srv, _ := testServer(t)
+	srv.scanner.ScanBlocking()
+
+	w := doRequest(
+		t, srv, http.MethodPost,
+		"/api/saves/NES/Mega%20Man/sram", bytes.NewReader([]byte("sramdata")),
+	)
+	if w.Code != http.StatusOK {
+		t.Errorf("POST save (no extension) got status %d, want 200", w.Code)
+	}
+}
+
+// TestGetSaveWithStrippedExtensionMatchesCatalogRom exercises the full
+// POST→GET round-trip using the slug URL convention the frontend uses:
+// stripExt("Mega Man.nes") → "Mega Man". Both the POST and the GET must
+// succeed, and the retrieved body must equal what was posted.
+func TestGetSaveWithStrippedExtensionMatchesCatalogRom(t *testing.T) {
+	srv, _ := testServer(t)
+	srv.scanner.ScanBlocking()
+	saveData := []byte("sramdata")
+
+	postW := doRequest(
+		t, srv, http.MethodPost,
+		"/api/saves/NES/Mega%20Man/sram", bytes.NewReader(saveData),
+	)
+	if postW.Code != http.StatusOK {
+		t.Fatalf("POST save (no extension) got status %d, want 200", postW.Code)
+	}
+
+	getW := doRequest(t, srv, http.MethodGet, "/api/saves/NES/Mega%20Man/sram", nil)
+	if getW.Code != http.StatusOK {
+		t.Fatalf("GET save (no extension) got status %d, want 200", getW.Code)
+	}
+	if !bytes.Equal(getW.Body.Bytes(), saveData) {
+		t.Errorf(
+			"GET save body = %q, want %q",
+			getW.Body.String(), string(saveData),
+		)
 	}
 }
 
@@ -973,7 +1020,7 @@ func TestPostSaveTooLargeReturns413(t *testing.T) {
 	payload := bytes.Repeat([]byte{'a'}, 65<<20)
 	w := doRequest(
 		t, srv, http.MethodPost,
-		"/api/saves/NES/Mega%20Man.nes/state", bytes.NewReader(payload),
+		"/api/saves/NES/Mega%20Man/state", bytes.NewReader(payload),
 	)
 	if w.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("got status %d, want 413", w.Code)
@@ -1089,7 +1136,7 @@ func TestPostSavePutError(t *testing.T) {
 
 	w := doRequest(
 		t, srv, http.MethodPost,
-		"/api/saves/NES/Mega%20Man.nes/state", bytes.NewReader([]byte("data")),
+		"/api/saves/NES/Mega%20Man/state", bytes.NewReader([]byte("data")),
 	)
 
 	if w.Code != http.StatusInternalServerError {

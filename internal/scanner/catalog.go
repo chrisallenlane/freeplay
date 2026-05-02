@@ -3,6 +3,7 @@ package scanner
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 )
 
 // Game represents a single ROM in the catalog.
@@ -21,25 +22,45 @@ type Game struct {
 }
 
 // Catalog is the full game library served by GET /api/games.
-// Games is the canonical list served to clients; gameSet is a derived
-// index that backs HasGame in O(1). Both are published atomically via
-// atomic.Pointer on the Scanner. Use newCatalog so the two never drift.
+// Games is the canonical list served to clients; gameSet and slugSet are
+// derived indexes that back HasGame and HasGameSlug in O(1). All three are
+// published atomically via atomic.Pointer on the Scanner. Use newCatalog so
+// the indexes never drift from the slice.
 type Catalog struct {
 	Consoles []string            `json:"consoles"`
 	Games    []Game              `json:"games"`
 	gameSet  map[string]struct{} `json:"-"`
+	slugSet  map[string]struct{} `json:"-"`
 }
 
-// newCatalog builds a Catalog with a freshly-indexed gameSet matching
-// the given games slice. Shared by scan() (first construction) and
-// EnrichMetadata (replacement after lookup-based enrichment) so the
-// index always tracks the slice.
+// newCatalog builds a Catalog with freshly-indexed gameSet and slugSet
+// matching the given games slice. Shared by scan() (first construction) and
+// EnrichMetadata (replacement after lookup-based enrichment) so the indexes
+// always track the slice.
 func newCatalog(consoles []string, games []Game) *Catalog {
 	set := make(map[string]struct{}, len(games))
+	slugs := make(map[string]struct{}, len(games))
 	for i := range games {
 		set[games[i].Console+"/"+games[i].Filename] = struct{}{}
+		slugs[games[i].Console+"/"+stripExt(games[i].Filename)] = struct{}{}
 	}
-	return &Catalog{Consoles: consoles, Games: games, gameSet: set}
+	return &Catalog{
+		Consoles: consoles,
+		Games:    games,
+		gameSet:  set,
+		slugSet:  slugs,
+	}
+}
+
+// stripExt returns filename with its final extension removed. Mirrors the
+// frontend's stripExt helper in frontend/urls.js: the last dot must be at
+// index > 0, so dotfiles like ".bashrc" are returned unchanged.
+func stripExt(filename string) string {
+	dot := strings.LastIndex(filename, ".")
+	if dot > 0 {
+		return filename[:dot]
+	}
+	return filename
 }
 
 // DetailsLookup returns cached IGDB metadata for a game. The returned struct
@@ -69,6 +90,18 @@ func (s *Scanner) Catalog() *Catalog {
 func (s *Scanner) HasGame(console, filename string) bool {
 	cat := s.catalog.Load()
 	_, ok := cat.gameSet[console+"/"+filename]
+	return ok
+}
+
+// HasGameSlug reports whether the given (console, slug) pair matches a game in
+// the current catalog, where slug is the ROM filename with its final extension
+// stripped — the URL convention used by the frontend
+// (/api/saves/{console}/{slug}/{type}). Use this for save endpoints; use
+// HasGame when the caller has the full filename. See frontend/urls.js's
+// stripExt for the frontend counterpart.
+func (s *Scanner) HasGameSlug(console, slug string) bool {
+	cat := s.catalog.Load()
+	_, ok := cat.slugSet[console+"/"+slug]
 	return ok
 }
 
