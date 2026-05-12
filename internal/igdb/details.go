@@ -104,6 +104,12 @@ func gameDetailsFromIGDB(g igdbGame) *GameDetails {
 	}
 
 	for _, ic := range g.InvolvedCompanies {
+		// IGDB occasionally returns involved_companies rows whose company
+		// subobject is absent or unnamed; skip them so the frontend
+		// doesn't render leading-comma artifacts.
+		if ic.Company.Name == "" {
+			continue
+		}
 		if ic.Developer {
 			details.Developers = append(details.Developers, ic.Company.Name)
 		}
@@ -113,6 +119,9 @@ func gameDetailsFromIGDB(g igdbGame) *GameDetails {
 	}
 
 	for _, p := range g.Platforms {
+		if p.Name == "" {
+			continue
+		}
 		details.Platforms = append(details.Platforms, p.Name)
 	}
 

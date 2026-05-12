@@ -742,7 +742,6 @@ func TestGameDetailsFromIGDBZeroReleaseDateUnset(t *testing.T) {
 // the frontend to render "Developer: , Real Dev" via
 // details?.developers?.join(", ").
 func TestGameDetailsFromIGDBFiltersEmptyDeveloperName(t *testing.T) {
-	t.Skip("deferred per lead-bug-hunt 2026-05-12 severity floor: empty-name filtering bug in gameDetailsFromIGDB")
 	g := igdbGame{Name: "X"}
 	g.InvolvedCompanies = []struct {
 		Company struct {
@@ -769,7 +768,6 @@ func TestGameDetailsFromIGDBFiltersEmptyDeveloperName(t *testing.T) {
 // TestGameDetailsFromIGDBFiltersEmptyPublisherName is the Publisher
 // counterpart to TestGameDetailsFromIGDBFiltersEmptyDeveloperName.
 func TestGameDetailsFromIGDBFiltersEmptyPublisherName(t *testing.T) {
-	t.Skip("deferred per lead-bug-hunt 2026-05-12 severity floor: empty-name filtering bug in gameDetailsFromIGDB")
 	g := igdbGame{Name: "X"}
 	g.InvolvedCompanies = []struct {
 		Company struct {
@@ -798,7 +796,6 @@ func TestGameDetailsFromIGDBFiltersEmptyPublisherName(t *testing.T) {
 // the realistic case: one good company plus one IGDB row with a missing
 // company subobject.
 func TestGameDetailsFromIGDBFiltersEmptyCompanyMixed(t *testing.T) {
-	t.Skip("deferred per lead-bug-hunt 2026-05-12 severity floor: empty-name filtering bug in gameDetailsFromIGDB")
 	g := igdbGame{Name: "X"}
 	g.InvolvedCompanies = []struct {
 		Company struct {
@@ -835,7 +832,6 @@ func TestGameDetailsFromIGDBFiltersEmptyCompanyMixed(t *testing.T) {
 // realistic IGDB-on-the-wire shape (and what `[{}]`-style fixtures
 // produce in the existing fuzz corpus).
 func TestFetchDetailsByIDFiltersEmptyCompanyNamesEndToEnd(t *testing.T) {
-	t.Skip("deferred per lead-bug-hunt 2026-05-12 severity floor: empty-name filtering bug in gameDetailsFromIGDB")
 	detailsResp, _ := json.Marshal([]map[string]any{
 		{
 			"id":   17,
@@ -884,7 +880,6 @@ func TestFetchDetailsByIDFiltersEmptyCompanyNamesEndToEnd(t *testing.T) {
 // frontend joins platforms with ", " and shows a leading/embedded comma
 // if "" sneaks through.
 func TestGameDetailsFromIGDBFiltersEmptyPlatformName(t *testing.T) {
-	t.Skip("deferred per lead-bug-hunt 2026-05-12 severity floor: empty-name filtering bug in gameDetailsFromIGDB")
 	g := igdbGame{Name: "X"}
 	g.Platforms = []struct {
 		Name string `json:"name"`
