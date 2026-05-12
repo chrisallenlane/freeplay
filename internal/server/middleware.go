@@ -41,6 +41,17 @@ func noDirListing(fsys fs.FS, next http.Handler) http.Handler {
 		info, err := fs.Stat(fsys, name)
 		if err == nil && info.IsDir() {
 			if _, err := fs.Stat(fsys, path.Join(name, "index.html")); err != nil {
+				// Strip cache headers set by upstream middleware so
+				// that 404s for directories without index.html are not
+				// cached immutably. http.NotFound does not clear
+				// previously-set headers (only stdlib's serveError
+				// does), so without this clear the response would
+				// inherit Cache-Control: immutable from cacheControl.
+				h := w.Header()
+				h.Del("Cache-Control")
+				h.Del("Etag")
+				h.Del("Last-Modified")
+				h.Del("Content-Encoding")
 				http.NotFound(w, r)
 				return
 			}
