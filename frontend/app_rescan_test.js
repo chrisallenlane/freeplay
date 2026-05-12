@@ -158,9 +158,11 @@ function makeHarness() {
 			});
 	}
 
-	// Returns nothing — mirrors app.js exactly. The inner promise chain
-	// runs in the background. Tests use `drainPoll()` below to await
-	// quiescence rather than relying on this function's return value.
+	// Mirrors app.js's pollCoverStatus: returns the fetch promise so
+	// callers can sequence cleanup AFTER /api/status resolves, clears
+	// statusPollTimer in both terminal branches, and tracks pending
+	// promises via pendingPolls so tests can await the recursive
+	// setTimeout chain via drainPolls().
 	let pendingPolls = [];
 	function pollCoverStatus() {
 		const p = fetchImpl("/api/status")
@@ -174,13 +176,17 @@ function makeHarness() {
 					rescanStatus.textContent = "Fetching game data…";
 					statusPollTimer = timers.setTimeout(pollCoverStatus, 2000);
 				} else {
+					statusPollTimer = null;
 					resetRescanBtn();
 					loadCatalog();
 				}
 			})
-			.catch(resetRescanBtn);
+			.catch(() => {
+				statusPollTimer = null;
+				resetRescanBtn();
+			});
 		pendingPolls.push(p);
-		// IMPORTANT: do NOT return p — app.js (line 425) doesn't either.
+		return p;
 	}
 
 	// Drains any in-flight poll promises so the test can observe the
@@ -306,9 +312,7 @@ describe("rescan with fetchingDetails poll cycle", () => {
 	// === false). The closure variable retains the stale timer ID from
 	// the LAST setTimeout call, even though that callback has already
 	// fired.
-	// SKIPPED: deferred per lead-bug-hunt 2026-05-12 severity floor.
-	// Bug is described in the BUG: comment above this test.
-	it.skip("BUG: statusPollTimer is not cleared to null after the poll chain completes", async () => {
+	it("BUG: statusPollTimer is not cleared to null after the poll chain completes", async () => {
 		const h = makeHarness();
 		h.fetchImpl.setQueue("/api/rescan", [ok200({})]);
 		h.fetchImpl.setQueue("/api/games", [
@@ -346,8 +350,7 @@ describe("two rescans back-to-back: second rescan's safety-reset must work", () 
 	// /api/rescan POST, or a 409), the .finally() guard sees the stale
 	// non-null statusPollTimer and SKIPS resetRescanBtn(). The button
 	// remains disabled with text "Scanning..." until manual page reload.
-	// SKIPPED: deferred per lead-bug-hunt 2026-05-12 severity floor.
-	it.skip("BUG: second rescan that hits 409 leaves the button stuck disabled", async () => {
+	it("BUG: second rescan that hits 409 leaves the button stuck disabled", async () => {
 		const h = makeHarness();
 
 		// Rescan #1: full happy poll cycle. Leaves statusPollTimer
@@ -393,8 +396,7 @@ describe("two rescans back-to-back: second rescan's safety-reset must work", () 
 	});
 
 	// Same bug surface, different trigger: rescan POST itself fails.
-	// SKIPPED: deferred per lead-bug-hunt 2026-05-12 severity floor.
-	it.skip("BUG: second rescan that fails the POST leaves the button stuck disabled", async () => {
+	it("BUG: second rescan that fails the POST leaves the button stuck disabled", async () => {
 		const h = makeHarness();
 		// Rescan #1 success poll-cycle, rescan #2 network-rejected POST.
 		h.fetchImpl.setQueue("/api/rescan", [ok200({}), new Error("network down")]);
@@ -487,33 +489,30 @@ describe("/api/status fetch rejects mid-poll: button is reset via .catch(resetRe
 	});
 });
 
-describe("concurrent poll chains: clicking rescan during an active poll", () => {
+describe("no latency-window flash: rescan button stays disabled while /api/status is in flight", () => {
 	// SCENARIO: In real browsers, the /api/status fetch takes 1+ms
-	// to resolve. Because app.js does NOT return pollCoverStatus's
-	// promise from the click handler's .then chain, the .finally
-	// block races the inner /api/status response. With realistic
-	// network latency, .finally wins — statusPollTimer is still null
-	// at that moment, so the safety-reset enables the button. The
-	// user briefly sees an enabled "Rescan" button between the rescan
-	// POST returning and the first /api/status response arriving.
+	// to resolve. Pre-fix, app.js did NOT return pollCoverStatus's
+	// promise from the click handler's .then chain, so the .finally
+	// block raced the inner /api/status response. .finally won —
+	// statusPollTimer was still null at that moment, so the safety-
+	// reset enabled the button. The user briefly saw an enabled
+	// "Rescan" button between the rescan POST returning and the first
+	// /api/status response arriving. If the user clicked again during
+	// that flash, a SECOND pollCoverStatus chain was initiated and
+	// the two chains stomped on each other's state.
 	//
-	// If the user clicks again during that flash, a SECOND
-	// pollCoverStatus chain is initiated. Both chains schedule their
-	// own setTimeout(pollCoverStatus, 2000) and both overwrite
-	// `statusPollTimer`. The earlier setTimeout ID is forgotten — no
-	// clearTimeout will ever fire on it. When it later wakes up, it
-	// runs alongside the second chain, doubling the poll rate and
-	// stomping on UI state.
+	// The fix: pollCoverStatus returns its fetch promise so the click
+	// handler's .then(pollCoverStatus) waits for it. .finally now
+	// runs only AFTER /api/status resolves, by which point either
+	// statusPollTimer is set (the if-branch) and the .finally guard
+	// correctly skips the safety-reset, or it's null again (the else
+	// branch handled cleanup itself). Either way, the user never sees
+	// the button re-enable mid-poll — the disabled state gates re-
+	// clicks at the DOM level.
 	//
-	// CONTRACT we'd like: at most one /api/status poll callback
-	// scheduled at any time.
-	// SKIPPED: deferred per lead-bug-hunt 2026-05-12 severity floor.
-	it.skip("BUG: re-click during /api/status latency window spawns concurrent poll chains", async () => {
-		// Custom harness with a /api/status fetch that defers
-		// resolution until the test explicitly releases it. This
-		// matches what happens in real browsers: the /api/status
-		// fetch takes longer than the microtask drain, so the
-		// click handler's .finally runs BEFORE /api/status returns.
+	// CONTRACT: rescanBtn.disabled stays true the entire time
+	// /api/status is in flight.
+	it("button stays disabled while /api/status is pending", async () => {
 		const rescanBtn = makeButton();
 		const rescanStatus = makeStatusEl();
 		const timers = makeTimers();
@@ -521,7 +520,7 @@ describe("concurrent poll chains: clicking rescan during an active poll", () => 
 		let statusPollTimer = null;
 		const pendingPolls = [];
 
-		// Manually controllable /api/status responses.
+		// Manually controllable /api/status response.
 		const statusGate = [];
 
 		function fetchImpl(url) {
@@ -551,6 +550,9 @@ describe("concurrent poll chains: clicking rescan during an active poll", () => 
 		function loadCatalog() {
 			return fetchImpl("/api/games").then(() => {});
 		}
+		// Mirrors the production pollCoverStatus (post-fix): returns
+		// its fetch promise, clears statusPollTimer in both terminal
+		// branches.
 		function pollCoverStatus() {
 			const p = fetchImpl("/api/status")
 				.then((res) => res.json())
@@ -562,12 +564,17 @@ describe("concurrent poll chains: clicking rescan during an active poll", () => 
 						rescanStatus.textContent = "Fetching game data…";
 						statusPollTimer = timers.setTimeout(pollCoverStatus, 2000);
 					} else {
+						statusPollTimer = null;
 						resetRescanBtn();
 						loadCatalog();
 					}
 				})
-				.catch(resetRescanBtn);
+				.catch(() => {
+					statusPollTimer = null;
+					resetRescanBtn();
+				});
 			pendingPolls.push(p);
+			return p;
 		}
 		function handleRescanClick() {
 			rescanBtn.disabled = true;
@@ -592,44 +599,43 @@ describe("concurrent poll chains: clicking rescan during an active poll", () => 
 				});
 		}
 
-		// CLICK 1: rescan POST resolves, loadCatalog resolves, pollCoverStatus
-		// kicks off a /api/status fetch (still pending — deferred). Then
-		// .finally runs with statusPollTimer still null → resetRescanBtn().
-		await handleRescanClick();
+		// Start the click but DO NOT await — /api/status is deferred,
+		// so the .finally would block until we release it.
+		const click = handleRescanClick();
+
+		// Drain microtasks so the rescan POST and loadCatalog settle.
+		// Two macrotask boundaries is enough for the three awaits.
+		await new Promise((r) => setTimeout(r, 0));
+		await new Promise((r) => setTimeout(r, 0));
+
+		// The /api/status fetch is now in flight. Pre-fix, this is
+		// when the .finally would have fired and re-enabled the
+		// button (the "flash"). Post-fix, the .finally is awaiting
+		// pollCoverStatus's promise.
+		assert.equal(statusGate.length, 1, "one /api/status fetch pending");
 		assert.equal(
 			rescanBtn.disabled,
-			false,
-			"click #1 .finally ran before /api/status resolved — button is enabled (the flash)",
+			true,
+			"button must stay disabled while /api/status is pending — no latency-window flash",
 		);
+
+		// Release /api/status with fetchingDetails=true. The
+		// if-branch sets statusPollTimer to a real timer ID, then
+		// .finally runs and the guard correctly skips the reset.
+		statusGate[0]();
+		await click;
+
+		// Button is still in "fetching" state (disabled + spinner).
 		assert.equal(
+			rescanBtn.disabled,
+			true,
+			"button stays disabled while a poll is scheduled",
+		);
+		assert.equal(timers.scheduled.size, 1, "exactly one scheduled poll");
+		assert.notEqual(
 			statusPollTimer,
 			null,
-			"timer not yet set because /api/status response is still in flight",
-		);
-
-		// CLICK 2 during the flash — same outcome: kicks off another
-		// /api/status fetch. Now TWO /api/status fetches are pending.
-		await handleRescanClick();
-		assert.equal(statusGate.length, 2, "two /api/status fetches now pending");
-
-		// Now release both /api/status responses.
-		for (const release of statusGate) release();
-		// Drain microtasks until everything settles.
-		while (pendingPolls.length > 0) {
-			const batch = pendingPolls.splice(0);
-			await Promise.all(batch);
-		}
-
-		// CONTRACT: at most one scheduled poll callback. The current
-		// code overwrites statusPollTimer each time, so the first
-		// setTimeout ID is forgotten — but it's still scheduled and
-		// will fire.
-		const ids = [...timers.scheduled.keys()];
-		assert.ok(
-			ids.length <= 1,
-			`expected at most one scheduled poll, found ${ids.length} — ` +
-				`re-click during the /api/status latency window spawned a ` +
-				`second poll chain whose timer leaks`,
+			"statusPollTimer points at the scheduled timer",
 		);
 	});
 });

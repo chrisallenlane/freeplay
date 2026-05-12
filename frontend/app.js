@@ -390,7 +390,9 @@
 	}
 
 	function pollCoverStatus() {
-		fetch("/api/status")
+		// Returns the fetch promise so callers can sequence
+		// `.finally`-style cleanup AFTER /api/status resolves, not before.
+		return fetch("/api/status")
 			.then((res) => res.json())
 			.then((data) => {
 				if (data.fetchingDetails) {
@@ -401,11 +403,18 @@
 					rescanStatus.textContent = "Fetching game data\u2026";
 					statusPollTimer = setTimeout(pollCoverStatus, 2000);
 				} else {
+					// Clear the stale timer ID; a non-null statusPollTimer
+					// is the .finally guard's signal that a poll is still
+					// in flight, so we must reset it once polling is done.
+					statusPollTimer = null;
 					resetRescanBtn();
 					loadCatalog();
 				}
 			})
-			.catch(resetRescanBtn);
+			.catch(() => {
+				statusPollTimer = null;
+				resetRescanBtn();
+			});
 	}
 
 	rescanBtn.addEventListener("click", () => {
