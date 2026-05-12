@@ -735,6 +735,171 @@ func TestGameDetailsFromIGDBZeroReleaseDateUnset(t *testing.T) {
 	}
 }
 
+// TestGameDetailsFromIGDBFiltersEmptyDeveloperName verifies that an
+// InvolvedCompanies entry whose Company.Name is the empty string is not
+// appended to Developers. IGDB occasionally returns involved_companies
+// rows with a missing/unnamed company subobject; appending "" causes
+// the frontend to render "Developer: , Real Dev" via
+// details?.developers?.join(", ").
+func TestGameDetailsFromIGDBFiltersEmptyDeveloperName(t *testing.T) {
+	t.Skip("deferred per lead-bug-hunt 2026-05-12 severity floor (Critical+High); see LEAD_BUG_HUNT_STATE.md § Deferred findings")
+	g := igdbGame{Name: "X"}
+	g.InvolvedCompanies = []struct {
+		Company struct {
+			Name string `json:"name"`
+		} `json:"company"`
+		Developer bool `json:"developer"`
+		Publisher bool `json:"publisher"`
+	}{
+		{Developer: true}, // Company.Name == ""
+	}
+
+	d := gameDetailsFromIGDB(g)
+	for _, name := range d.Developers {
+		if name == "" {
+			t.Errorf(
+				"Developers contains empty string: %#v; "+
+					"want empties filtered (frontend renders ', Real Dev' otherwise)",
+				d.Developers,
+			)
+		}
+	}
+}
+
+// TestGameDetailsFromIGDBFiltersEmptyPublisherName is the Publisher
+// counterpart to TestGameDetailsFromIGDBFiltersEmptyDeveloperName.
+func TestGameDetailsFromIGDBFiltersEmptyPublisherName(t *testing.T) {
+	t.Skip("deferred per lead-bug-hunt 2026-05-12 severity floor (Critical+High); see LEAD_BUG_HUNT_STATE.md § Deferred findings")
+	g := igdbGame{Name: "X"}
+	g.InvolvedCompanies = []struct {
+		Company struct {
+			Name string `json:"name"`
+		} `json:"company"`
+		Developer bool `json:"developer"`
+		Publisher bool `json:"publisher"`
+	}{
+		{Publisher: true}, // Company.Name == ""
+	}
+
+	d := gameDetailsFromIGDB(g)
+	for _, name := range d.Publishers {
+		if name == "" {
+			t.Errorf(
+				"Publishers contains empty string: %#v; "+
+					"want empties filtered",
+				d.Publishers,
+			)
+		}
+	}
+}
+
+// TestGameDetailsFromIGDBFiltersEmptyCompanyMixed verifies that a mix of
+// valid and empty-named entries produces only the valid names. This is
+// the realistic case: one good company plus one IGDB row with a missing
+// company subobject.
+func TestGameDetailsFromIGDBFiltersEmptyCompanyMixed(t *testing.T) {
+	t.Skip("deferred per lead-bug-hunt 2026-05-12 severity floor (Critical+High); see LEAD_BUG_HUNT_STATE.md § Deferred findings")
+	g := igdbGame{Name: "X"}
+	g.InvolvedCompanies = []struct {
+		Company struct {
+			Name string `json:"name"`
+		} `json:"company"`
+		Developer bool `json:"developer"`
+		Publisher bool `json:"publisher"`
+	}{
+		{Developer: true, Publisher: true}, // empty name
+		// valid Capcom entry
+		{
+			Company: struct {
+				Name string `json:"name"`
+			}{Name: "Capcom"},
+			Developer: true,
+			Publisher: true,
+		},
+	}
+
+	d := gameDetailsFromIGDB(g)
+
+	if len(d.Developers) != 1 || d.Developers[0] != "Capcom" {
+		t.Errorf("Developers = %#v, want [Capcom] (empties filtered)", d.Developers)
+	}
+	if len(d.Publishers) != 1 || d.Publishers[0] != "Capcom" {
+		t.Errorf("Publishers = %#v, want [Capcom] (empties filtered)", d.Publishers)
+	}
+}
+
+// TestFetchDetailsByIDFiltersEmptyCompanyNamesEndToEnd verifies the
+// IGDB-JSON -> GameDetails path: an involved_companies entry with a
+// missing `company` subobject decodes to a zero Company struct and
+// must not produce empty strings in Developers/Publishers. This is the
+// realistic IGDB-on-the-wire shape (and what `[{}]`-style fixtures
+// produce in the existing fuzz corpus).
+func TestFetchDetailsByIDFiltersEmptyCompanyNamesEndToEnd(t *testing.T) {
+	t.Skip("deferred per lead-bug-hunt 2026-05-12 severity floor (Critical+High); see LEAD_BUG_HUNT_STATE.md § Deferred findings")
+	detailsResp, _ := json.Marshal([]map[string]any{
+		{
+			"id":   17,
+			"name": "Mega Man",
+			"involved_companies": []map[string]any{
+				// First entry: no `company` subobject at all -
+				// decodes to zero Company{Name: ""}.
+				{"developer": true, "publisher": true},
+				// Second entry: valid Capcom.
+				{
+					"company":   map[string]any{"name": "Capcom"},
+					"developer": true,
+					"publisher": true,
+				},
+			},
+		},
+	})
+	f := newIGDBFetcherStatic(t, detailsResp)
+
+	details, err := f.FetchDetailsByID(17)
+	if err != nil {
+		t.Fatalf("FetchDetailsByID returned error: %v", err)
+	}
+	if details == nil {
+		t.Fatal("expected non-nil details")
+	}
+	if len(details.Developers) != 1 || details.Developers[0] != "Capcom" {
+		t.Errorf(
+			"Developers = %#v, want [Capcom] "+
+				"(missing-company-subobject entry should be filtered)",
+			details.Developers,
+		)
+	}
+	if len(details.Publishers) != 1 || details.Publishers[0] != "Capcom" {
+		t.Errorf(
+			"Publishers = %#v, want [Capcom] "+
+				"(missing-company-subobject entry should be filtered)",
+			details.Publishers,
+		)
+	}
+}
+
+// TestGameDetailsFromIGDBFiltersEmptyPlatformName verifies the same
+// edge-case for Platforms: an entry with an empty Name should not be
+// appended. Symmetric concern to the company-name filtering — the
+// frontend joins platforms with ", " and shows a leading/embedded comma
+// if "" sneaks through.
+func TestGameDetailsFromIGDBFiltersEmptyPlatformName(t *testing.T) {
+	t.Skip("deferred per lead-bug-hunt 2026-05-12 severity floor (Critical+High); see LEAD_BUG_HUNT_STATE.md § Deferred findings")
+	g := igdbGame{Name: "X"}
+	g.Platforms = []struct {
+		Name string `json:"name"`
+	}{
+		{Name: ""},
+		{Name: "NES"},
+	}
+
+	d := gameDetailsFromIGDB(g)
+
+	if len(d.Platforms) != 1 || d.Platforms[0] != "NES" {
+		t.Errorf("Platforms = %#v, want [NES] (empties filtered)", d.Platforms)
+	}
+}
+
 func TestGameDetailsFromIGDBRejectsJavaScriptURL(t *testing.T) {
 	g := igdbGame{
 		Name: "X",
