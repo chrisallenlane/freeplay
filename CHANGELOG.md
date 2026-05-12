@@ -4,6 +4,70 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.0] - 2026-05-12
+
+### Added
+- `-port` CLI flag overrides the port from the config file (`0` = use
+  config value)
+- `LOG_LEVEL` environment variable for slog level
+  (`debug`/`info`/`warn`/`error`, case-insensitive; default `info`;
+  unrecognised values fall back to `info` with a one-time warning)
+- Request-log middleware emits one `slog.Info` per response (method,
+  path, status, bytes, ms)
+- Panic-recovery middleware normalises handler panics to a 500 response
+  with a structured `slog.Error` (method, path, panic value, stack)
+- Integration test suite under `internal/integration` (build-tagged,
+  run via `make integration`)
+- Frontend↔server contract test for the save round-trip
+  (`frontend/contract_test.js`)
+- Fuzz coverage for `datadir.PathInside` and `igdb.safeIGDBInfoURL`
+- `CONTRIBUTING.md`
+
+### Changed
+- `GET /api/saves/...` now returns 5xx (was 404) when a save file
+  exists but cannot be read. The frontend uses this distinction to
+  refuse periodic-auto-save registration when a real save is present
+  but unreadable, rather than overwriting it
+- `library.Start` performs the first scan synchronously before HTTP
+  serves traffic, closing a cold-start race window where legitimate
+  save GETs 404'd and POSTs were silently dropped before
+  `MaxBytesReader`
+- Frontend SRAM and state probes now branch on response status:
+  404 registers the periodic save (legitimate fresh game); any other
+  non-2xx leaves it unregistered and emits `console.error` so
+  operators can correlate against the server-side `slog.Warn`
+- `frontend/postSave` no-ops on empty buffers instead of overwriting,
+  closing a save-loss path
+- Save-endpoint gate aligns with the URL slug convention via
+  `HasGameSlug`
+
+### Fixed
+- `details.writeNotFound` and `ensureCoverThumbnail` log
+  `atomicfile.Write` failures at warn level instead of swallowing
+  them silently. Without these logs, persistent disk-full or
+  permission errors caused unbounded IGDB re-fetches and permanent
+  missing covers with no operator-visible diagnostic
+- `noDirListing` clears `Cache-Control`, `Etag`, `Last-Modified`, and
+  `Content-Encoding` headers before returning a 404 for a directory
+  without `index.html`. Pre-fix, browsers cached the 404 immutably
+  for a year because the outer `cacheControl(longCacheImmutable, ...)`
+  middleware stamped the header before `http.NotFound` ran
+- `gameDetailsFromIGDB` skips `InvolvedCompanies` and `Platforms`
+  entries with empty names. Pre-fix, IGDB responses with an unnamed
+  company subobject produced leading-comma artifacts ("Developer: ,
+  Capcom") on rendered detail pages
+- `frontend/app.js` rescan flow now clears `statusPollTimer` in both
+  terminal branches of `pollCoverStatus` and returns the inner
+  promise so the click handler's `.finally` safety-reset correctly
+  waits for the poll cycle to settle. Pre-fix, a second rescan that
+  hit a 409 or a network failure on the POST left the button stuck
+  disabled in "Scanning…" until manual page reload
+- IGDB nil-fetcher initialisation no longer produces a typed-nil
+  interface that escapes the `c.fetcher == nil` guard and would
+  crash the background pipeline
+- `make test` now builds the binary before integration/contract tests
+  in CI so `dist/freeplay` exists when the contract test runs
+
 ## [1.0.0] - 2026-04-05
 
 ### Added
