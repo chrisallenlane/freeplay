@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
+	"testing/fstest"
 )
 
 // assertCacheControlSafeForError fails the test if cc is a value that
@@ -116,18 +118,46 @@ func TestEmulatorJSDirListing404CacheControl(t *testing.T) {
 	}
 }
 
-// TestEmulatorJSDirListing404ClearsAllCacheHeaders pins the positive
-// contract for the noDirListing fix: when noDirListing emits a 404 it
-// must strip ALL four cache-related headers the outer cacheControl
-// middleware could have set — Cache-Control, Etag, Last-Modified, and
-// Content-Encoding — mirroring stdlib's serveError (net/http/fs.go).
-// The companion TestEmulatorJSDirListing404CacheControl covers only
-// Cache-Control; this test catches a future refactor that drops one
-// of the other three header clears.
-func TestEmulatorJSDirListing404ClearsAllCacheHeaders(t *testing.T) {
-	srv, _ := testServer(t)
+// TestNoDirListing_ClearsAllCacheHeadersOnDirectory404 pins the positive
+// contract for the noDirListing fix: when noDirListing emits a 404 for
+// a directory without index.html, it must strip ALL four cache-related
+// headers the outer middleware could have set — Cache-Control, Etag,
+// Last-Modified, and Content-Encoding — mirroring stdlib's serveError
+// (net/http/fs.go).
+//
+// Done as a unit test (calling noDirListing directly with a synthetic
+// fs.FS and a pre-seeded ResponseRecorder) rather than via testServer
+// because the live middleware chain only sets Cache-Control upstream;
+// nothing in the real stack ever sets Etag/Last-Modified/Content-
+// Encoding before noDirListing runs, so an integration test couldn't
+// distinguish "the Dels work" from "no upstream sets them." Pre-seeding
+// the headers manually exercises each Del path directly and catches a
+// future refactor that drops one of the four clears.
+func TestNoDirListing_ClearsAllCacheHeadersOnDirectory404(t *testing.T) {
+	// MapFS with a directory ("data") that has files but no index.html.
+	// fs.Stat on "data" returns a directory; fs.Stat on "data/index.html"
+	// returns an error. That's the 404 trigger.
+	fsys := fstest.MapFS{
+		"data/somefile.js": &fstest.MapFile{Data: []byte("x")},
+	}
 
-	w := doRequest(t, srv, http.MethodGet, "/emulatorjs/data/", nil)
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("inner handler must not run for a directory-without-index 404")
+	})
+
+	handler := noDirListing(fsys, next)
+	req := httptest.NewRequest(http.MethodGet, "/data/", nil)
+	w := httptest.NewRecorder()
+
+	// Pre-seed every header an upstream middleware could plausibly have
+	// set. Each Del path must clear its own header.
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("Etag", `"abc123"`)
+	w.Header().Set("Last-Modified", "Mon, 01 Jan 2024 00:00:00 GMT")
+	w.Header().Set("Content-Encoding", "gzip")
+
+	handler.ServeHTTP(w, req)
+
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("got status %d, want 404", w.Code)
 	}
@@ -139,10 +169,8 @@ func TestEmulatorJSDirListing404ClearsAllCacheHeaders(t *testing.T) {
 	} {
 		if got := w.Header().Get(h); got != "" {
 			t.Errorf(
-				"%s = %q on noDirListing 404, want absent — the upstream "+
-					"cacheControl middleware may have set this header before "+
-					"noDirListing returned, so noDirListing must clear it to "+
-					"avoid leaking the long-cache directives onto the 404",
+				"%s = %q on noDirListing 404, want absent — the Del for "+
+					"this header was not exercised by the production fix",
 				h, got,
 			)
 		}
