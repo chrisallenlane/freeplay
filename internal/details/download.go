@@ -130,6 +130,10 @@ func (c *Cache) writeNotFound(console, cleanName string) {
 	if err := atomicfile.Write(c.notFoundPath(console, cleanName), func(_ io.Writer) error {
 		return nil
 	}); err != nil {
+		slog.Warn(
+			"writing .notfound marker failed",
+			"game", cleanName, "console", console, "error", err,
+		)
 		return
 	}
 	c.store(console, cleanName, nil)
@@ -188,8 +192,13 @@ func (c *Cache) ensureCoverThumbnail(console, nameNoExt, cleanName string) {
 		return // no cached cover yet
 	}
 
-	_ = atomicfile.Write(dst, func(w io.Writer) error {
+	if err := atomicfile.Write(dst, func(w io.Writer) error {
 		_, err := w.Write(data)
 		return err
-	})
+	}); err != nil {
+		slog.Warn(
+			"writing cover thumbnail failed",
+			"game", cleanName, "console", console, "dst", dst, "error", err,
+		)
+	}
 }
