@@ -4,9 +4,34 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"strings"
 	"testing"
 )
+
+// assertCacheControlSafeForError fails the test if cc is a value that
+// could lead to a browser caching an error response. Acceptable values:
+// empty (no header set), "no-store", or "no-cache". Anything else
+// risks browsers caching the error and leaving the same URL broken
+// until manual cache clear.
+//
+// Substring-based rejection of specific long-cache directives is
+// weaker — a future refactor that sets Cache-Control: public,
+// max-age=600 on a 404 would slip past a "no immutable" / "no
+// max-age=31536000" filter despite still being a bug. This whitelist
+// pins the exact set of safe values.
+func assertCacheControlSafeForError(t *testing.T, cc string) {
+	t.Helper()
+	switch cc {
+	case "", "no-store", "no-cache":
+		return
+	}
+	t.Errorf(
+		"Cache-Control = %q is not safe for an error response; "+
+			"expected empty, no-store, or no-cache so browsers don't "+
+			"cache the error and leave the URL broken until manual "+
+			"cache clear",
+		cc,
+	)
+}
 
 // TestEmulatorJS404CacheControl pins what should be the correct contract
 // for non-2xx responses on the /emulatorjs/ route: a 404 must not be
@@ -40,17 +65,7 @@ func TestEmulatorJS404CacheControl(t *testing.T) {
 			if w.Code != http.StatusNotFound {
 				t.Fatalf("got status %d, want 404", w.Code)
 			}
-			cc := w.Header().Get("Cache-Control")
-			// A 404 must NOT carry the immutable long-cache directive.
-			// Acceptable values include "no-store", "no-cache", or an
-			// absent header (so the browser falls back to heuristic
-			// caching, which is short-lived for unexpected statuses).
-			if strings.Contains(cc, "immutable") {
-				t.Errorf("404 response has Cache-Control %q — browsers will cache the 404 immutably for max-age seconds; a typo or stale URL gets permanently broken until cache clear", cc)
-			}
-			if strings.Contains(cc, "max-age=31536000") {
-				t.Errorf("404 response has Cache-Control %q — browsers will cache the 404 for a year", cc)
-			}
+			assertCacheControlSafeForError(t, w.Header().Get("Cache-Control"))
 		})
 	}
 }
@@ -96,11 +111,41 @@ func TestEmulatorJSDirListing404CacheControl(t *testing.T) {
 			if w.Code != http.StatusNotFound {
 				t.Fatalf("got status %d, want 404", w.Code)
 			}
-			cc := w.Header().Get("Cache-Control")
-			if strings.Contains(cc, "immutable") || strings.Contains(cc, "max-age=31536000") {
-				t.Errorf("404 Cache-Control = %q — browsers cache the 404 immutably for a year; the same URL stays broken until manual cache clear", cc)
-			}
+			assertCacheControlSafeForError(t, w.Header().Get("Cache-Control"))
 		})
+	}
+}
+
+// TestEmulatorJSDirListing404ClearsAllCacheHeaders pins the positive
+// contract for the noDirListing fix: when noDirListing emits a 404 it
+// must strip ALL four cache-related headers the outer cacheControl
+// middleware could have set — Cache-Control, Etag, Last-Modified, and
+// Content-Encoding — mirroring stdlib's serveError (net/http/fs.go).
+// The companion TestEmulatorJSDirListing404CacheControl covers only
+// Cache-Control; this test catches a future refactor that drops one
+// of the other three header clears.
+func TestEmulatorJSDirListing404ClearsAllCacheHeaders(t *testing.T) {
+	srv, _ := testServer(t)
+
+	w := doRequest(t, srv, http.MethodGet, "/emulatorjs/data/", nil)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("got status %d, want 404", w.Code)
+	}
+	for _, h := range []string{
+		"Cache-Control",
+		"Etag",
+		"Last-Modified",
+		"Content-Encoding",
+	} {
+		if got := w.Header().Get(h); got != "" {
+			t.Errorf(
+				"%s = %q on noDirListing 404, want absent — the upstream "+
+					"cacheControl middleware may have set this header before "+
+					"noDirListing returned, so noDirListing must clear it to "+
+					"avoid leaking the long-cache directives onto the 404",
+				h, got,
+			)
+		}
 	}
 }
 
@@ -121,10 +166,7 @@ func TestCovers404CacheControl(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("got status %d, want 404", w.Code)
 	}
-	cc := w.Header().Get("Cache-Control")
-	if strings.Contains(cc, "max-age=31536000") {
-		t.Errorf("/covers 404 Cache-Control = %q — once the operator adds the missing cover, clients will see the cached 404 for up to a year", cc)
-	}
+	assertCacheControlSafeForError(t, w.Header().Get("Cache-Control"))
 }
 
 // TestManuals404CacheControl pins the contract for /manuals/ 404s.
@@ -137,10 +179,7 @@ func TestManuals404CacheControl(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("got status %d, want 404", w.Code)
 	}
-	cc := w.Header().Get("Cache-Control")
-	if strings.Contains(cc, "max-age=31536000") {
-		t.Errorf("/manuals 404 Cache-Control = %q — once the operator adds the missing manual, clients will see the cached 404 for up to a year", cc)
-	}
+	assertCacheControlSafeForError(t, w.Header().Get("Cache-Control"))
 }
 
 // TestROM404CacheControl exercises handleROM's NotFound path for an
@@ -157,10 +196,7 @@ func TestROM404CacheControl(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("got status %d, want 404", w.Code)
 	}
-	cc := w.Header().Get("Cache-Control")
-	if strings.Contains(cc, "max-age=31536000") {
-		t.Errorf("/roms 404 Cache-Control = %q — caching a 404 for a year would break ROM access after the operator adds the file", cc)
-	}
+	assertCacheControlSafeForError(t, w.Header().Get("Cache-Control"))
 }
 
 // TestBIOS404CacheControl exercises handleBIOS's NotFound path. Unlike
@@ -175,10 +211,7 @@ func TestBIOS404CacheControl(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("got status %d, want 404", w.Code)
 	}
-	cc := w.Header().Get("Cache-Control")
-	if strings.Contains(cc, "max-age=31536000") {
-		t.Errorf("/bios 404 Cache-Control = %q", cc)
-	}
+	assertCacheControlSafeForError(t, w.Header().Get("Cache-Control"))
 }
 
 // TestCacheFiles404CacheControl exercises the /cache/igdb/ 404 path.
@@ -191,10 +224,7 @@ func TestCacheFiles404CacheControl(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("got status %d, want 404", w.Code)
 	}
-	cc := w.Header().Get("Cache-Control")
-	if strings.Contains(cc, "max-age=31536000") {
-		t.Errorf("/cache/igdb 404 Cache-Control = %q — once IGDB cache is repopulated, clients will see cached 404s for up to a year", cc)
-	}
+	assertCacheControlSafeForError(t, w.Header().Get("Cache-Control"))
 }
 
 // TestSecurityHeadersForbidden403CacheControl pins that a securityHeaders
@@ -217,15 +247,12 @@ func TestSecurityHeadersForbidden403CacheControl(t *testing.T) {
 			if w.Code != http.StatusForbidden {
 				t.Fatalf("got status %d, want 403", w.Code)
 			}
-			cc := w.Header().Get("Cache-Control")
 			// securityHeaders short-circuits before the per-route
 			// cacheControl middleware runs (cacheControl is wrapped
 			// inside the mux handler, which doesn't run on the 403
-			// short-circuit). Either no header is acceptable, or any
-			// non-long-cache directive.
-			if strings.Contains(cc, "max-age=31536000") || strings.Contains(cc, "immutable") {
-				t.Errorf("403 Cache-Control = %q, must not be long-cached", cc)
-			}
+			// short-circuit), so the response should carry no
+			// long-cache directive.
+			assertCacheControlSafeForError(t, w.Header().Get("Cache-Control"))
 		})
 	}
 }
@@ -242,10 +269,9 @@ func TestRootCatchAll404CacheControl(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("got status %d, want 404", w.Code)
 	}
-	cc := w.Header().Get("Cache-Control")
-	// "no-cache" is acceptable: it tells the browser to revalidate on
-	// every use, so a typo gets corrected on the next reload.
-	if strings.Contains(cc, "immutable") || strings.Contains(cc, "max-age=31536000") {
-		t.Errorf("/ catch-all 404 Cache-Control = %q, must not be long-cached", cc)
-	}
+	// The catch-all is wrapped with cacheControl("no-cache", ...), so
+	// the 404 carries "no-cache" — acceptable: it tells the browser to
+	// revalidate on every use, so a typo gets corrected on the next
+	// reload.
+	assertCacheControlSafeForError(t, w.Header().Get("Cache-Control"))
 }

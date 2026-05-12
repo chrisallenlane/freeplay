@@ -106,16 +106,14 @@ func TestWriteNotFound_LogsOnWriteFailure(t *testing.T) {
 		)
 	}
 
-	rec := h.findRecord("notfound")
-	if rec == nil {
-		// Fall back: maybe the message names the marker differently;
-		// require SOMETHING that mentions write failure.
-		rec = h.findRecord("writ")
-	}
+	// Match the production message verbatim. If the message ever changes,
+	// the test should fail loudly and force a deliberate update rather
+	// than silently match a broad substring that happens to overlap.
+	rec := h.findRecord("writing .notfound marker failed")
 	if rec == nil {
 		t.Fatalf(
-			"writeNotFound logged %d records but none mention .notfound or write; "+
-				"messages: %v",
+			"writeNotFound logged %d records but none match the expected "+
+				"message; messages: %v",
 			len(h.records), h.messages(),
 		)
 	}
@@ -166,7 +164,12 @@ func TestWriteNotFound_NoInMemoryPoisonOnWriteFailure(t *testing.T) {
 // correlate against.
 //
 // Expected behaviour: warn log with "game" attribute.
-// Current behaviour: `_ = atomicfile.Write(...)` — test FAILS, bug confirmed.
+//
+// Paired with TestEnsureCoverThumbnail_NoSilentNoOpOnWriteFailure: this test
+// pins the exact attribute shape ("game" attr present), and the companion
+// relaxes that to "some log fires" so the strict shape can evolve without
+// losing the no-silent-failure guarantee. Keep both — neither subsumes the
+// other.
 func TestEnsureCoverThumbnail_LogsOnWriteFailure(t *testing.T) {
 	h := captureSlog(t)
 
