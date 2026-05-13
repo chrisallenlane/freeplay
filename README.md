@@ -76,6 +76,7 @@ cover art configuration.
 | [INSTALLING.md](INSTALLING.md)                 | Users setting up Freeplay          |
 | [HACKING.md](HACKING.md)                       | Developers working on the codebase |
 | [ARCHITECTURE.md](ARCHITECTURE.md)             | Understanding the internal design  |
+| [CONTRIBUTING.md](CONTRIBUTING.md)             | Contribution policy                |
 | [freeplay.example.toml](freeplay.example.toml) | Annotated configuration reference  |
 
 ## Acknowledgements

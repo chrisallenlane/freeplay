@@ -105,6 +105,16 @@ cp freeplay.example.toml /path/to/data/freeplay.toml
 The `-data` flag defaults to `/data` if omitted (which is only useful inside
 the Docker container).
 
+To override the listen port from the config file, pass `-port`:
+
+```bash
+./dist/freeplay -data /path/to/data -port 9090
+```
+
+Useful when running multiple instances or when the config-file port conflicts
+with another service. Omit the flag (or pass `-port 0`) to use the value from
+`freeplay.toml`.
+
 Logs go to stdout. Set the `LOG_LEVEL` environment variable to `debug`,
 `info` (default), `warn`, or `error` to control verbosity:
 

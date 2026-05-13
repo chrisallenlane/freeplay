@@ -42,7 +42,8 @@ Run `make help` for the full list. The most useful targets:
 | `make run`           | Build and run against `testdata/`       |
 | `make fmt`           | Format Go (gofumpt) and JS (Biome)      |
 | `make lint`          | Lint Go (golangci-lint), JS and HTML (Biome/html-validate) |
-| `make test`          | Run Go and JS unit tests                |
+| `make test`          | Run Go and JS unit tests (includes the frontend↔server contract test) |
+| `make integration`   | Run the integration test suite against a real server |
 | `make coverage`      | Generate HTML coverage report           |
 | `make coverage-text` | Show per-function coverage in terminal  |
 | `make a11y`          | Run pa11y + axe-core accessibility audit against live server |
@@ -99,6 +100,13 @@ To run with a different data directory:
 ```bash
 make build
 ./dist/freeplay -data /path/to/data
+```
+
+Pass `-port` to override the listen port from the config file (useful when
+running multiple instances side-by-side):
+
+```bash
+./dist/freeplay -data /path/to/data -port 9090
 ```
 
 ## Benchmarks
