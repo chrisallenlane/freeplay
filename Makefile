@@ -4,10 +4,13 @@ cmd_dir  := ./cmd/freeplay
 dist_dir := ./dist
 
 # EmulatorJS vendored asset release (fetched at build time, not committed)
-EMULATORJS_VERSION  := v4.2.3-freeplay1
-EMULATORJS_TARBALL  := emulatorjs-assets-$(EMULATORJS_VERSION).tar.gz
-EMULATORJS_URL      := https://github.com/chrisallenlane/EmulatorJS/releases/download/$(EMULATORJS_VERSION)/$(EMULATORJS_TARBALL)
-EMULATORJS_SHA256   := 765803f22ea2c0459d9b443a1659c92af349e425243e48642ae8aa412c56cd7c
+# Upstream tag and asset filename differ (tag has a leading `v`, asset
+# does not), so they're separate variables rather than one composed from
+# the other.
+EMULATORJS_TAG      := v4.3.0-pre
+EMULATORJS_ASSET    := 4.3.0-pre.7z
+EMULATORJS_URL      := https://github.com/EmulatorJS/EmulatorJS/releases/download/$(EMULATORJS_TAG)/$(EMULATORJS_ASSET)
+EMULATORJS_SHA256   := 0949d75fa5cff05c47e0431443dad6b65e2ebc5f1517cbb09f3d671236d3effd
 EMULATORJS_SENTINEL := emulatorjs/data/version.json
 
 # executables
@@ -149,11 +152,15 @@ docker: $(EMULATORJS_SENTINEL)
 fetch-emulatorjs: $(EMULATORJS_SENTINEL)
 
 $(EMULATORJS_SENTINEL): | .tmp
-	@echo "Fetching EmulatorJS assets $(EMULATORJS_VERSION)..."
-	@curl -fsSL -o .tmp/$(EMULATORJS_TARBALL) $(EMULATORJS_URL)
-	@echo "$(EMULATORJS_SHA256)  .tmp/$(EMULATORJS_TARBALL)" | sha256sum -c -
-	@tar -xzf .tmp/$(EMULATORJS_TARBALL) -C .
-	@rm -f .tmp/$(EMULATORJS_TARBALL)
+	@echo "Fetching EmulatorJS assets $(EMULATORJS_TAG)..."
+	@curl -fsSL -o .tmp/$(EMULATORJS_ASSET) $(EMULATORJS_URL)
+	@echo "$(EMULATORJS_SHA256)  .tmp/$(EMULATORJS_ASSET)" | sha256sum -c -
+	@rm -rf emulatorjs
+	@# `-xr!*Zone.Identifier` skips NTFS alternate-data-stream marker
+	@# files that ship in the upstream archive (the release is packaged
+	@# on Windows). Go's //go:embed rejects them as invalid filenames.
+	@7z x -y -o./emulatorjs '-xr!*Zone.Identifier' .tmp/$(EMULATORJS_ASSET) data > /dev/null
+	@rm -f .tmp/$(EMULATORJS_ASSET)
 	@echo "EmulatorJS assets ready at ./emulatorjs/"
 
 # .tmp

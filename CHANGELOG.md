@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- EmulatorJS dependency switched from the `chrisallenlane/EmulatorJS`
+  fork to upstream `EmulatorJS/EmulatorJS@v4.3.0-pre`. The
+  controller-port-device patches that power lightgun support were
+  merged upstream (EmulatorJS PR #1182, RetroArch PR #38), so Freeplay
+  no longer needs to ship a fork or force unminified asset loading via
+  `EJS_DEBUG_XX`. The player page now loads the standard
+  `emulator.min.js` bundle.
+
+### Fixed
+- `/emulatorjs/*` responses now carry a version-stamped `ETag` and no
+  longer use the `immutable` Cache-Control directive. Browsers
+  revalidate via `If-None-Match` on every Freeplay release, so an
+  upstream EmulatorJS bump can change file bytes at stable URLs
+  without trapping clients on stale cached copies.
+
 ## [1.1.0] - 2026-05-12
 
 ### Added

@@ -154,11 +154,12 @@ clients cannot reach it.
 Two directories must not be modified or committed by hand:
 
 - **`emulatorjs/`** — EmulatorJS assets (JS, WASM, CSS) fetched at build
-  time from a pinned GitHub release on the [patched
-  fork](https://github.com/chrisallenlane/EmulatorJS/releases). `make build`
+  time from a pinned upstream
+  [release](https://github.com/EmulatorJS/EmulatorJS/releases). `make build`
   and `make check` auto-invoke `make fetch-emulatorjs`, which downloads the
-  tarball, verifies the pinned SHA-256, and extracts to `emulatorjs/`. The
-  pinned version and checksum live at the top of the `Makefile`. Gitignored.
+  `.7z` archive, verifies the pinned SHA-256, and extracts `data/` into
+  `emulatorjs/`. The pinned tag and checksum live at the top of the
+  `Makefile`. Gitignored.
 - **`vendor/`** — Go module dependencies managed by `go mod vendor`. Use
   `make vendor` or `make vendor-update` to modify.
 
@@ -167,8 +168,10 @@ Two directories must not be modified or committed by hand:
 The frontend and EmulatorJS assets are embedded into the binary at compile
 time using Go's `embed` package (see `embed.go`). Changes to files in
 `frontend/` take effect on the next `make build`. To change the pinned
-EmulatorJS version, update `EMULATORJS_VERSION` and `EMULATORJS_SHA256` in
-the `Makefile`, then delete `emulatorjs/` and run `make fetch-emulatorjs`.
+EmulatorJS version, update `EMULATORJS_TAG`, `EMULATORJS_ASSET`, and
+`EMULATORJS_SHA256` in the `Makefile`, then run `make fetch-emulatorjs`
+(the target removes the existing `emulatorjs/` directory before
+extracting).
 
 ## Docker
 

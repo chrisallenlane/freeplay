@@ -114,6 +114,7 @@ func bootServer(t *testing.T, dataDir string) (*httptest.Server, *server.Server)
 		cfg, dataDir,
 		freeplay.FrontendFS, freeplay.EmulatorjsFS,
 		detailsCache, scn, lib,
+		"test",
 	)
 	if err != nil {
 		t.Fatalf("server.New: %v", err)

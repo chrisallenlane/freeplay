@@ -94,6 +94,7 @@ func main() {
 		cfg, *dataDir,
 		freeplay.FrontendFS, freeplay.EmulatorjsFS,
 		detailsCache, scn, lib,
+		freeplay.Version,
 	)
 	if err != nil {
 		fatal(err)

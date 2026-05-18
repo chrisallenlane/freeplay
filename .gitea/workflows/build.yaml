@@ -21,8 +21,9 @@ jobs:
       - name: Install system packages
         # alpine is minimal: bring in the tools the lint, biome, and
         # html-validate steps need. bash is required for actions/checkout's
-        # bundled scripts; make drives the EmulatorJS fetch.
-        run: apk add --no-cache bash curl git make nodejs npm tar
+        # bundled scripts; make drives the EmulatorJS fetch; 7zip extracts
+        # the upstream EmulatorJS release archive.
+        run: apk add --no-cache 7zip bash curl git make nodejs npm
 
       - uses: actions/checkout@v4
 
@@ -69,6 +70,11 @@ jobs:
     container: catthehacker/ubuntu:act-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install p7zip
+        # The upstream EmulatorJS release ships as a .7z archive; the
+        # ubuntu base image doesn't include a 7z extractor by default.
+        run: apt-get update && apt-get install -y --no-install-recommends p7zip-full
 
       - name: Fetch EmulatorJS assets
         # The Dockerfile's COPY . . expects emulatorjs/ to already exist in

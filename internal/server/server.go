@@ -23,6 +23,13 @@ const longCacheImmutable = "public, max-age=31536000, immutable"
 // revalidate via If-Modified-Since once the max-age expires.
 const longCacheMutable = "public, max-age=31536000"
 
+// emulatorjsCacheControl pairs with a version-stamped ETag (see
+// cacheWithETag) on /emulatorjs/* routes. Long max-age for cache
+// efficiency, no `immutable` so browsers will revalidate via
+// If-None-Match. A Freeplay release changes the ETag and invalidates
+// every previously-cached asset under the route.
+const emulatorjsCacheControl = "public, max-age=31536000"
+
 // DetailsCache serves locally-cached game metadata.
 type DetailsCache interface {
 	Get(console, romFilename string) *igdb.GameDetails
@@ -38,21 +45,24 @@ type Rescanner interface {
 
 // Server is the Freeplay HTTP server.
 type Server struct {
-	cfg           *config.Config
-	dataDir       string
-	scanner       *scanner.Scanner
-	rescanner     Rescanner
-	saves         *saves.Manager
-	detailsCache  DetailsCache
-	frontendSub   fs.FS
-	emulatorjsSub fs.FS
-	mux           *http.ServeMux
-	handler       http.Handler
+	cfg            *config.Config
+	dataDir        string
+	scanner        *scanner.Scanner
+	rescanner      Rescanner
+	saves          *saves.Manager
+	detailsCache   DetailsCache
+	frontendSub    fs.FS
+	emulatorjsSub  fs.FS
+	emulatorjsETag string
+	mux            *http.ServeMux
+	handler        http.Handler
 }
 
 // New creates a configured Server ready to listen. detailsCache may be
 // nil if IGDB is not configured. rescanner may be nil, in which case
-// POST /api/rescan returns 503.
+// POST /api/rescan returns 503. version is the build-time freeplay
+// version; it stamps the ETag on /emulatorjs/* responses so that a
+// release invalidates previously-cached client copies.
 func New(
 	cfg *config.Config,
 	dataDir string,
@@ -60,6 +70,7 @@ func New(
 	detailsCache DetailsCache,
 	scn *scanner.Scanner,
 	rescanner Rescanner,
+	version string,
 ) (*Server, error) {
 	frontendSub, err := fs.Sub(frontendFS, "frontend")
 	if err != nil {
@@ -71,15 +82,16 @@ func New(
 	}
 
 	s := &Server{
-		cfg:           cfg,
-		dataDir:       dataDir,
-		scanner:       scn,
-		rescanner:     rescanner,
-		saves:         saves.New(dataDir),
-		detailsCache:  detailsCache,
-		frontendSub:   frontendSub,
-		emulatorjsSub: emulatorjsSub,
-		mux:           http.NewServeMux(),
+		cfg:            cfg,
+		dataDir:        dataDir,
+		scanner:        scn,
+		rescanner:      rescanner,
+		saves:          saves.New(dataDir),
+		detailsCache:   detailsCache,
+		frontendSub:    frontendSub,
+		emulatorjsSub:  emulatorjsSub,
+		emulatorjsETag: fmt.Sprintf(`"freeplay-%s"`, version),
+		mux:            http.NewServeMux(),
 	}
 	s.routes()
 	// logRequests is outermost so it observes every response, including

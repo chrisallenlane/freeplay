@@ -191,6 +191,39 @@ func TestEmulatorJSLoaderResolvesEmbeddedDeps(t *testing.T) {
 	}
 }
 
+// TestEmulatorJSMinifiedBundleHasLightgunPatches asserts that the
+// embedded emulator.min.js contains the controller-port-device API
+// that lightgun support depends on (merged upstream as EmulatorJS
+// PR #1182). A future EMULATORJS_TAG bump to a release that loses or
+// reverts the patches would fail this test instead of breaking the
+// lightgun UX silently.
+func TestEmulatorJSMinifiedBundleHasLightgunPatches(t *testing.T) {
+	dataDir := freshDataDir(t)
+	ts, _ := bootServer(t, dataDir)
+
+	res, err := http.Get(ts.URL + "/emulatorjs/data/emulator.min.js") //nolint:gosec,noctx
+	if err != nil {
+		t.Fatalf("GET emulator.min.js: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("GET emulator.min.js: status %d, want 200", res.StatusCode)
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	// setControllerPortDevice is the RetroArch C API exposed to the JS
+	// binding by the patches in EmulatorJS PR #1182 / RetroArch PR #38.
+	// Minification preserves cross-language symbol names, so this is the
+	// stable marker for the lightgun patches in the minified bundle.
+	if !bytes.Contains(body, []byte("setControllerPortDevice")) {
+		t.Errorf("emulator.min.js missing setControllerPortDevice; " +
+			"lightgun patches may have been dropped from the pinned " +
+			"EmulatorJS release")
+	}
+}
+
 // TestRescanReflectsNewROM exercises the full scan→catalog→slug-gate
 // pipeline through the real library.Library and scanner.Scanner.
 // Adds a ROM file mid-test, triggers a rescan, then verifies the

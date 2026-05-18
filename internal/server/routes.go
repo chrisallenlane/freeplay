@@ -33,8 +33,10 @@ func (s *Server) routes() {
 	// Manual serving
 	s.mux.HandleFunc("GET /manuals/{rest...}", s.handleManuals)
 
-	// Embedded EmulatorJS — immutable cache; assets are embedded at build time
-	s.mux.Handle("/emulatorjs/", cacheControl(longCacheImmutable, http.StripPrefix("/emulatorjs/", noDirListing(s.emulatorjsSub, http.FileServerFS(s.emulatorjsSub)))))
+	// Embedded EmulatorJS — long max-age with a version-stamped ETag so
+	// browsers revalidate cheaply and a Freeplay release self-heals any
+	// previously-cached asset. See cacheWithETag for the contract.
+	s.mux.Handle("/emulatorjs/", cacheWithETag(s.emulatorjsETag, emulatorjsCacheControl, http.StripPrefix("/emulatorjs/", noDirListing(s.emulatorjsSub, http.FileServerFS(s.emulatorjsSub)))))
 
 	// Game details
 	s.mux.HandleFunc("GET /api/game-details", s.handleGameDetails)

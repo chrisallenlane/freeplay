@@ -69,3 +69,21 @@ func cacheControl(value string, next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// cacheWithETag sets both ETag and Cache-Control before delegating.
+// http.ServeContent (called downstream by http.FileServerFS) honours
+// a pre-set ETag for If-None-Match handling, returning 304 on match.
+// The etag value is a constant string set at registration time —
+// typically the build version, so a Freeplay release invalidates
+// every previously-cached response under the route without operator
+// intervention.
+//
+// noDirListing's 404 path already strips ETag (see Header().Del above)
+// so error responses do not inherit the long cache.
+func cacheWithETag(etag, value string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", value)
+		next.ServeHTTP(w, r)
+	})
+}

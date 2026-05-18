@@ -45,11 +45,12 @@ compile time via Go's `embed` package (see `embed.go`). This means the
 compiled binary is fully self-contained -- no runtime file dependencies
 beyond the data directory.
 
-The player page sets `EJS_DEBUG_XX = true`, which tells EmulatorJS to load
-its unminified source files instead of `emulator.min.js`. This is required
-because the vendored `emulator.min.js` does not include the controller port
-device patches (lightgun support). The individual source files in
-`emulatorjs/data/src/` do contain these patches.
+The `emulatorjs/` tree is fetched at build time from the upstream
+[EmulatorJS release](https://github.com/EmulatorJS/EmulatorJS/releases)
+pinned in the `Makefile` (tag and SHA-256). The pinned version contains
+the controller-port-device patches that power lightgun support
+(EmulatorJS PR #1182, RetroArch PR #38), so the player page loads
+the standard `emulator.min.js` bundle.
 
 ## API
 

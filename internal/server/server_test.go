@@ -67,6 +67,7 @@ func testServer(t *testing.T, dc ...DetailsCache) (*Server, string) {
 	srv, err := New(
 		cfg, dir, testFrontendFS, testEmulatorjsFS,
 		cache, scn, &stubRescanner{},
+		"test",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -647,8 +648,8 @@ func TestEmulatorJSCacheHeaders(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("got status %d, want 200", w.Code)
 	}
-	if cc := w.Header().Get("Cache-Control"); cc != longCacheImmutable {
-		t.Errorf("Cache-Control = %q, want %q", cc, longCacheImmutable)
+	if cc := w.Header().Get("Cache-Control"); cc != emulatorjsCacheControl {
+		t.Errorf("Cache-Control = %q, want %q", cc, emulatorjsCacheControl)
 	}
 }
 

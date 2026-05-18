@@ -117,7 +117,7 @@ func TestServeSecureFile_TrailingSeparatorInBaseDir(t *testing.T) {
 	}
 
 	scn := scanner.New(cfg, dir)
-	srv, err := New(cfg, dir, testFrontendFS, testEmulatorjsFS, nil, scn, nil)
+	srv, err := New(cfg, dir, testFrontendFS, testEmulatorjsFS, nil, scn, nil, "test")
 	if err != nil {
 		t.Fatal(err)
 	}

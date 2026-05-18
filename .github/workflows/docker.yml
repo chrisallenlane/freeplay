@@ -23,6 +23,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install p7zip
+        # ubuntu-latest typically ships p7zip-full but pinning the
+        # install makes the build resilient to runner image changes.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends p7zip-full
+
       - id: emulatorjs
         run: echo "sha=$(grep '^EMULATORJS_SHA256' Makefile | awk '{print $3}')" >> "$GITHUB_OUTPUT"
 
@@ -48,6 +53,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install p7zip
+        # ubuntu-latest typically ships p7zip-full but pinning the
+        # install makes the build resilient to runner image changes.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends p7zip-full
 
       - id: emulatorjs
         run: echo "sha=$(grep '^EMULATORJS_SHA256' Makefile | awk '{print $3}')" >> "$GITHUB_OUTPUT"
