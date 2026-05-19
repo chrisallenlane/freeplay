@@ -139,8 +139,9 @@ func TestCacheFileNosniffHeaderPresent(t *testing.T) {
 }
 
 // TestCacheFileLongCacheHeader verifies that cached IGDB files are served
-// with the long-cache-mutable header — rescans can rewrite cover bytes
-// behind the same URL, so `immutable` would leave stale caches pinned.
+// with the longCache header — rescans can rewrite cover bytes behind the
+// same URL, so `immutable` would leave stale caches pinned (and is in
+// any case banned project-wide; see server.go).
 func TestCacheFileLongCacheHeader(t *testing.T) {
 	srv, dir := testServer(t)
 

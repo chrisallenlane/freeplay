@@ -39,8 +39,8 @@ func TestRouteCachePolicyManifest(t *testing.T) {
 		"/api/saves/NES/Mega%20Man/sram", bytes.NewReader([]byte("save")))
 
 	// Seed files for cover/manual/cache routes so they return 200.
-	seedFile(t, filepath.Join(datadir.Covers(dir), "NES", "Mega Man.jpg"), []byte("jpg"))
-	seedFile(t, filepath.Join(datadir.Manuals(dir), "NES", "Mega Man.pdf"), []byte("pdf"))
+	writeTestFile(t, filepath.Join(datadir.Covers(dir), "NES", "Mega Man.jpg"), []byte("jpg"))
+	writeTestFile(t, filepath.Join(datadir.Manuals(dir), "NES", "Mega Man.pdf"), []byte("pdf"))
 	writeCacheFile(t, dir, "NES", "Mega Man", "cover_thumb.jpg", []byte("jpg"))
 
 	// The expected ETag value comes from testServer's "test" version
@@ -108,10 +108,4 @@ func TestRouteCachePolicyManifest(t *testing.T) {
 			}
 		})
 	}
-}
-
-// seedFile writes content at path, creating parent directories.
-func seedFile(t *testing.T, path string, content []byte) {
-	t.Helper()
-	writeTestFile(t, path, content)
 }

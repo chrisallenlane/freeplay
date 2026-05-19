@@ -35,7 +35,7 @@ func securityHeaders(next http.Handler) http.Handler {
 // max-age window.
 func clearLongCacheHeaders(h http.Header) {
 	h.Del("Cache-Control")
-	h.Del("Etag")
+	h.Del("ETag")
 	h.Del("Last-Modified")
 	h.Del("Content-Encoding")
 }
