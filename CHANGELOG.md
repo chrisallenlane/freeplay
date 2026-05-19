@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.2] - 2026-05-19
+
+### Changed
+- `Cache-Control: immutable` has been removed from all static file
+  routes (`/roms/`, `/bios/`, `/covers/`, `/manuals/`, `/cache/igdb/`,
+  `/emulatorjs/`). Browsers can now recover from cached-but-broken
+  assets via a hard refresh; previously, `immutable` blocked
+  revalidation even on hard refresh and a broken bundle could trap
+  clients on stale bytes. The long-cache `max-age` is also cut from
+  365 days to 24 hours to bound staleness.
+- All long-cache static routes now share a single `longCache`
+  directive (`public, max-age=86400`). The previous distinction
+  between `longCacheImmutable` (ROMs, BIOS, EmulatorJS) and
+  `longCacheMutable` (covers, IGDB cache, manuals) is gone.
+- `/api/game-details` is now wrapped in `noStore` so its error
+  responses (404 for missing console/rom, 400 for invalid
+  parameters) carry `Cache-Control: no-store` rather than no
+  header. The success path retains its `private, max-age=300`
+  override.
+
+### Fixed
+- Panic-recovery 500 responses now strip `Cache-Control`, `ETag`,
+  `Last-Modified`, and `Content-Encoding` headers before emitting
+  the error. Pre-fix, a transient panic on a route wrapped in
+  long-cache middleware would cache the 500 for the full max-age
+  window — Go's `http.Error` does not clear these headers (only the
+  unexported `http.serveError` used by `FileServerFS` does), so the
+  fix is to clear them explicitly via a shared
+  `clearLongCacheHeaders` helper.
+
 ## [1.1.1] - 2026-05-18
 
 ### Changed

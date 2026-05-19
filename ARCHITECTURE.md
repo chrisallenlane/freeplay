@@ -69,22 +69,33 @@ change without notice.
 
 ## Static file routes
 
-| Path                      | Source                         | Cache-Control                              |
-|---------------------------|--------------------------------|--------------------------------------------|
-| `/roms/{console}/{file}`  | Configured ROM directory       | `public, max-age=31536000, immutable`      |
-| `/bios/{console}`         | Configured BIOS file           | `public, max-age=31536000, immutable`      |
-| `/covers/{rest...}`       | `<data>/covers/`               | `public, max-age=31536000`                 |
-| `/cache/igdb/{rest...}`   | `<data>/cache/igdb/`           | `public, max-age=31536000`                 |
-| `/manuals/{rest...}`      | `<data>/manuals/`              | `public, max-age=31536000`                 |
-| `/emulatorjs/...`         | Embedded EmulatorJS assets     | `public, max-age=31536000, immutable`      |
-| `/details`                | Embedded details page          | `no-cache`                                 |
-| `/play`                   | Embedded player page           | `no-cache`                                 |
-| `/`                       | Embedded frontend (catch-all)  | `no-cache`                                 |
+| Path                     | Source                        | Cache-Control           |
+|--------------------------|-------------------------------|-------------------------|
+| `/roms/{console}/{file}` | Configured ROM directory      | `public, max-age=86400` |
+| `/bios/{console}`        | Configured BIOS file          | `public, max-age=86400` |
+| `/covers/{rest...}`      | `<data>/covers/`              | `public, max-age=86400` |
+| `/cache/igdb/{rest...}`  | `<data>/cache/igdb/`          | `public, max-age=86400` |
+| `/manuals/{rest...}`     | `<data>/manuals/`             | `public, max-age=86400` |
+| `/emulatorjs/...`        | Embedded EmulatorJS assets    | `public, max-age=86400` |
+| `/details`               | Embedded details page         | `no-cache`              |
+| `/play`                  | Embedded player page          | `no-cache`              |
+| `/`                      | Embedded frontend (catch-all) | `no-cache`              |
 
-ROMs, BIOS files, and EmulatorJS assets use `immutable` because their URLs
-are stable and the bytes never change behind a given path. Covers, cached
-IGDB images, and manuals use a long max-age without `immutable` so browsers
-revalidate via `If-Modified-Since` once the TTL expires — these files can be
-rewritten after an IGDB rescan or a manual update without changing their URLs.
+All long-cache static routes share `public, max-age=86400` (24 hours).
+`immutable` is intentionally absent project-wide: it blocks revalidation
+even on hard refresh, so a broken release that ships malformed bytes at a
+stable URL would pin browsers on the broken copy until cache eviction. The
+24-hour TTL bounds worst-case staleness for any file behind a stable URL
+that legitimately changes — cover rescans, BIOS swaps, an EmulatorJS bump
+— while still keeping repeat-navigation traffic off the wire on a LAN.
+
+`/emulatorjs/*` additionally carries a version-stamped `ETag`, so a
+Freeplay release invalidates cached client copies via `If-None-Match`
+(returning 304 when the bundle hasn't changed) without forcing a full
+re-download.
+
 The frontend, details page, and player page use `no-cache` so that
-redeployments are picked up immediately.
+redeployments are picked up immediately. The panic-recovery 500 path
+strips `Cache-Control`, `ETag`, `Last-Modified`, and `Content-Encoding`
+before emitting the error, so a transient 500 on a long-cached route is
+not itself cached for the full max-age window.
