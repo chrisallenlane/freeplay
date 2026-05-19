@@ -25,6 +25,21 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
+// clearLongCacheHeaders deletes the long-cache-related headers from h.
+// Used by error-response paths that sit inside a route wrapped in
+// cacheControl / cacheWithETag — Go's http.Error and http.NotFound do
+// NOT clear these headers themselves (only the unexported
+// http.serveError used by FileServerFS does, see net/http/fs.go:188).
+// Without this clear, errors inherit the long-cache directive set by
+// upstream middleware and clients cache the failure for the full
+// max-age window.
+func clearLongCacheHeaders(h http.Header) {
+	h.Del("Cache-Control")
+	h.Del("Etag")
+	h.Del("Last-Modified")
+	h.Del("Content-Encoding")
+}
+
 // noDirListing wraps next so that requests whose URL path resolves to
 // a directory in fsys return 404 unless an index.html sits inside
 // that directory. Stops http.FileServerFS from emitting clickable
@@ -41,17 +56,10 @@ func noDirListing(fsys fs.FS, next http.Handler) http.Handler {
 		info, err := fs.Stat(fsys, name)
 		if err == nil && info.IsDir() {
 			if _, err := fs.Stat(fsys, path.Join(name, "index.html")); err != nil {
-				// Strip cache headers set by upstream middleware so
-				// that 404s for directories without index.html are not
-				// cached immutably. http.NotFound does not clear
-				// previously-set headers (only stdlib's serveError
-				// does), so without this clear the response would
-				// inherit Cache-Control: immutable from cacheControl.
-				h := w.Header()
-				h.Del("Cache-Control")
-				h.Del("Etag")
-				h.Del("Last-Modified")
-				h.Del("Content-Encoding")
+				// 404 for a directory without index.html — strip the
+				// long-cache headers set by upstream middleware so the
+				// failure isn't cached.
+				clearLongCacheHeaders(w.Header())
 				http.NotFound(w, r)
 				return
 			}

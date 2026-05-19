@@ -178,12 +178,11 @@ func TestNoDirListing_ClearsAllCacheHeadersOnDirectory404(t *testing.T) {
 }
 
 // TestCovers404CacheControl pins the contract for /covers/ 404s. The
-// `longCacheMutable` policy (public, max-age=31536000) is less severe
-// than immutable — browsers will revalidate via If-Modified-Since after
-// the max-age — but a 404 cached for a year still means the cover stays
-// "missing" client-side until the user manually clears cache or hits
-// shift-reload, even after the operator drops the file in the covers
-// directory.
+// `longCache` policy (public, max-age=86400) carries no `immutable`,
+// so browsers can recover with a hard refresh — but a 404 cached for
+// up to a day still means the cover stays "missing" client-side until
+// the operator's drop-in propagates. The strip-on-404 contract here
+// makes the cover appear on the next request.
 //
 // MEDIUM severity rather than HIGH because the cover failure is visual,
 // not functional — the page still loads. But it's a real bug.
@@ -199,7 +198,7 @@ func TestCovers404CacheControl(t *testing.T) {
 
 // TestManuals404CacheControl pins the contract for /manuals/ 404s.
 // Mirror of TestCovers404CacheControl for the manuals route, which
-// shares the longCacheMutable policy via serveSecureFile.
+// shares the longCache policy via serveSecureFile.
 func TestManuals404CacheControl(t *testing.T) {
 	srv, _ := testServer(t)
 
@@ -243,7 +242,7 @@ func TestBIOS404CacheControl(t *testing.T) {
 }
 
 // TestCacheFiles404CacheControl exercises the /cache/igdb/ 404 path.
-// Same longCacheMutable policy as covers and manuals.
+// Same longCache policy as covers and manuals.
 func TestCacheFiles404CacheControl(t *testing.T) {
 	srv, _ := testServer(t)
 

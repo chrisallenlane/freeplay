@@ -13,22 +13,13 @@ import (
 	"github.com/chrisallenlane/freeplay/internal/scanner"
 )
 
-// longCacheImmutable is for content-addressed assets (URL changes when
-// bytes change) — browsers skip revalidation entirely.
-const longCacheImmutable = "public, max-age=31536000, immutable"
-
-// longCacheMutable is for static-ish files whose bytes may change
-// behind a stable URL (covers re-downloaded after an IGDB rescan,
-// operator-updated manuals). Browsers still cache aggressively but
-// revalidate via If-Modified-Since once the max-age expires.
-const longCacheMutable = "public, max-age=31536000"
-
-// emulatorjsCacheControl pairs with a version-stamped ETag (see
-// cacheWithETag) on /emulatorjs/* routes. Long max-age for cache
-// efficiency, no `immutable` so browsers will revalidate via
-// If-None-Match. A Freeplay release changes the ETag and invalidates
-// every previously-cached asset under the route.
-const emulatorjsCacheControl = "public, max-age=31536000"
+// longCache is the project's single long-cache directive for static
+// assets. 24h max-age balances aggressive caching with bounded staleness;
+// `immutable` is intentionally absent project-wide (see
+// feedback_no_immutable_cache memory and the v1.1.1 trap incident).
+// /emulatorjs/* additionally carries a version-stamped ETag via
+// cacheWithETag so a Freeplay release self-heals stale caches.
+const longCache = "public, max-age=86400"
 
 // DetailsCache serves locally-cached game metadata.
 type DetailsCache interface {

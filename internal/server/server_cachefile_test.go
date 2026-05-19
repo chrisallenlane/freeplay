@@ -158,7 +158,7 @@ func TestCacheFileLongCacheHeader(t *testing.T) {
 	}
 
 	cc := w.Header().Get("Cache-Control")
-	if cc != longCacheMutable {
-		t.Errorf("Cache-Control = %q, want %q", cc, longCacheMutable)
+	if cc != longCache {
+		t.Errorf("Cache-Control = %q, want %q", cc, longCache)
 	}
 }

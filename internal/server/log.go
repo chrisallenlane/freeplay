@@ -86,6 +86,12 @@ func recoverPanic(next http.Handler) http.Handler {
 				// If the handler already flushed bytes the connection is
 				// unrecoverable; writing again would corrupt or duplicate.
 				if lw, ok := w.(*loggingResponseWriter); ok && !lw.wroteHeader {
+					// Strip any long-cache headers the inner handler set
+					// before it panicked. http.Error does not clear these
+					// (only Go's unexported serveError does), so without
+					// this the 500 inherits e.g. /emulatorjs/*'s ETag and
+					// long max-age, caching the failure for up to a day.
+					clearLongCacheHeaders(w.Header())
 					http.Error(w, "internal server error", http.StatusInternalServerError)
 				}
 			}

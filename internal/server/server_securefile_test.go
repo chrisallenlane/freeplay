@@ -30,7 +30,7 @@ func TestServeSecureFile_EmptyFilename(t *testing.T) {
 	// We call serveSecureFile directly to test the branch.
 	req := httptest.NewRequest("GET", "/covers/", nil)
 	w := httptest.NewRecorder()
-	srv.serveSecureFile(w, req, coverDir, "", longCacheImmutable)
+	srv.serveSecureFile(w, req, coverDir, "", longCache)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("empty filename: got status %d, want 404", w.Code)
@@ -49,7 +49,7 @@ func TestServeSecureFile_DotFilename(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/covers/.", nil)
 	w := httptest.NewRecorder()
-	srv.serveSecureFile(w, req, coverDir, ".", longCacheImmutable)
+	srv.serveSecureFile(w, req, coverDir, ".", longCache)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("dot filename: got status %d, want 404", w.Code)
@@ -80,7 +80,7 @@ func TestServeSecureFile_DotDotBlocked(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/covers/"+tc.file, nil)
 			w := httptest.NewRecorder()
-			srv.serveSecureFile(w, req, coverDir, tc.file, longCacheImmutable)
+			srv.serveSecureFile(w, req, coverDir, tc.file, longCache)
 
 			if w.Code != http.StatusNotFound {
 				t.Errorf("file=%q: got status %d, want 404", tc.file, w.Code)
@@ -154,7 +154,7 @@ func TestServeSecureFile_SubdirectoryTraversal(t *testing.T) {
 	for _, file := range cases {
 		req := httptest.NewRequest("GET", "/covers/"+file, nil)
 		w := httptest.NewRecorder()
-		srv.serveSecureFile(w, req, coverDir, file, longCacheImmutable)
+		srv.serveSecureFile(w, req, coverDir, file, longCache)
 
 		if w.Code == http.StatusOK {
 			t.Errorf(
@@ -179,7 +179,7 @@ func TestServeSecureFile_NullByteInFilename(t *testing.T) {
 	// On Linux, the OS will reject them at the syscall level.
 	req := httptest.NewRequest("GET", "/covers/evil", nil)
 	w := httptest.NewRecorder()
-	srv.serveSecureFile(w, req, coverDir, "evil\x00.png", longCacheImmutable)
+	srv.serveSecureFile(w, req, coverDir, "evil\x00.png", longCache)
 
 	// Should get 404 (file doesn't exist or OS rejects null byte), not 5xx
 	if w.Code >= 500 {
@@ -201,7 +201,7 @@ func TestServeSecureFile_AbsolutePathInFile(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/covers/etc/passwd", nil)
 	w := httptest.NewRecorder()
-	srv.serveSecureFile(w, req, coverDir, "/etc/passwd", longCacheImmutable)
+	srv.serveSecureFile(w, req, coverDir, "/etc/passwd", longCache)
 
 	// The file doesn't exist under covers, so 404 is expected.
 	// The important thing is it does NOT serve /etc/passwd.
@@ -223,7 +223,7 @@ func TestServeSecureFile_SlashAsFilename(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/covers/", nil)
 	w := httptest.NewRecorder()
-	srv.serveSecureFile(w, req, coverDir, "/", longCacheImmutable)
+	srv.serveSecureFile(w, req, coverDir, "/", longCache)
 
 	// "/" cleans to "/" and Join(base, "/") produces base, which is a
 	// directory, so serveFile returns 404.
@@ -248,7 +248,7 @@ func TestServeSecureFile_ValidSubdirectoryFile(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/covers/NES/game.png", nil)
 	w := httptest.NewRecorder()
-	srv.serveSecureFile(w, req, coverDir, "NES/game.png", longCacheImmutable)
+	srv.serveSecureFile(w, req, coverDir, "NES/game.png", longCache)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("valid subdir file: got status %d, want 200", w.Code)
@@ -336,7 +336,7 @@ func TestServeSecureFile_LexicallyInsideButCrossesNamespace(t *testing.T) {
 	// → filepath.Join(covers, "etc/passwd") → <covers>/etc/passwd
 	req := httptest.NewRequest("GET", "/covers/", nil)
 	w := httptest.NewRecorder()
-	srv.serveSecureFile(w, req, covers, "a/b/../../etc/passwd", longCacheImmutable)
+	srv.serveSecureFile(w, req, covers, "a/b/../../etc/passwd", longCache)
 
 	// In-baseDir resolution is fine; PathInside correctly accepts.
 	if w.Code != http.StatusOK {
@@ -591,7 +591,7 @@ func TestServeSecureFile_HiddenFileAllowed(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/covers/.gitkeep", nil)
 	w := httptest.NewRecorder()
-	srv.serveSecureFile(w, req, coverDir, ".gitkeep", longCacheImmutable)
+	srv.serveSecureFile(w, req, coverDir, ".gitkeep", longCache)
 
 	// Hidden files should be servable (they pass all security checks).
 	if w.Code != http.StatusOK {

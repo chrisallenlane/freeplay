@@ -36,10 +36,13 @@ func (s *Server) routes() {
 	// Embedded EmulatorJS — long max-age with a version-stamped ETag so
 	// browsers revalidate cheaply and a Freeplay release self-heals any
 	// previously-cached asset. See cacheWithETag for the contract.
-	s.mux.Handle("/emulatorjs/", cacheWithETag(s.emulatorjsETag, emulatorjsCacheControl, http.StripPrefix("/emulatorjs/", noDirListing(s.emulatorjsSub, http.FileServerFS(s.emulatorjsSub)))))
+	s.mux.Handle("/emulatorjs/", cacheWithETag(s.emulatorjsETag, longCache, http.StripPrefix("/emulatorjs/", noDirListing(s.emulatorjsSub, http.FileServerFS(s.emulatorjsSub)))))
 
-	// Game details
-	s.mux.HandleFunc("GET /api/game-details", s.handleGameDetails)
+	// Game details — wrapped in noStore so the four error-emitting paths
+	// in handleGameDetails carry Cache-Control: no-store. The success
+	// path overrides to `private, max-age=300` (later Set wins) to keep
+	// in-session navigation dedup.
+	s.mux.Handle("GET /api/game-details", noStore(s.handleGameDetails))
 	s.mux.Handle("GET /details", cacheControl("no-cache", s.servePage("details.html")))
 
 	// Player page (explicit route before catch-all)
