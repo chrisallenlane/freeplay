@@ -51,8 +51,36 @@
 			window.EJS_biosUrl = FP.biosUrl(consoleName);
 		}
 
+		// Surface a transient confirmation via the emulator's own message
+		// overlay. Falls back to a no-op if the emulator isn't up yet.
+		const notify = (msg) => window.EJS_emulator?.displayMessage?.(msg);
+
+		// Manual save (bottom-bar "save state" button). Posts to the
+		// server and confirms — without the message the button "appears to
+		// do nothing", since EmulatorJS suppresses its own SAVED-STATE
+		// message once a saveState listener is registered.
 		window.EJS_onSaveState = (data) => {
-			FP.postSave(saveBase, "state", data.state);
+			const req = FP.postSave(saveBase, "state", data?.state);
+			if (!req) {
+				// postSave skipped the request (empty/falsy state) — nothing
+				// reached the server.
+				notify("Could not save state");
+				return;
+			}
+			req.then((res) =>
+				notify(res?.ok ? "Saved save state" : "Could not save state"),
+			);
+		};
+
+		// Manual load (bottom-bar "load state" button). Restores from the
+		// server, mirroring the save above. Registering this listener also
+		// stops EmulatorJS's button from falling through to its built-in
+		// browser-storage path, which aborts the WASM runtime when it calls
+		// gameManager.loadState(undefined) for a server-resident state.
+		window.EJS_onLoadState = () => {
+			const gm = window.EJS_emulator?.gameManager;
+			if (!gm) return;
+			FP.loadStateFromServer(saveBase, gm, notify);
 		};
 
 		// Load SRAM save from server (if exists), then register periodic

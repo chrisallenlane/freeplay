@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- The bottom-bar "load state" button no longer crashes the emulator.
+  Freeplay routes save states to the server (via `EJS_onSaveState` /
+  `EJS_loadStateURL`) but never registered a `loadState` listener, so
+  the button fell through to EmulatorJS's built-in behaviour. With the
+  "Save State Location" setting on "Keep in Browser" — but the state
+  living on the server, not in browser storage — that path called
+  `gameManager.loadState(undefined)`, which aborts the WASM runtime
+  (`Aborted(Unsupported data type)`) and required a page reload to
+  recover. A new `EJS_onLoadState` handler (`frontend/loadState.js`)
+  restores the state from the server, mirroring the save direction, and
+  registering it also short-circuits the crashing built-in path.
+
+### Changed
+- The bottom-bar "save state" button now shows a confirmation message.
+  It always posted to the server, but EmulatorJS suppresses its own
+  "SAVED STATE" message once a `saveState` listener is registered, so
+  the button appeared to do nothing. Save and load now both surface a
+  transient status message via the emulator's overlay.
+
 ## [1.1.2] - 2026-05-19
 
 ### Changed
