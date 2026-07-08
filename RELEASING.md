@@ -19,9 +19,11 @@ How to cut a Freeplay release.
 Both pipelines watch `tags: ['v*']` and produce a Docker image:
 
 - **`.gitea/workflows/build.yaml`** runs `make check`, then builds and
-  pushes `:vX.Y.Z` and `:sha-<short>` to the maintainer's internal
-  registry (host configured via the `REGISTRY_HOST`, `REGISTRY_USERNAME`,
-  and `REGISTRY_PASSWORD` Gitea Actions secrets).
+  pushes `:vX.Y.Z`, `:latest`, and `:sha-<short>` to the maintainer's
+  internal registry (host configured via the `REGISTRY_HOST`,
+  `REGISTRY_USERNAME`, and `REGISTRY_PASSWORD` Gitea Actions secrets).
+  `:latest` is published by the tag build (tracking the newest release,
+  not master HEAD); plain master pushes get only `:sha-<short>`.
 - **`.github/workflows/docker.yml`** is the public-facing pipeline: it
   pushes `ghcr.io/chrisallenlane/freeplay:X.Y.Z`, `:X.Y`, and (on the
   tag that is the newest semver) `:latest` to GHCR.

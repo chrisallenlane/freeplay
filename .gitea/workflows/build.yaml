@@ -91,18 +91,25 @@ jobs:
       - name: Compute image tags and build version
         id: meta
         # Every build gets a :sha-<short> tag (immutable, pullable per commit).
-        # master additionally gets :latest. A v* tag additionally gets :<tag>
-        # and uses the tag name as the VERSION build arg.
+        # A v* tag additionally gets :<tag> and :latest, and uses the tag name
+        # as the VERSION build arg.
+        #
+        # :latest deliberately rides the TAG build, not the master build. It
+        # tracks the newest release, not master HEAD — so it never points at an
+        # untagged dev commit, and it is published by the tag build (which is a
+        # single run) rather than the master build. During a release the commit
+        # is pushed to master and the tag is pushed moments later, spawning two
+        # concurrent runs for the same SHA; the master run has intermittently
+        # died under that contention, which previously left :latest stale. The
+        # tag build has no such sibling, so :latest now publishes reliably.
         run: |
           REPO="${{ secrets.REGISTRY_HOST }}/chrisallenlane/freeplay"
           SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
           TAGS="${REPO}:sha-${SHORT_SHA}"
           VERSION="${SHORT_SHA}"
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            TAGS="${TAGS} ${REPO}:${GITHUB_REF_NAME}"
+            TAGS="${TAGS} ${REPO}:${GITHUB_REF_NAME} ${REPO}:latest"
             VERSION="${GITHUB_REF_NAME}"
-          elif [ "${GITHUB_REF_NAME}" = "master" ]; then
-            TAGS="${TAGS} ${REPO}:latest"
           fi
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"

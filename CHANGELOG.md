@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- CI: the Gitea build now publishes `:latest` from the **tag** build
+  instead of the master build. Previously `:latest` tracked master HEAD
+  and was pushed by the master-branch build, which — during a release,
+  when the release commit and the tag are pushed moments apart — races a
+  concurrent same-SHA tag build for the runner and has intermittently
+  died, leaving `:latest` stale (e.g. it did not advance to v1.1.3). It
+  now rides the single, reliable tag build and tracks the newest release
+  rather than master HEAD. Plain master pushes publish only `:sha-<short>`.
+
 ## [1.1.3] - 2026-07-08
 
 ### Changed
