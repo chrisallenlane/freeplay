@@ -64,9 +64,11 @@
 //       graph. Browser-only; a no-op where AudioNode is undefined (Node tests).
 //   applyMasterVolume(volume, openalActive) — the pure decision + apply step.
 //   wrapSetVolume(emulator) — wrap emulator.setVolume once and sync the initial
-//       gain to the slider's starting position.
+//       gain to the slider's starting position. No-op until the emulator's
+//       Emscripten Module is attached (EmulatorJS's setVolume needs it).
 //   installMasterVolume(getEmulator?) — poll for the emulator to become ready
-//       (setVolume is defined late, after the "start" event) and wrap it.
+//       (setVolume defined + Module attached, both landing after "start") and
+//       wrap it.
 //
 // `applyMasterVolume` and `wrapSetVolume` are pure/injectable so the decision
 // logic is unit-tested without a real AudioContext; the graph interception
@@ -142,6 +144,14 @@
 		if (
 			!emulator ||
 			typeof emulator.setVolume !== "function" ||
+			// EmulatorJS's own setVolume dereferences `this.Module.AL` WITHOUT
+			// optional chaining (emulator.js: `this.Module.AL && ...`), so calling
+			// it — including our initial sync below — throws
+			// "Cannot read properties of undefined (reading 'AL')" until the
+			// Emscripten Module is attached. setVolume is defined in
+			// createBottomMenuBar, which can run a beat before Module lands, so
+			// gate on Module here and let the poll keep retrying until it exists.
+			!emulator.Module ||
 			emulator.__fpMasterVolumeInstalled
 		) {
 			return false;
@@ -167,9 +177,10 @@
 		return true;
 	};
 
-	// Poll until the emulator exists and setVolume is defined (it is created
+	// Poll until the emulator exists, setVolume is defined (it is created
 	// inside createBottomMenuBar, which runs AFTER the "start" event, so no
-	// single EmulatorJS event is a reliable hook), then wrap it. Bounded so a
+	// single EmulatorJS event is a reliable hook), AND its Emscripten Module is
+	// attached (see the Module gate in wrapSetVolume), then wrap it. Bounded so a
 	// core that never finishes starting doesn't leave a live interval.
 	exports.installMasterVolume = (getEmulator) => {
 		const resolve = getEmulator || (() => window.EJS_emulator);

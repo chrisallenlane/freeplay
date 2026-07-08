@@ -146,6 +146,39 @@ describe("wrapSetVolume: hooking EmulatorJS setVolume", () => {
 		assert.equal(FP.wrapSetVolume({ volume: 1 }), false);
 	});
 
+	it("returns false — and does not call setVolume — until Module is attached", () => {
+		// Reproduces the crash: EmulatorJS's real setVolume dereferences
+		// this.Module.AL without optional chaining, so the initial sync throws
+		// "reading 'AL'" if we wrap before Module lands. Model that here with an
+		// orig setVolume that throws when this.Module is undefined; wrapSetVolume
+		// must not wrap (and thus must not fire the sync) while Module is absent.
+		let origCalls = 0;
+		const e = {
+			volume: 1,
+			// Module deliberately absent.
+			setVolume() {
+				origCalls++;
+				// eslint-disable-next-line no-unused-expressions
+				this.Module.AL; // throws TypeError when Module is undefined
+			},
+		};
+
+		assert.equal(FP.wrapSetVolume(e), false);
+		assert.equal(
+			e.__fpMasterVolumeInstalled,
+			undefined,
+			"must not mark installed",
+		);
+		assert.equal(origCalls, 0, "must not call setVolume before Module exists");
+		assert.equal(typeof e.setVolume, "function");
+
+		// Once Module is attached, the wrap installs and the initial sync runs
+		// against the original without throwing.
+		e.Module = { AL: {} };
+		assert.equal(FP.wrapSetVolume(e), true);
+		assert.equal(origCalls, 1, "initial sync forwards to the original once");
+	});
+
 	it("defaults the initial sync to full volume when emulator.volume is absent", () => {
 		const node = fakeGain(0.2);
 		FP.__state.masterGains.add(node);

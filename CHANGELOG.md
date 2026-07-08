@@ -17,6 +17,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   `EJS_hideSettings`; the still-functional "Save State Slot" setting,
   which the quick-save hotkeys and context menu read, is retained.
 
+### Fixed
+- The master-volume workaround no longer throws an uncaught
+  `TypeError` at startup. `wrapSetVolume` did its initial gain-sync as
+  soon as `emulator.setVolume` existed, but EmulatorJS's `setVolume`
+  dereferences `this.Module.AL` without optional chaining and
+  `Module` can attach a beat later — so the sync threw "Cannot read
+  properties of undefined (reading 'AL')". It was benign (the wrap was
+  already in place, later slider calls worked, and startup is at unity
+  gain), but noisy. `wrapSetVolume` now also waits for `emulator.Module`
+  before wrapping, and the bounded poll keeps retrying until it lands.
+
 ## [1.1.4] - 2026-07-08
 
 ### Fixed
