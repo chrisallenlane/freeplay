@@ -90,7 +90,19 @@ driver's audio — an unknown future driver simply gains a working volume
 control. `setVolume` is then wrapped so the slider and mute button drive the
 master gain.
 
-**The one guard.** The only real hazard is double attenuation: a core that
+**Startup timing.** The wrap is not applied the instant `emulator.setVolume`
+exists. EmulatorJS's `setVolume` dereferences `this.Module.AL` *without*
+optional chaining, and the Emscripten `Module` can attach a beat after
+`setVolume` is created (inside `createBottomMenuBar`, after the `start` event).
+Wrapping too early — specifically the initial gain-sync the wrapper performs to
+align the master node with the slider's starting position — would call through
+to `setVolume` before `Module` exists and throw `Cannot read properties of
+undefined (reading 'AL')`. So `wrapSetVolume` no-ops until *both*
+`emulator.setVolume` and `emulator.Module` are present, and the bounded poll in
+`installMasterVolume` keeps retrying until they are. This is a guard against a
+startup-ordering crash, distinct from the double-attenuation guard below.
+
+**The one correctness guard.** The only real hazard is double attenuation: a core that
 *did* use OpenAL would have its gains scaled by EmulatorJS *and* by our master,
 giving volume². The wrapper guards against this behaviorally — it applies the
 master gain only when no active OpenAL context is present

@@ -27,6 +27,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   already in place, later slider calls worked, and startup is at unity
   gain), but noisy. `wrapSetVolume` now also waits for `emulator.Module`
   before wrapping, and the bounded poll keeps retrying until it lands.
+- CI: the Gitea build's concurrency group is now scoped to the commit
+  SHA (`github.sha`) instead of the ref (`github.ref`). A release pushes
+  master and then the `v*` tag moments later, spawning two runs for the
+  same commit; SHA-scoping puts both in one group so the later (tag) run
+  cancels the redundant master run, and the commit builds once on the
+  resource-constrained runner instead of racing two identical builds to
+  exhaustion. Depends on master being pushed before the tag (see
+  RELEASING.md), so the surviving run is the tag run.
 
 ## [1.1.4] - 2026-07-08
 
