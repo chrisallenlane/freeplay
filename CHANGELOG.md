@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Fixed
+- The volume slider and mute button now work. EmulatorJS's `setVolume`
+  changes volume only through the Emscripten OpenAL driver, but the
+  RetroArch cores it ships use the `rwebaudio` driver instead — so the
+  slider moved and mute toggled its icon while the audio never changed.
+  There is no upstream or config fix (forcing `audio_driver = "openal"`
+  does not engage OpenAL). A new frontend module (`frontend/masterVolume.js`)
+  splices a master `GainNode` into the WebAudio graph and drives it from
+  the existing slider + mute, guarded to stay transparent for any core
+  that does use OpenAL. See ARCHITECTURE.md § "EmulatorJS volume workaround".
 - The bottom-bar "load state" button no longer crashes the emulator.
   Freeplay routes save states to the server (via `EJS_onSaveState` /
   `EJS_loadStateURL`) but never registered a `loadState` listener, so

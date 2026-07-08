@@ -52,6 +52,56 @@ the controller-port-device patches that power lightgun support
 (EmulatorJS PR #1182, RetroArch PR #38), so the player page loads
 the standard `emulator.min.js` bundle.
 
+## EmulatorJS volume workaround
+
+The player page ships a frontend module, `frontend/masterVolume.js`, that
+works around a bug in EmulatorJS's volume control. It is worth understanding
+before touching anything audio-related.
+
+**The bug.** EmulatorJS's volume slider and mute button both funnel through
+`emulator.setVolume()`, which changes volume only by walking the Emscripten
+OpenAL source list (`Module.AL.currentCtx.sources`). But the RetroArch cores
+EmulatorJS ships do not use OpenAL at runtime — they use RetroArch's
+`rwebaudio` driver, which streams `AudioBufferSourceNode`s connected directly
+to `AudioContext.destination`, and `Module.AL.currentCtx` stays null. So
+`setVolume` iterates an empty list: the slider moves, mute toggles its icon,
+and the audio never changes.
+
+**Why we work around it instead of fixing it upstream.** This was chased to
+ground: the latest EmulatorJS release (`v4.3.0-pre`, pinned in the `Makefile`)
+and upstream `main` both leave `setVolume` OpenAL-only; the historical volume
+fix (PR #903, `window.AL` → `Module.AL`) is already present; and forcing
+`audio_driver = "openal"` in `retroarch.cfg` does not make the core engage
+OpenAL — it stays on `rwebaudio` (tested live). There is no configuration or
+version bump that fixes it.
+
+**How the workaround works.** A browser has exactly one audio sink,
+`AudioContext.destination`, and every driver must connect to it to make sound.
+`masterVolume.js` patches `AudioNode.prototype.connect` (at module load, before
+the core boots) so any connection to `destination` is rerouted through a single
+per-context "master" `GainNode`:
+
+```
+source ─► destination      becomes      source ─► masterGain ─► destination
+```
+
+A gain of 1.0 is a transparent passthrough, so the insertion cannot break any
+driver's audio — an unknown future driver simply gains a working volume
+control. `setVolume` is then wrapped so the slider and mute button drive the
+master gain.
+
+**The one guard.** The only real hazard is double attenuation: a core that
+*did* use OpenAL would have its gains scaled by EmulatorJS *and* by our master,
+giving volume². The wrapper guards against this behaviorally — it applies the
+master gain only when no active OpenAL context is present
+(`Module.AL.currentCtx`), otherwise it leaves the master at unity and lets
+EmulatorJS keep control. This is safe for unknown drivers (transparent when
+idle, working when needed) and avoids a brittle `is-rwebaudio` whitelist that
+would fail closed for any third driver.
+
+The graph interception is browser-only and verified live; the decision and
+wiring logic are unit-tested in `frontend/masterVolume_test.js`.
+
 ## API
 
 All API routes are internal to the frontend. They are not versioned and may

@@ -47,6 +47,12 @@
 		window.EJS_gameName = gameName;
 		window.EJS_startOnLoaded = true;
 
+		// Start at full volume so the initial loudness matches the
+		// pre-workaround behaviour (the slider was ignored, so audio always
+		// played at 100%). The slider now actually works — see
+		// masterVolume.js — so this is just the default, freely adjustable.
+		window.EJS_volume = 1;
+
 		if (game.hasBios) {
 			window.EJS_biosUrl = FP.biosUrl(consoleName);
 		}
@@ -82,6 +88,13 @@
 			if (!gm) return;
 			FP.loadStateFromServer(saveBase, gm, notify);
 		};
+
+		// Wire up the master-volume workaround for EmulatorJS's dead volume
+		// slider (see masterVolume.js). The graph interceptor is already
+		// installed at module load; this polls for the emulator to finish
+		// starting, then hooks setVolume so the slider and mute button take
+		// effect.
+		FP.installMasterVolume();
 
 		// Load SRAM save from server (if exists), then register periodic
 		// saves. Branch on response shape:
