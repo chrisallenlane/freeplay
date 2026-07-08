@@ -5,10 +5,16 @@ on:
     branches: ['**']
     tags: ['v*']
 
-# Cancel an in-flight run when a newer commit lands on the same branch or
-# tag. Protects against build queue buildup during a chain of quick pushes.
+# Group by commit SHA, not ref, so the two events a release fires for the
+# SAME commit — the push to master and the v* tag pushed moments later —
+# share one concurrency group. cancel-in-progress then cancels the earlier
+# (master) run when the later (tag) run is queued, so a release builds the
+# commit ONCE on this resource-constrained runner instead of racing two
+# identical builds to exhaustion. RELEASING.md pushes master before the tag,
+# so the surviving run is the tag run — the one that publishes :v<tag> and
+# :latest.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
