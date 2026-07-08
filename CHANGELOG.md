@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- The emulator's "Save State Location" setting (Download / Keep in
+  Browser) is now hidden. Freeplay routes the bottom-bar Save/Load
+  buttons to the server via the `EJS_onSaveState` / `EJS_onLoadState`
+  hooks, which short-circuit before that setting is ever consulted — so
+  the dropdown had no effect on where a state was stored and only
+  implied a "Keep in Browser" choice that no longer existed (it was also
+  the trigger for the v1.1.3 load-state crash). Hidden via
+  `EJS_hideSettings`; the still-functional "Save State Slot" setting,
+  which the quick-save hotkeys and context menu read, is retained.
+
 ## [1.1.4] - 2026-07-08
 
 ### Fixed

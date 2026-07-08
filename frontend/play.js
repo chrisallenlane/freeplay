@@ -89,6 +89,22 @@
 			FP.loadStateFromServer(saveBase, gm, notify);
 		};
 
+		// Hide EmulatorJS's "Save State Location" settings dropdown
+		// (Download / Keep in Browser). That setting only governs where the
+		// bottom-bar Save/Load buttons put a state when NO integrator hook is
+		// registered. The EJS_onSaveState / EJS_onLoadState handlers above are
+		// exactly that hook: the button paths short-circuit into them
+		// (emulator.js callEvent returns > 0) before the setting is ever read,
+		// so in Freeplay every bottom-bar save/load goes to the server
+		// regardless of this dropdown. Left visible, the control is inert and
+		// misleading — it implies a choice ("Keep in Browser") that no longer
+		// exists, and that same setting was the trigger for the v1.1.3 load
+		// crash. EJS_hideSettings (loader.js -> config.hideSettings) makes
+		// EmulatorJS skip creating the menu item entirely. Do NOT add
+		// "save-state-slot" here: that one is live — the quick-save hotkeys
+		// (1/2/3) and context-menu Quick Save/Load read it.
+		window.EJS_hideSettings = ["save-state-location"];
+
 		// Wire up the master-volume workaround for EmulatorJS's dead volume
 		// slider (see masterVolume.js). The graph interceptor is already
 		// installed at module load; this polls for the emulator to finish
