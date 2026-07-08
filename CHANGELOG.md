@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+- The bottom-bar "save state" button now shows a confirmation message.
+  It always posted to the server, but EmulatorJS suppresses its own
+  "SAVED STATE" message once a `saveState` listener is registered, so
+  the button appeared to do nothing. Save and load now both surface a
+  transient status message via the emulator's overlay.
+
 ### Fixed
 - The volume slider and mute button now work. EmulatorJS's `setVolume`
   changes volume only through the Emscripten OpenAL driver, but the
@@ -27,13 +34,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   recover. A new `EJS_onLoadState` handler (`frontend/loadState.js`)
   restores the state from the server, mirroring the save direction, and
   registering it also short-circuits the crashing built-in path.
-
-### Changed
-- The bottom-bar "save state" button now shows a confirmation message.
-  It always posted to the server, but EmulatorJS suppresses its own
-  "SAVED STATE" message once a `saveState` listener is registered, so
-  the button appeared to do nothing. Save and load now both surface a
-  transient status message via the emulator's overlay.
 
 ## [1.1.2] - 2026-05-19
 
